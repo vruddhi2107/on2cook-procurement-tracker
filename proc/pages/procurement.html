@@ -1,0 +1,2195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<link rel="icon" type="image/x-icon" href="../on2cook no bg.png">
+<title>ProcureX — Procurement</title>
+<link rel="stylesheet" href="../css/styles.css"/>
+<style>
+.currency-amount-wrap{display:flex;gap:0}
+.currency-select{width:90px;border-radius:var(--radius-sm) 0 0 var(--radius-sm);border-right:none}
+.currency-input{border-radius:0 var(--radius-sm) var(--radius-sm) 0;flex:1}
+.po-preview{background:white;border:1px solid var(--border);border-radius:var(--radius);padding:20px;font-size:0.82rem;line-height:1.6}
+.po-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #1a1a1a}
+.po-company{font-size:1rem;font-weight:700}
+.po-table{width:100%;border-collapse:collapse;margin-top:12px}
+.po-table th,.po-table td{border:1px solid var(--border);padding:6px 10px;font-size:0.78rem;text-align:left}
+.po-table th{background:var(--off-white);font-weight:600}
+.advance-options{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.advance-option{flex:1;min-width:180px;border:2px solid var(--border);border-radius:var(--radius);padding:12px;cursor:pointer;transition:all 0.15s;text-align:center}
+.advance-option:hover{border-color:var(--red)}
+.advance-option.selected{border-color:var(--red);background:rgba(214,43,43,0.04)}
+.payment-req-form .form-group{margin-bottom:12px}
+
+/* ── PO PAPER STYLES ── */
+#poPreviewBox {
+  background: #fff;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #111;
+  border: 1px solid #ccc;
+}
+.po-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 10px;
+  border-bottom: 2.5px solid #111;
+}
+.po-paper-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-align: center;
+  flex: 1;
+  text-transform: uppercase;
+}
+.po-logo-img {
+  height: 52px;
+  max-width: 130px;
+  object-fit: contain;
+}
+.po-addr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid #999;
+}
+.po-addr-cell {
+  padding: 10px 14px;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+.po-addr-cell:first-child { border-right: 1px solid #999; }
+.po-addr-cell .cell-head {
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  color: #444;
+}
+.po-addr-cell .company-name {
+  font-weight: 700;
+  font-size: 0.82rem;
+  margin-bottom: 2px;
+}
+.po-addr-cell table td { padding: 1px 3px 1px 0; vertical-align: top; }
+.po-addr-cell table td:first-child { font-weight: 600; white-space: nowrap; padding-right: 6px; }
+.po-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.73rem;
+}
+.po-items-table th {
+  background: #f0f0f0;
+  border: 1px solid #999;
+  padding: 6px 8px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+.po-items-table td {
+  border: 1px solid #999;
+  padding: 6px 8px;
+  vertical-align: top;
+}
+.po-items-table td.center { text-align: center; }
+.po-items-table td.right { text-align: right; }
+.item-desc-main { font-weight: 700; }
+.item-desc-sub { font-size: 0.67rem; color: #555; margin-top: 2px; }
+.po-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid #999;
+}
+.po-left-bottom { border-right: 1px solid #999; }
+.bank-section {
+  padding: 9px 12px;
+  border-bottom: 1px solid #ccc;
+  font-size: 0.71rem;
+}
+.bank-section table td { padding: 1.5px 3px 1.5px 0; vertical-align: top; }
+.bank-section table td:first-child { font-weight: 600; white-space: nowrap; padding-right: 6px; width: 115px; }
+.po-terms-section {
+  padding: 9px 12px;
+  font-size: 0.68rem;
+  line-height: 1.55;
+  color: #333;
+}
+.po-terms-section .terms-head {
+  font-weight: 700;
+  font-size: 0.7rem;
+  margin-bottom: 5px;
+}
+.po-terms-section p { margin-bottom: 4px; }
+.po-amount-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+.po-amount-table tr td {
+  padding: 5px 12px;
+  border-bottom: 1px solid #eee;
+}
+.po-amount-table tr td:last-child {
+  text-align: right;
+  font-weight: 600;
+}
+.po-amount-table tr.net-row {
+  background: #f7f7f7;
+}
+.po-amount-table tr.net-row td {
+  font-weight: 800;
+  font-size: 0.88rem;
+  border-bottom: none;
+  padding: 7px 12px;
+}
+.po-amount-table tr.words-row td {
+  font-size: 0.68rem;
+  font-style: italic;
+  color: #444;
+  border-bottom: none;
+  padding: 5px 12px 9px;
+  white-space: normal;
+  line-height: 1.4;
+}
+.po-sig-section {
+  padding: 12px;
+  text-align: center;
+  border-top: 1px solid #ccc;
+}
+.po-sig-img-wrap {
+  height: 62px;
+  border-bottom: 1px solid #999;
+  width: 75%;
+  margin: 0 auto 5px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.po-sig-img-wrap img {
+  max-height: 68px;
+  max-width: 100%;
+  object-fit: contain;
+}
+.po-sig-label { font-size: 0.7rem; color: #333; }
+.po-doc-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 14px;
+  border-top: 2px solid #111;
+  font-size: 0.64rem;
+  color: #555;
+}
+/* inline editable inputs in PO preview */
+.po-meta-input {
+  border: none;
+  border-bottom: 1px dashed #aaa;
+  outline: none;
+  background: transparent;
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+  width: 100%;
+  padding: 0;
+}
+.po-meta-input:focus { border-bottom-color: #4d7cfa; background: rgba(77,124,250,0.04); }
+.po-tax-input {
+  width: 36px;
+  border: 1px solid #ccc;
+  padding: 1px 3px;
+  font-size: 0.72rem;
+  border-radius: 3px;
+}
+.po-terms-editable {
+  min-height: 100px;
+  border: 1px dashed #aaa;
+  padding: 8px;
+  border-radius: 4px;
+  outline: none;
+  white-space: pre-wrap;
+  font-size: 0.68rem;
+  line-height: 1.55;
+}
+.po-terms-editable:focus { box-shadow: inset 0 0 0 1px #4d7cfa; }
+</style>
+</head>
+<body>
+<div id="navbarMount"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<main class="page-container">
+  <div class="page-header">
+    <h1 class="page-title">Procurement <span>Manager</span></h1>
+    <p class="page-sub">Manage vendors, upload quotations, place orders and track payment requests</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-card-value" id="sActive">—</div><div class="stat-card-label">Active</div><div class="stat-card-icon">⚙️</div></div>
+    <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sOrders">—</div><div class="stat-card-label">To Order</div><div class="stat-card-icon">🛒</div></div>
+    <div class="stat-card" style="--accent:#f59e0b"><div class="stat-card-value" id="sGRN">—</div><div class="stat-card-label">GRN Pending</div><div class="stat-card-icon">📦</div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sVendors">—</div><div class="stat-card-label">Active Vendors</div><div class="stat-card-icon">🏢</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('active')">🔔 Action Needed</button>
+    <button class="tab-btn" onclick="switchTab('all')">All Requests</button>
+    <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendor DB</button>
+  </div>
+
+  <div id="tabRequests">
+    <div class="filter-bar">
+<input type="text" id="searchInput" placeholder="Search by project or PR #..." oninput="filterTable()" autocomplete="off"/>      <select id="filterPhase" onchange="filterTable()">
+        <option value="">All Phases</option>
+        <option value="procurement_active">Procurement Active</option>
+        <option value="approved">Approved — to Order</option>
+        <option value="order_placed">Order Placed</option>
+        <option value="grn_pending">GRN Pending</option>
+        <option value="qc_passed">QC Passed</option>
+        <option value="accepted">Accepted</option>
+        <option value="rejected">Rejected</option>
+        <option value="payment_requested">Payment Requested</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>PM</th><th>Engineer</th><th>Lead Time</th><th>Updated</th><th></th></tr></thead>
+          <tbody id="requestsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tabVendors" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+      <input type="text" id="vendorSearch" class="form-control" placeholder="Search vendors by name or specialization..." style="max-width:320px"/>
+      <button class="btn btn-primary" onclick="openVendorModal()">+ Add Vendor</button>
+    </div>
+    <div class="vendor-grid" id="vendorGrid"></div>
+  </div>
+</main>
+
+<!-- PR DETAIL MODAL -->
+<div class="modal-overlay" id="prModal">
+  <div class="modal" style="max-width:880px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="prModalTitle">Request</div><div class="modal-title-sub" id="prModalSub"></div></div>
+      <button class="modal-close" onclick="closeModal('prModal')">✕</button>
+    </div>
+    <div class="modal-body" id="prModalBody" style="max-height:80vh;overflow-y:auto"></div>
+    <div class="modal-footer" id="prModalFooter"><button class="btn btn-secondary" onclick="closeModal('prModal')">Close</button></div>
+  </div>
+</div>
+
+<!-- VENDOR ADD/EDIT MODAL -->
+<div class="modal-overlay" id="vendorModal">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-header">
+      <div class="modal-title" id="vendorModalTitle">Add Vendor</div>
+      <button class="modal-close" onclick="closeModal('vendorModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="vId"/>
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">Vendor Name *</label><input class="form-control" id="vName" placeholder="Company name"/></div>
+        <div class="form-group"><label class="form-label">Contact Person</label><input class="form-control" id="vContact" placeholder="Full name"/></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-control" id="vEmail" type="email" placeholder="vendor@email.com"/></div>
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-control" id="vPhone" placeholder="+971 ..."/></div>
+        <div class="form-group"><label class="form-label">Specialization</label><input class="form-control" id="vSpec" placeholder="Electronics, Mechanical..."/></div>
+        <div class="form-group"><label class="form-label">GSTIN</label><input class="form-control" id="vGstin" placeholder="24ABCDE1234F1Z5"/></div>
+
+        <div class="form-group"><label class="form-label">Country</label><input class="form-control" id="vCountry" placeholder="India"/></div>
+
+        <div class="form-group">
+          <label class="form-label">Vendor Type</label>
+          <select class="form-control" id="vVendorType">
+            <option value="">Select type...</option>
+            <option value="Manufacturer">Manufacturer</option>
+            <option value="Supplier">Job Work</option>
+            <option value="Service Provider">Distributor</option>
+            <option value="Trader">Trader</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Payment Terms *</label>
+          <select class="form-control" id="vPaymentTerms">
+            <option value="">Select payment terms...</option>
+            <option value="50_50">50% Advance — 50% Post Delivery</option>
+            <option value="full_advance">100% Full Advance</option>
+            <option value="full_on_delivery">100% On Delivery</option>
+            <option value="30_70">30% Advance — 70% Post Delivery</option>
+            <option value="no_advance">No Advance (Net 30/60/90)</option>
+            <option value="custom">Custom Terms</option>
+          </select>
+        </div>
+        <div class="form-group full" id="customPaymentTermsGroup" style="display:none">
+          <label class="form-label">Custom Payment Terms Detail</label>
+          <input class="form-control" id="vCustomPaymentTerms" placeholder="e.g. 40% on order, 60% on delivery"/>
+        </div>
+        <div class="form-group full"><label class="form-label">Address</label><input class="form-control" id="vAddress" placeholder="Office / warehouse address"/></div>
+        <div class="form-group full"><label class="form-label">Internal Notes</label><textarea class="form-control" id="vNotes" placeholder="Lead times, quality notes..."></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('vendorModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveVendor()">Save Vendor</button>
+    </div>
+  </div>
+</div>
+
+<!-- RATE VENDOR MODAL -->
+<div class="modal-overlay" id="rateModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="rateModalTitle">Rate Vendor</div>
+      <button class="modal-close" onclick="closeModal('rateModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:16px">Rate vendor performance on two dimensions for this order.</p>
+      <!-- TAT Rating -->
+      <div class="form-group" style="margin-bottom:18px;padding:12px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius)">
+        <label class="form-label" style="margin-bottom:4px">⏱ TAT Rating * <span style="font-weight:400;font-size:0.75rem;color:var(--gray-3)">(Turnaround vs. quoted lead time)</span></label>
+        <div style="font-size:0.72rem;color:var(--gray-4);margin-bottom:8px">1=Very Late · 2=Late · 3=On Time · 4=Early · 5=Way Ahead</div>
+        <div class="star-input" id="rateTATStars" data-rating="0"></div>
+      </div>
+      <!-- Quality Rating -->
+      <div class="form-group" style="margin-bottom:14px;padding:12px;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.2);border-radius:var(--radius)">
+        <label class="form-label" style="margin-bottom:4px">✅ Quality Rating * <span style="font-weight:400;font-size:0.75rem;color:var(--gray-3)">(Product quality &amp; accuracy)</span></label>
+        <div style="font-size:0.72rem;color:var(--gray-4);margin-bottom:8px">1=Poor · 2=Below Avg · 3=Acceptable · 4=Good · 5=Excellent</div>
+        <div class="star-input" id="rateQualityStars" data-rating="0"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Comments</label>
+        <textarea class="form-control" id="rateComment" placeholder="Optional: notes on delivery, communication, packaging..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('rateModal')">Skip</button>
+      <button class="btn btn-primary" onclick="submitVendorRating()">Submit Rating</button>
+    </div>
+  </div>
+</div>
+
+<!-- PO BRANDING MODAL -->
+<div class="modal-overlay" id="poBrandingModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div><div class="modal-title">🖼 PO Logo &amp; Signature</div><div class="modal-title-sub">Saved in your browser — applied to every PO you generate</div></div>
+      <button class="modal-close" onclick="closeModal('poBrandingModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:20px">
+        <label class="form-label">Company Logo</label>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div id="logoPreviewWrap" style="width:120px;height:54px;border:1.5px dashed var(--border);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;background:var(--off-white);overflow:hidden;font-size:0.72rem;color:var(--gray-4)">No logo</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer">Upload Logo<input type="file" accept="image/*" onchange="handleBrandingUpload(event,'logo')" style="display:none"/></label>
+            <button class="btn btn-ghost btn-sm" onclick="clearBranding('logo')">✕ Remove</button>
+          </div>
+        </div>
+        <div style="font-size:0.72rem;color:var(--gray-4);margin-top:6px">Appears in the top-right corner of the PO. PNG with transparent background recommended.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Authorized Signatory</label>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div id="sigPreviewWrap" style="width:120px;height:54px;border:1.5px dashed var(--border);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;background:var(--off-white);overflow:hidden;font-size:0.72rem;color:var(--gray-4)">No signature</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer">Upload Signature<input type="file" accept="image/*" onchange="handleBrandingUpload(event,'sig')" style="display:none"/></label>
+            <button class="btn btn-ghost btn-sm" onclick="clearBranding('sig')">✕ Remove</button>
+          </div>
+        </div>
+        <div style="font-size:0.72rem;color:var(--gray-4);margin-top:6px">Appears above "Authorized Signatory" in the PO. Transparent PNG recommended.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('poBrandingModal')">Close</button>
+      <button class="btn btn-primary" onclick="saveBrandingAndClose()">✓ Save &amp; Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- PO MODAL -->
+<div class="modal-overlay" id="poModal">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-header">
+      <div><div class="modal-title">📄 Generate Purchase Order</div><div class="modal-title-sub" id="poModalSub"></div></div>
+      <button class="modal-close" onclick="closeModal('poModal')">✕</button>
+    </div>
+    <div class="modal-body" id="poModalBody" style="max-height:82vh;overflow-y:auto;padding:16px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="openPOBranding()" style="margin-right:auto">🖼 Logo &amp; Signature</button>
+      <button class="btn btn-secondary" onclick="downloadPO()">⬇ Download PDF</button>
+      <button class="btn btn-secondary" onclick="closeModal('poModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmGeneratePO()">✓ Generate &amp; Save PO</button>
+    </div>
+  </div>
+</div>
+<!-- PAYMENT REQUEST MODAL -->
+<div class="modal-overlay" id="payReqModal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div><div class="modal-title">💰 Create Payment Request</div><div class="modal-title-sub" id="payReqSub"></div></div>
+      <button class="modal-close" onclick="closeModal('payReqModal')">✕</button>
+    </div>
+    <div class="modal-body" id="payReqBody" style="max-height:78vh;overflow-y:auto"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('payReqModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitPaymentRequest()">Submit to Accounts →</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── ATTACHMENT PREVIEW MODAL ──────────────────────────── -->
+<div id="attPreviewOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.82);align-items:center;justify-content:center;flex-direction:column;gap:12px" onclick="if(event.target===this)closeAttPreview()">
+  <div style="position:relative;max-width:92vw;max-height:90vh;background:white;border-radius:10px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.4)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #e5e7eb;background:#f9fafb">
+      <span id="attPreviewName" style="font-size:0.85rem;font-weight:600;color:#374151;max-width:50vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary btn-sm" onclick="downloadCurrentPreview()">⬇ Download</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeAttPreview()">✕ Close</button>
+      </div>
+    </div>
+    <div id="attPreviewContent" style="max-width:92vw;max-height:80vh;overflow:auto;display:flex;align-items:center;justify-content:center;padding:16px"></div>
+  </div>
+</div>
+<div id="toast-container"></div>
+<div id="footerMount"></div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="../js/supabase-config.js"></script>
+<script src="../js/shared.js"></script>
+<script>
+let currentUser, allRequests=[], allVendors=[], activeTab='active', currentPR=null;
+function addPhaseTimestamp(pr, phaseName) {
+  var existing = (pr && pr.phase_timestamps) ? pr.phase_timestamps : {};
+  var ts = Object.assign({}, existing);
+  ts[phaseName] = new Date().toISOString();
+  return ts;
+}
+let pendingRatePRId=null, pendingRateVendorId=null;
+let uploadedFiles=[], currentAttachments=[], paymentRequestFiles=[];
+
+// ── INIT ─────────────────────────────────────────────────────
+async function init() {
+  currentUser=Session.require(['procurement_manager']); if(!currentUser) return;
+  document.getElementById('navbarMount').innerHTML=buildNavbar(currentUser);
+  document.getElementById('footerMount').innerHTML=buildFooter();
+  initNavbar(currentUser);
+  document.getElementById('vPaymentTerms')?.addEventListener('change',e=>{
+    document.getElementById('customPaymentTermsGroup').style.display=e.target.value==='custom'?'block':'none';
+  });
+  showLoader(true);
+  await Promise.all([loadRequests(), loadVendors()]);
+  showLoader(false);
+}
+
+async function openVendorHistory(vendorId) {
+  let ov=document.getElementById('_vendorHistoryModal');
+  if(!ov){
+    ov=document.createElement('div');ov.id='_vendorHistoryModal';ov.className='modal-overlay';
+    ov.onclick=e=>{if(e.target===ov)ov.classList.remove('active');};
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML=`<div class="modal" style="max-width:960px"><div class="modal-header"><div class="modal-title">Vendor History</div><button class="modal-close" onclick="document.getElementById('_vendorHistoryModal').classList.remove('active')">✕</button></div><div class="modal-body" id="_vhBody"><div style="text-align:center;padding:24px;color:var(--gray-4)">Loading...</div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById('_vendorHistoryModal').classList.remove('active')">Close</button></div></div>`;
+  ov.classList.add('active');
+
+  const [vendorRes, ratingsRes, ordersRes] = await Promise.all([
+    db.from('vendors').select('*').eq('id',vendorId).single(),
+    db.from('vendor_ratings').select('*,users(name),procurement_requests(project_name,request_number)').eq('vendor_id',vendorId).order('created_at',{ascending:false}),
+    db.from('procurement_requests').select('*').eq('assigned_vendor_id',vendorId).order('created_at',{ascending:false})
+  ]);
+
+  const v = vendorRes.data||{};
+  const ratings = ratingsRes.data||[];
+  const orders = ordersRes.data||[];
+  const pt = PAYMENT_TERMS_OPTIONS.find(p=>p.value===v.payment_terms);
+
+  document.getElementById('_vhBody').innerHTML=`
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      <div style="width:48px;height:48px;border-radius:10px;background:var(--off-white);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:1.4rem">🏢</div>
+      <div>
+        <div style="font-weight:700;font-size:1rem">${v.name}</div>
+        <div style="font-size:0.78rem;color:var(--gray-3)">${v.specialization||''}</div>
+        <div style="margin-top:3px">${starRating(v.avg_rating,v.rating_count)}</div>
+      </div>
+      ${v.email?`<div style="font-size:0.76rem;color:var(--gray-3);margin-left:8px">${v.email}${v.phone?' · '+v.phone:''}</div>`:''}
+      ${pt?`<div style="margin-left:auto;font-size:0.72rem;padding:4px 10px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:5px;color:#6366f1;white-space:nowrap">💳 ${pt.label}</div>`:''}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+      <div>
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--gray-4);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          📦 Orders <span style="background:var(--off-white);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:0.68rem">${orders.length}</span>
+        </div>
+        ${orders.length?`<div style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto">
+          ${orders.map(o=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--off-white);border:1px solid var(--border);border-radius:6px">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:0.78rem">PR-${String(o.request_number).padStart(4,'0')}</div>
+              <div style="font-size:0.7rem;color:var(--gray-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.project_name}</div>
+              <div style="font-size:0.65rem;color:var(--gray-4)">${fmtDate(o.created_at)}</div>
+            </div>
+            ${getPhaseBadge(o.phase)}
+          </div>`).join('')}
+        </div>`:`<div style="padding:20px;text-align:center;background:var(--off-white);border:1px solid var(--border);border-radius:6px"><div style="font-size:1.5rem;margin-bottom:4px">📭</div><p style="color:var(--gray-4);font-size:0.78rem">No orders yet</p></div>`}
+      </div>
+      <div>
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--gray-4);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          ⭐ Ratings <span style="background:var(--off-white);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:0.68rem">${ratings.length}</span>
+        </div>
+        ${ratings.length?`<div style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto">
+          ${ratings.map(r=>`<div style="padding:9px 10px;background:var(--off-white);border:1px solid var(--border);border-radius:6px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px">
+              <span style="color:#f59e0b;letter-spacing:1px;font-size:0.82rem">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
+              <span style="font-size:0.65rem;color:var(--gray-4)">${fmtDate(r.created_at)}</span>
+            </div>
+            <div style="font-size:0.7rem;color:var(--gray-4);margin-bottom:3px">${r.users?.name||'Unknown'}${r.procurement_requests?.project_name?' · '+r.procurement_requests.project_name:''}</div>
+            ${r.comment?`<p style="font-size:0.76rem;color:var(--gray-3);line-height:1.4">${r.comment}</p>`:'<p style="font-size:0.7rem;color:var(--gray-4);font-style:italic">No comment</p>'}
+          </div>`).join('')}
+        </div>`:`<div style="padding:20px;text-align:center;background:var(--off-white);border:1px solid var(--border);border-radius:6px"><div style="font-size:1.5rem;margin-bottom:4px">⭐</div><p style="color:var(--gray-4);font-size:0.78rem">No ratings yet</p></div>`}
+      </div>
+    </div>`;
+}
+
+async function loadRequests() {
+  const{data}=await db.from('procurement_requests')
+    .select('*, users!procurement_requests_created_by_fkey(name)')
+    .order('updated_at',{ascending:false});
+  allRequests=data||[];
+  updateStats(); filterTable();
+}
+
+async function loadVendors() {
+  const{data}=await db.from('vendors').select('*').order('name');
+  allVendors=data||[];
+  document.getElementById('sVendors').textContent=allVendors.filter(v=>v.is_active).length;
+}
+
+function updateStats() {
+  document.getElementById('sActive').textContent=allRequests.filter(r=>r.phase==='procurement_active').length;
+  document.getElementById('sOrders').textContent=allRequests.filter(r=>r.phase==='approved').length;
+  document.getElementById('sGRN').textContent=allRequests.filter(r=>r.phase==='grn_pending').length;
+}
+
+function switchTab(t) {
+  activeTab=t;
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['active','all','vendors'][i]===t));
+  document.getElementById('tabRequests').style.display=t==='vendors'?'none':'block';
+  document.getElementById('tabVendors').style.display=t==='vendors'?'block':'none';
+  if(t==='vendors') renderVendorCards(allVendors,'vendorGrid',true);
+  else filterTable();
+}
+
+function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterPhase').value='';filterTable();}
+
+function filterTable(){
+  const s=document.getElementById('searchInput').value.toLowerCase();
+  const ph=document.getElementById('filterPhase').value;
+  const actionPhases=['procurement_active','approved','advance_requested','grn_pending','qc_passed'];
+  let reqs=allRequests;
+  if(activeTab==='active') reqs=reqs.filter(r=>actionPhases.includes(r.phase));
+  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
+  if(ph) reqs=reqs.filter(r=>r.phase===ph);
+  renderTable(reqs);
+}
+
+function renderTable(reqs) {
+  const tbody=document.getElementById('requestsBody');
+  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>${activeTab==='active'?'All caught up!':'No requests'}</h3></div></td></tr>`;return;}
+  tbody.innerHTML=reqs.map(r=>{
+    const needsAction=['procurement_active','approved','grn_pending','qc_passed'].includes(r.phase);
+    const lbl={procurement_active:'Work on it',approved:'Place Order',advance_requested:'View Advance',grn_pending:'Invoke GRN',qc_passed:'Payment Req'}[r.phase]||'View';
+    return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
+      <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
+      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase||''}</div></td>
+      <td><span style="font-size:0.72rem;background:var(--off-white);border:1px solid var(--border);padding:1px 7px;border-radius:3px">${r.request_category==='vendor_info'?'Vendor Info':'RFQ'}</span></td>
+      <td>${getPhaseBadge(r.phase)}</td>
+      <td style="font-size:0.78rem">${r.project_manager_name||'—'}</td>
+      <td style="font-size:0.78rem">${r.users?.name||'—'}</td>
+      <td>${leadTimeBadge(r.created_at)}</td>
+      <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gray-4)">${fmtDate(r.updated_at||r.created_at)}</td>
+      <td><button class="btn ${needsAction?'btn-primary':'btn-ghost'} btn-sm" onclick='openPR("${r.id}")'>${lbl}</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── VENDOR DB ─────────────────────────────────────────────────
+async function refreshVendors(){
+  await loadVendors();
+  renderVendorCards(allVendors,'vendorGrid',true);
+  const search=document.getElementById('vendorSearch')?.value.toLowerCase()||'';
+  if(search) renderVendorCards(allVendors.filter(v=>v.name.toLowerCase().includes(search)||(v.specialization||'').toLowerCase().includes(search)),'vendorGrid',true);
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('vendorSearch')?.addEventListener('input',e=>{
+    const s=e.target.value.toLowerCase();
+    renderVendorCards(allVendors.filter(v=>!s||v.name.toLowerCase().includes(s)||(v.specialization||'').toLowerCase().includes(s)),'vendorGrid',true);
+  });
+});
+
+function openVendorModal(vendor=null){
+  document.getElementById('vendorModalTitle').textContent=vendor?'Edit Vendor':'Add Vendor';
+  ['vId','vName','vContact','vEmail','vPhone','vSpec','vAddress','vNotes','vPaymentTerms','vCustomPaymentTerms','vGstin','vCountry','vVendorType'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  document.getElementById('customPaymentTermsGroup').style.display='none';
+  if(vendor){
+    document.getElementById('vId').value=vendor.id;
+    document.getElementById('vName').value=vendor.name||'';
+    document.getElementById('vContact').value=vendor.contact_person||'';
+    document.getElementById('vEmail').value=vendor.email||'';
+    document.getElementById('vPhone').value=vendor.phone||'';
+    document.getElementById('vSpec').value=vendor.specialization||'';
+    document.getElementById('vAddress').value=vendor.address||'';
+    document.getElementById('vNotes').value=vendor.notes||'';
+    document.getElementById('vPaymentTerms').value=vendor.payment_terms||'';
+    document.getElementById('vGstin').value = vendor.GSTIN || '';
+document.getElementById('vCountry').value = vendor.country || '';
+document.getElementById('vVendorType').value = vendor.vendor_type || '';
+    if(vendor.payment_terms==='custom'){document.getElementById('customPaymentTermsGroup').style.display='block';document.getElementById('vCustomPaymentTerms').value=vendor.custom_payment_terms||'';}
+  }
+  openModal('vendorModal');
+}
+
+function editVendor(id){const v=allVendors.find(x=>x.id===id);if(v)openVendorModal(v);}
+
+async function saveVendor(){
+  const name=document.getElementById('vName').value.trim();
+  if(!name){showToast('Vendor name is required','error');return;}
+  const paymentTerms=document.getElementById('vPaymentTerms').value;
+  if(!paymentTerms){showToast('Please select payment terms','error');return;}
+  const id=document.getElementById('vId').value;
+  const vals={name,contact_person:document.getElementById('vContact').value.trim()||null,email:document.getElementById('vEmail').value.trim()||null,phone:document.getElementById('vPhone').value.trim()||null,specialization:document.getElementById('vSpec').value.trim()||null,address:document.getElementById('vAddress').value.trim()||null,notes:document.getElementById('vNotes').value.trim()||null,GSTIN: document.getElementById('vGstin').value.trim() || null,
+  country: document.getElementById('vCountry').value.trim() || null,
+  vendor_type: document.getElementById('vVendorType').value.trim() || null,payment_terms:paymentTerms,custom_payment_terms:paymentTerms==='custom'?document.getElementById('vCustomPaymentTerms').value.trim():null,added_by:currentUser.id};
+  showLoader(true);
+  const{error}=id?await db.from('vendors').update(vals).eq('id',id):await db.from('vendors').insert(vals);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast(id?'Vendor updated.':'Vendor added!','success');
+  closeModal('vendorModal');await refreshVendors();
+}
+
+async function toggleVendorActive(id,current){
+  const{error}=await db.from('vendors').update({is_active:!current}).eq('id',id);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast(`Vendor ${current?'deactivated':'activated'}.`,'success');await refreshVendors();
+}
+
+// ── PR DETAIL MODAL ──────────────────────────────────────────
+async function openPR(id) {
+  currentPR=allRequests.find(r=>r.id===id);if(!currentPR)return;
+  uploadedFiles=[];
+  document.getElementById('prModalTitle').textContent=`PR-${String(currentPR.request_number).padStart(4,'0')} — ${currentPR.project_name}`;
+  document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${currentPR.users?.name||''}`;
+  showLoader(true);
+  await loadVendors();
+  const[comments,quotations,vd,poRes,attRes]=await Promise.all([
+    loadComments(id),
+    db.from('pr_quotations').select('*').eq('pr_id',id).order('created_at').then(r=>r.data||[]),
+    currentPR.assigned_vendor_id?db.from('vendors').select('*').eq('id',currentPR.assigned_vendor_id).single():Promise.resolve({data:null}),
+    db.from('purchase_orders').select('*').eq('pr_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
+    db.from('pr_attachments').select('*').eq('pr_id',id).order('created_at')
+  ]);
+  const existingPO = poRes.data || null;
+  // Normalize engineer's JSONB attachments (stored in procurement_requests.attachments)
+  // into the same shape as pr_attachments table rows so they render identically
+  const jsonbAttachments = (currentPR.attachments || []).map(a => ({
+    file_name: a.name || 'Attachment',
+    file_url: a.data,
+    attachment_type: 'engineer_upload',
+    file_type: a.type
+  }));
+  currentAttachments = [...jsonbAttachments, ...(attRes.data || [])];
+  const attachments = currentAttachments;
+  showLoader(false);
+  const footer=document.getElementById('prModalFooter');
+  footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('prModal')">Close</button>`;
+  let actionSection='';
+
+  // ── VENDOR INFO ──
+  if(currentPR.phase==='procurement_active'&&currentPR.request_category==='vendor_info') {
+    actionSection=`<div class="action-section">
+      <div class="action-section-title">🏢 Provide Vendor Information <span class="action-badge">ACTION REQUIRED</span></div>
+      <div class="form-group">
+        <label class="form-label">Vendor Details *</label>
+        <textarea class="form-control" id="vendorInfoDetails" placeholder="Vendor name, contact, email, phone, specialization, lead times..." style="min-height:120px"></textarea>
+      </div>
+      <div style="margin-top:12px"><button class="btn btn-primary" onclick="submitVendorInfo()">Send to Engineer →</button></div>
+    </div>`;
+  }
+
+  // ── RFQ: assign vendor + upload quotations ──
+  if(currentPR.phase==='procurement_active'&&currentPR.request_category==='RFQ') {
+    const vendorList=allVendors;
+    const selectedVendorObj=vd?.data;
+    actionSection=`<div class="action-section">
+      <div class="action-section-title">⚙️ Assign Vendor &amp; Upload Quotations <span class="action-badge">ACTION REQUIRED</span></div>
+      ${currentPR.vendor_suggestion?`<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:12px;font-size:0.78rem">💡 Engineer suggested: <strong>${currentPR.vendor_suggestion}</strong></div>`:''}
+      <div class="form-group" style="margin-bottom:14px">
+        <label class="form-label">Assign Vendor * <span style="color:var(--gray-4);font-weight:400">(must be from vendor database)</span></label>
+        <select class="form-control" id="assignVendor" onchange="onVendorSelect()">
+          <option value="">— Select a vendor from DB —</option>
+          ${vendorList.map(v=>`<option value="${v.id}" ${currentPR.assigned_vendor_id===v.id?'selected':''}>${v.name}${v.specialization?' ('+v.specialization+')':''}</option>`).join('')}
+        </select>
+        <div id="selectedVendorInfo" style="margin-top:8px;display:none"></div>
+      </div>
+      ${quotations.length?`<div style="margin-bottom:12px"><div class="detail-key" style="margin-bottom:8px">Existing Quotations</div><div style="display:flex;flex-direction:column;gap:6px">${quotations.map(q=>renderQuotationCard(q,false)).join('')}</div></div>`:''}
+      <div class="form-label" style="margin-bottom:6px">Upload Quotations (PNG, JPG, PDF)</div>
+      <div class="drop-zone" id="quoteDZ" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event)">
+        <input type="file" id="quoteFileInput" accept=".png,.jpg,.jpeg,.pdf" multiple onchange="handleQuoteFiles(event)"/>
+        <div class="drop-zone-icon">📎</div>
+        <div class="drop-zone-label">Drag &amp; drop or click to upload</div>
+        <div class="drop-zone-hint">PNG, JPG or PDF — max 5MB each</div>
+      </div>
+      <div id="quoteUploadList" class="upload-list"></div>
+      ${buildQuoteFieldsHTML()}
+      <div style="margin-top:14px"><button class="btn btn-primary" onclick="shareQuotations()">Share Quotations with Engineer →</button></div>
+    </div>`;
+    if(currentPR.assigned_vendor_id&&selectedVendorObj) {
+      setTimeout(()=>showVendorInfoChip(selectedVendorObj),0);
+    }
+  }
+
+  // ── APPROVED: place order first, advance payment optional ──
+  if(currentPR.phase==='approved') {
+    const selectedQ = quotations.find(q=>q.is_selected||q.id===currentPR.selected_quotation_id);
+    const vendorObj = vd?.data;
+    const pt = PAYMENT_TERMS_OPTIONS.find(p=>p.value===vendorObj?.payment_terms);
+    // Also fetch advRec for advance_requested
+    actionSection = buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO);
+  }
+
+  // ── ADVANCE REQUESTED: waiting for accounts ──
+  if(currentPR.phase==='advance_requested') {
+    const selectedQ=quotations.find(q=>q.is_selected||q.id===currentPR.selected_quotation_id);
+    const vendorObj=vd?.data;
+    const pt=PAYMENT_TERMS_OPTIONS.find(p=>p.value===vendorObj?.payment_terms);
+    const{data:advRec}=await db.from('advance_payment_requests')
+      .select('*').eq('pr_id',currentPR.id).order('created_at',{ascending:false}).limit(1).single();
+    actionSection=`<div class="action-section" style="border:1px solid rgba(245,158,11,0.25);background:rgba(245,158,11,0.04);border-radius:var(--radius);padding:14px">
+      <div class="action-section-title" style="color:#b45309">
+        ⏳ Advance Payment — Awaiting Accounts <span class="action-badge">PENDING</span>
+      </div>
+      ${selectedQ?`<div style="margin:10px 0;padding:9px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <div class="detail-key" style="margin-bottom:3px">Selected Quote</div>
+        <div style="font-weight:600;font-size:0.88rem">${selectedQ.vendor_name||vendorObj?.name||'—'} — ${selectedQ.currency||'INR'} ${Number(selectedQ.amount||0).toLocaleString()}</div>
+        ${pt?`<div style="font-size:0.72rem;color:#6366f1;margin-top:2px">💳 ${pt.label}</div>`:''}
+      </div>`:''}
+      ${advRec?`<div style="margin-bottom:12px;font-family:var(--font-mono);font-size:0.9rem">
+        Advance requested: <strong>AED ${Number(advRec.amount||0).toLocaleString()}</strong>
+        ${advRec.notes?`<span style="font-size:0.75rem;color:var(--gray-3);margin-left:8px">${advRec.notes}</span>`:''}
+      </div>`:''}
+      <p style="font-size:0.8rem;color:var(--gray-3)">Waiting for accounts team to approve. This page will reflect the decision once accounts acts on it.</p>
+    </div>`;
+  }
+
+  // ── ADVANCE APPROVED by accounts ──
+  if(currentPR.phase==='advance_approved') {
+    const selectedQ = quotations.find(q=>q.is_selected||q.id===currentPR.selected_quotation_id);
+    const vendorObj = vd?.data;
+    const pt = PAYMENT_TERMS_OPTIONS.find(p=>p.value===vendorObj?.payment_terms);
+    const{data:advRec} = await db.from('advance_payment_requests').select('*').eq('pr_id',currentPR.id).order('created_at',{ascending:false}).limit(1).single();
+    actionSection = buildAdvanceApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, advRec, existingPO);
+  }
+
+  // ── ADVANCE REJECTED by accounts ──
+ if(currentPR.phase==='advance_rejected') {
+    const selectedQ = quotations.find(q=>q.is_selected||q.id===currentPR.selected_quotation_id);
+    const vendorObj = vd?.data;
+    const pt = PAYMENT_TERMS_OPTIONS.find(p=>p.value===vendorObj?.payment_terms);
+    actionSection = buildAdvanceRejectedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO);
+  }
+
+  // ── ORDER PLACED: invoke GRN ──
+  if(currentPR.phase==='order_placed') {
+    actionSection=`<div class="action-section">
+      <div class="action-section-title">📦 Invoke GRN <span class="action-badge">ACTION REQUIRED</span></div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Once goods have arrived, invoke GRN to notify the engineer for QC.</p>
+      <button class="btn btn-primary" onclick="invokeGRN()">Goods Received — Notify Engineer for QC →</button>
+    </div>`;
+  }
+
+  // ── GRN PENDING ──
+  if(currentPR.phase==='grn_pending'&&currentPR.assigned_vendor_id) {
+    actionSection=`<div class="action-section">
+      <div class="action-section-title">📦 GRN in Progress</div>
+      <p style="font-size:0.82rem;color:var(--gray-3)">Waiting for engineer to complete QC.</p>
+      <button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="openRateModal('${currentPR.id}','${currentPR.assigned_vendor_id}')">⭐ Rate Vendor</button>
+    </div>`;
+  }
+
+  // ── QC PASSED ──
+  if(currentPR.phase==='qc_passed') {
+    actionSection=`<div class="action-section" style="background:rgba(22,163,74,0.04);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:14px">
+      <div class="action-section-title" style="color:#16a34a"> QC Passed — Ready for Payment</div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">The engineer has passed QC. You can now create a payment request for the accounts team.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="openPaymentRequestModal('${id}')">💰 Create Payment Request</button>
+        ${currentPR.assigned_vendor_id?`<button class="btn btn-secondary" onclick="openRateModal('${currentPR.id}','${currentPR.assigned_vendor_id}')">⭐ Rate Vendor</button>`:''}
+      </div>
+    </div>`;
+  }
+
+  // ── PAYMENT REQUESTED ──
+  if(currentPR.phase==='payment_requested') {
+    actionSection=`<div style="margin-top:14px;padding:12px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.18);border-radius:var(--radius)">
+      <div style="font-size:0.82rem;font-weight:600;color:#7c3aed">💰 Payment Request Submitted</div>
+      <p style="font-size:0.78rem;color:var(--gray-3);margin-top:4px">Awaiting processing by accounts team.</p>
+      ${currentPR.assigned_vendor_id?`<button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="openRateModal('${currentPR.id}','${currentPR.assigned_vendor_id}')">⭐ Rate Vendor</button>`:''}
+    </div>`;
+  }
+
+  // ── ACCEPTED (CLOSED) ──
+  if(currentPR.phase==='accepted') {
+    actionSection=`<div style="margin-top:14px;padding:16px;background:rgba(22,163,74,0.05);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);text-align:center">
+      <div style="font-size:2rem;margin-bottom:8px">✔️</div>
+      <div style="font-size:0.95rem;font-weight:700;color:#16a34a;margin-bottom:4px">Order Complete &amp; Closed</div>
+      <p style="font-size:0.8rem;color:var(--gray-3);margin:0">This procurement request has been fully processed and payment confirmed by accounts.</p>
+      ${currentPR.assigned_vendor_id?`<div style="margin-top:12px"><button class="btn btn-secondary btn-sm" onclick="openRateModal('${currentPR.id}','${currentPR.assigned_vendor_id}')">⭐ Rate Vendor</button></div>`:''}
+    </div>`;
+  }
+
+  const attachmentsSectionHTML = _buildAttsSection(attachments, 'Attachments');
+
+  document.getElementById('prModalBody').innerHTML=
+    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',currentPR.project_manager_name||'')
+    +attachmentsSectionHTML
+    +actionSection+
+    `<div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
+      <div class="section-title" style="margin-bottom:10px">💬 Comments</div>
+      <div id="commentsList">${renderComments(comments)}</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input class="form-control" id="commentInput" placeholder="Add a comment..." style="flex:1" onkeydown="if(event.key==='Enter')addComment()"/>
+        <button class="btn btn-secondary btn-sm" onclick="addComment()">Post</button>
+      </div>
+    </div>`;
+  openModal('prModal');
+}
+
+// ── VENDOR SELECTOR CHIP ─────────────────────────────────────
+function onVendorSelect() {
+  const vid=document.getElementById('assignVendor').value;
+  const vendor=allVendors.find(v=>v.id===vid);
+  if(vendor) showVendorInfoChip(vendor);
+  else document.getElementById('selectedVendorInfo').style.display='none';
+}
+
+function showVendorInfoChip(v) {
+  const el=document.getElementById('selectedVendorInfo');
+  if(!el)return;
+  const pt=PAYMENT_TERMS_OPTIONS.find(p=>p.value===v.payment_terms);
+  el.style.display='block';
+  el.innerHTML=`<div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius-sm);padding:9px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div style="flex:1">
+      <div style="font-weight:600;font-size:0.82rem">${v.name}</div>
+      <div style="font-size:0.72rem;color:var(--gray-3)">${v.email||''} ${v.phone?'· '+v.phone:''}</div>
+      ${pt?`<div style="font-size:0.72rem;color:#6366f1;margin-top:2px">💳 ${pt.label}</div>`:''}
+    </div>
+    <div>${starRating(v.avg_rating,v.rating_count)}</div>
+    <button class="btn btn-ghost btn-sm" onclick="openVendorHistory('${v.id}')">📋 History</button>
+  </div>`;
+}
+
+// ── QUOTATION UPLOAD ──────────────────────────────────────────
+function buildQuoteFieldsHTML() {
+  if(!uploadedFiles.length) return '<div id="quoteFieldsContainer"></div>';
+  const allV=allVendors;
+  return `<div id="quoteFieldsContainer" style="margin-top:14px">
+    <div class="form-label" style="margin-bottom:8px">Quotation Details — select a vendor per file</div>
+    ${uploadedFiles.map((f,i)=>`
+      <div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px;background:white">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span>${f.type.includes('pdf')?'📄':'🖼️'}</span>
+          <span style="font-weight:600;font-size:0.8rem">${f.name}</span>
+        </div>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label class="form-label">Vendor for this quote *</label>
+            <select class="form-control" id="qvendor-${i}">
+              <option value="">— Select vendor —</option>
+              ${allV.map(v=>`<option value="${v.id}" data-name="${v.name}">${v.name}${v.specialization?' ('+v.specialization+')':''} ${v.is_active?'':'(inactive)'}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Amount</label>
+            <div class="currency-amount-wrap">
+              <select class="form-control currency-select" id="qcur-${i}">
+                ${CURRENCIES.map(cur=>`<option value="${cur}" ${cur==='INR'?'selected':''}>${cur}</option>`).join('')}
+              </select>
+              <input class="form-control currency-input" id="qamt-${i}" type="number" placeholder="0.00"/>
+            </div>
+          </div>
+          <div class="form-group"><label class="form-label">Lead Time (days)</label><input class="form-control" id="qlt-${i}" type="number" placeholder="7"/></div>
+          <div class="form-group full"><label class="form-label">Notes</label><input class="form-control" id="qnote-${i}" placeholder="Any notes..."/></div>
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function handleDrop(e){e.preventDefault();document.getElementById('quoteDZ').classList.remove('dragover');handleQuoteFiles({target:{files:e.dataTransfer.files}});}
+
+async function handleQuoteFiles(e) {
+  const files=[...e.target.files];
+  for(const file of files){
+    if(file.size>5*1024*1024){showToast(`${file.name} too large`,'error');continue;}
+    const allowed=['image/png','image/jpeg','image/jpg','application/pdf'];
+    if(!allowed.includes(file.type)){showToast(`${file.name} — unsupported`,'error');continue;}
+    const b64=await fileToBase64(file);
+    uploadedFiles.push({name:file.name,type:file.type,data:b64});
+  }
+  document.getElementById('quoteFileInput').value='';
+  renderUploadList();
+  const qfc=document.getElementById('quoteFieldsContainer');
+  if(qfc) qfc.outerHTML=buildQuoteFieldsHTML();
+}
+
+function renderUploadList() {
+  const ul=document.getElementById('quoteUploadList');if(!ul)return;
+  ul.innerHTML=uploadedFiles.map((f,i)=>`
+    <div class="upload-item">
+      <span>${f.type.includes('pdf')?'📄':f.type.includes('image')?'🖼️':'📎'}</span>
+      <span class="upload-item-name">${f.name}</span>
+      <button class="btn btn-danger btn-sm" onclick="removeUpload(${i})">✕</button>
+    </div>`).join('');
+}
+
+function removeUpload(i){uploadedFiles.splice(i,1);renderUploadList();const qfc=document.getElementById('quoteFieldsContainer');if(qfc)qfc.outerHTML=buildQuoteFieldsHTML();}
+
+// ── SHARE QUOTATIONS ─────────────────────────────────────────
+async function shareQuotations() {
+  if (!currentPR) { showToast('No procurement request selected','error'); return; }
+  if (!uploadedFiles || !uploadedFiles.length) { showToast('Upload at least one quotation file','error'); return; }
+  for (let i = 0; i < uploadedFiles.length; i++) {
+    const vendorInput = document.getElementById(`qvendor-${i}`);
+    if (!vendorInput || !vendorInput.value) {
+      showToast(`Please select a vendor for "${uploadedFiles[i].name}"`, 'error');
+      return;
+    }
+  }
+  showLoader(true);
+  try {
+    const firstVendorEl = document.getElementById('qvendor-0');
+    const firstVendorId = firstVendorEl?.value || null;
+    if (firstVendorId) {
+      await db.from('procurement_requests').update({assigned_vendor_id:firstVendorId}).eq('id',currentPR.id);
+    }
+    const vendorNames = [];
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const f = uploadedFiles[i];
+      const vendorEl = document.getElementById(`qvendor-${i}`);
+      const vendorId = vendorEl?.value || null;
+      let vendorName = null;
+      if (vendorEl && vendorEl.selectedIndex >= 0) {
+        vendorName = vendorEl.options[vendorEl.selectedIndex]?.dataset?.name || null;
+      }
+      if (vendorName) vendorNames.push(vendorName);
+      const amtEl = document.getElementById(`qamt-${i}`);
+      const ltEl = document.getElementById(`qlt-${i}`);
+      const noteEl = document.getElementById(`qnote-${i}`);
+      const curEl = document.getElementById(`qcur-${i}`);
+      await db.from('pr_quotations').insert({
+        pr_id: currentPR.id, vendor_id: vendorId, vendor_name: vendorName,
+        file_name: f.name, file_url: f.data, file_type: f.type,
+        amount: amtEl?.value ? parseFloat(amtEl.value) : null,
+        currency: curEl?.value || 'INR',
+        lead_time_days: ltEl?.value ? parseInt(ltEl.value) : null,
+        notes: noteEl?.value ? noteEl.value.trim() : null,
+        uploaded_by: currentUser?.id || null
+      });
+    }
+    const { error } = await db.from('procurement_requests').update({
+      phase:'quotations_shared', updated_at:new Date().toISOString(), phase_timestamps:addPhaseTimestamp(currentPR,'quotations_shared')
+    }).eq('id',currentPR.id);
+    notifyPhaseChange(currentPR.id,'quotations_shared',currentUser?.id);
+    if (!error) {
+      const uniqueVendors = [...new Set(vendorNames)];
+      await window.postComment(currentPR.id, currentUser?.id,
+        `📎 ${uploadedFiles.length} quotation${uploadedFiles.length>1?'s':''} from ${uniqueVendors.join(', ')} shared with engineer.`);
+    }
+    showLoader(false);
+    if (error) { showToast('Error: '+error.message,'error'); return; }
+    showToast('Quotations shared with engineer!','success');
+    closeModal('prModal'); await loadRequests();
+  } catch(err) {
+    showLoader(false); showToast(err.message,'error');
+  }
+}
+
+// ── VENDOR INFO RESPONSE ─────────────────────────────────────
+async function submitVendorInfo() {
+  if (!currentPR) return;
+
+  const detailsEl = document.getElementById('vendorInfoDetails');
+  const details = detailsEl?.value ? detailsEl.value.trim() : '';
+
+  if (!details) {
+    showToast('Please enter vendor details', 'error');
+    return;
+  }
+
+  showLoader(true);
+
+  const { error } = await db
+    .from('procurement_requests')
+    .update({
+      phase: 'vendor_info_shared',
+      vendor_info_details: details,
+      updated_at: new Date().toISOString(),
+      phase_timestamps: addPhaseTimestamp(currentPR, 'vendor_info_shared')
+    })
+    .eq('id', currentPR.id);
+
+  // Notify after successful update
+  if (!error) {
+    await notifyPhaseChange(
+      currentPR.id,
+      'vendor_info_shared',
+      currentUser?.id
+    );
+
+    await window.postComment(
+      currentPR.id,
+      currentUser?.id,
+      '🏢 Vendor information provided to engineer.'
+    );
+  }
+
+  showLoader(false);
+
+  if (error) {
+    showToast('Error: ' + error.message, 'error');
+    return;
+  }
+
+  showToast('Vendor info sent!', 'success');
+
+  closeModal('prModal');
+  await loadRequests();
+}
+
+// ── ADVANCE PAYMENT ───────────────────────────────────────────
+let selectedAdvanceOption = null;
+
+function selectAdvanceOption(opt) {
+  selectedAdvanceOption = opt;
+  ['none','received','request'].forEach(o => {
+    const btn = document.getElementById(`advOpt${o.charAt(0).toUpperCase()+o.slice(1)}`);
+    if (btn) btn.classList.toggle('selected', o === opt);
+  });
+  const box = document.getElementById('advRequestDetails');
+  if (box) box.style.display = opt === 'request' ? 'block' : 'none';
+  const poSection = document.getElementById('poPlaceOrderSection');
+  if (poSection) poSection.style.display = 'block';
+}
+
+async function requestAdvance() {
+  if (!currentPR) return;
+  const amtEl = document.getElementById('advanceAmt');
+  const noteEl = document.getElementById('advanceNote');
+  const amt = amtEl?.value ? parseFloat(amtEl.value) : null;
+  const note = noteEl?.value ? noteEl.value.trim() : null;
+  if (!amt) { showToast('Please enter advance amount','error'); return; }
+  showLoader(true);
+  const { error } = await db.from('advance_payment_requests').insert({
+    pr_id: currentPR.id, amount: amt, notes: note,
+    requested_by: currentUser?.id, status:'pending'
+  });
+  if (!error) {
+    await db.from('procurement_requests').update({
+      phase:'advance_requested', updated_at:new Date().toISOString(), phase_timestamps:addPhaseTimestamp(currentPR,'advance_requested')
+    }).eq('id',currentPR.id);
+    await window.postComment(currentPR.id, currentUser?.id, `💳 Advance payment request of ${amt} sent to accounts.`);
+  }
+  showLoader(false);
+  if (error) { showToast('Error: '+error.message,'error'); return; }
+  showToast('Advance request sent to accounts!','success');
+  closeModal('prModal'); await loadRequests();
+}
+
+// ── PLACE ORDER ─────────────────────────────────────────────
+async function placeOrder() {
+  if (!currentPR) return;
+
+  const { data: poCheck } = await db.from('purchase_orders')
+    .select('id,po_number')
+    .eq('pr_id', currentPR.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (!poCheck) {
+    showToast('Please generate and save the Purchase Order (Step 1) before confirming the order.', 'error');
+    return;
+  }
+
+  const notesEl = document.getElementById('orderNotes');
+  const notes = notesEl?.value ? notesEl.value.trim() : null;
+
+  showLoader(true);
+
+  const { error } = await db.from('procurement_requests').update({
+    phase: 'order_placed',
+    order_notes: notes,
+    advance_option: selectedAdvanceOption || 'none',
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR,'order_placed')
+  }).eq('id', currentPR.id);
+  notifyPhaseChange(currentPR.id,'order_placed',currentUser?.id);
+
+  if (!error) {
+    await window.postComment(
+      currentPR.id,
+      currentUser.id,
+      `🛒 Order placed with vendor. PO: ${poCheck.po_number}.` + (notes ? ` Notes: ${notes}` : '')
+    );
+  }
+
+  showLoader(false);
+
+  if (error) {
+    showToast('Error: ' + error.message, 'error');
+    return;
+  }
+
+  showToast('Order confirmed!', 'success');
+  closeModal('prModal');
+  await loadRequests();
+}
+// ── GRN ─────────────────────────────────────────────────────
+async function invokeGRN() {
+  if (!currentPR) return;
+  showLoader(true);
+  const { error } = await db.from('procurement_requests').update({
+    phase:'grn_pending', updated_at:new Date().toISOString(), phase_timestamps:addPhaseTimestamp(currentPR,'grn_pending')
+  }).eq('id',currentPR.id);
+  notifyPhaseChange(currentPR.id,'grn_pending',currentUser?.id);
+  if (!error) {
+    await window.postComment(currentPR.id, currentUser?.id, '📦 Goods received — engineer notified for QC.');
+  }
+  showLoader(false);
+  if (error) { showToast('Error: '+error.message,'error'); return; }
+  showToast('GRN invoked!','success');
+  closeModal('prModal'); await loadRequests();
+}
+
+// ── NUMBER TO WORDS (INDIAN) ─────────────────────────────────
+function numToWords(n) {
+  if (!n || isNaN(n)) return 'Zero Only';
+  const a=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const b=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  function words(num){
+    if(num===0) return '';
+    if(num<20) return a[num]+' ';
+    if(num<100) return b[Math.floor(num/10)]+' '+(num%10?a[num%10]+' ':'');
+    if(num<1000) return a[Math.floor(num/100)]+' Hundred '+(num%100?words(num%100):'');
+    if(num<100000) return words(Math.floor(num/1000))+'Thousand '+(num%1000?words(num%1000):'');
+    if(num<10000000) return words(Math.floor(num/100000))+'Lakh '+(num%100000?words(num%100000):'');
+    return words(Math.floor(num/10000000))+'Crore '+(num%10000000?words(num%10000000):'');
+  }
+  const intPart=Math.floor(n);
+  const decPart=Math.round((n-intPart)*100);
+  let result=words(intPart).trim()+' Only';
+  if(decPart){ result = words(intPart).trim()+' and '+words(decPart).trim()+' Paise Only'; }
+  return result;
+}
+
+// ── PO MODAL — styled paper layout ───────────────────────────
+async function openPOModal(prId) {
+  const pr = currentPR;
+  const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',prId);
+  const selectedQ=quotations?.find(q=>q.is_selected||q.id===pr.selected_quotation_id)||quotations?.[0];
+  const{data:vendor}=pr.assigned_vendor_id?await db.from('vendors').select('*').eq('id',pr.assigned_vendor_id).single():{data:null};
+
+  const now=new Date();
+  const fy=now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;
+  const fyShort=`${String(fy).slice(2)}-${String(fy+1).slice(2)}`;
+  const poNumber=`IIIPO/${fyShort}/${String(pr.request_number).padStart(4,'0')}`;
+  const todayStr=now.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/');
+  const deliveryDate=selectedQ?.lead_time_days
+    ? new Date(Date.now()+selectedQ.lead_time_days*86400000).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/')
+    : '—';
+  const pt=PAYMENT_TERMS_OPTIONS.find(p=>p.value===vendor?.payment_terms);
+  const ptLabel = vendor?.payment_terms === 'custom'
+    ? (vendor?.custom_payment_terms || 'Custom Terms')
+    : (pt?.label || 'As agreed');
+  const currency=selectedQ?.currency||'INR';
+  const currSymbol=currency==='INR'?'₹':currency;
+
+  const baseAmt=parseFloat(selectedQ?.amount||0);
+  const cgstPct=9, sgstPct=9;
+  const cgstAmt=Math.round(baseAmt*cgstPct/100*100)/100;
+  const sgstAmt=Math.round(baseAmt*sgstPct/100*100)/100;
+  const netPayable=baseAmt+cgstAmt+sgstAmt;
+
+  const savedLogo=localStorage.getItem('po_logo');
+  const savedSig=localStorage.getItem('po_sig');
+  const logoSrc=savedLogo||'../on2cooklogo-bg.png';
+  const sigSrc=savedSig||'../stamp.png';
+
+  const defaultTermsHTML=`- <strong>Packing :</strong> Goods must be packed in new containers with clear markings for content, gross weight, tare weight, net weight, and hazard info. We will reject goods that don't meet these packing requirements.
+- <strong>Delivery :</strong> Goods should be delivered at the desired destination between 9 AM to 5 PM. We shall allow the delivery of the vehicle inside our premises at any time, but unloading of goods is as per Instructions.
+- <strong>Payment :</strong> This will be according to the terms mentioned in the Purchase Order.
+- <strong>Weight &amp; Purity :</strong> Both the parameters should be in accordance with the order form. Any difference in weight or purity will be calculated to achieve the real quantity supplied and payment shall be made on this real quantity.
+- <strong>Mandatory Documents Set :</strong> Material supplied should be accompanied with invoice for buyer along with duplicate for transporter. All supplied document/s must clearly indicate our purchase order number &amp; date, else the payment may not be processed.
+- <strong>Jurisdiction :</strong> Subject To Ahmedabad jurisdiction only.`;
+
+  document.getElementById('poModalSub').textContent=`${poNumber} — ${pr.project_name}`;
+
+  // Build parts rows
+  const partsArr = pr.parts && pr.parts.length ? pr.parts : [{name: pr.project_name||'—', qty:1, spec:''}];
+  const itemRows = partsArr.map((p,i) => {
+    const unitRate = partsArr.length > 1
+      ? (baseAmt / partsArr.reduce((s,x)=>s+(x.qty||1),0))
+      : (baseAmt / (p.qty||1));
+    const rowTotal = unitRate * (p.qty||1);
+    return `<tr>
+      <td class="center">${i+1}</td>
+      <td class="center"><input class="po-meta-input" style="text-align:center" placeholder="—"/></td>
+      <td><div class="item-desc-main">${p.name||'—'}</div>${p.spec?`<div class="item-desc-sub">${p.spec}</div>`:''}</td>
+      <td class="center"><input class="po-meta-input" style="text-align:center" placeholder="—"/></td>
+      <td class="center">${p.qty||1}</td>
+      <td class="center">Nos</td>
+      <td class="right"><input class="po-meta-input" id="po-unitrate-${i}" style="text-align:right" type="number" value="${unitRate.toFixed(2)}" oninput="recalcPORow(${i},${p.qty||1})"/></td>
+      <td class="right" id="po-rowtotal-${i}">${currSymbol} ${rowTotal.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('poModalBody').innerHTML=`
+    <!-- Tax controls strip (outside printable area) -->
+    <div style="margin-bottom:12px;padding:9px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:6px;font-size:0.78rem;display:flex;align-items:center;flex-wrap:wrap;gap:12px">
+      <span>⚙️ Review and edit fields directly in the PO below. Adjust tax rates here:</span>
+      <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
+        <label style="font-size:0.74rem;white-space:nowrap">CGST %</label>
+        <input id="cgstInput" type="number" value="${cgstPct}" class="po-tax-input" onchange="recalcPO()"/>
+        <label style="font-size:0.74rem;white-space:nowrap">SGST %</label>
+        <input id="sgstInput" type="number" value="${sgstPct}" class="po-tax-input" onchange="recalcPO()"/>
+        <label style="font-size:0.74rem;white-space:nowrap">P&amp;F</label>
+        <input id="pnfInput" type="number" value="0" class="po-tax-input" style="width:70px" onchange="recalcPO()"/>
+      </div>
+    </div>
+
+    <!-- ══ PO PAPER ══ -->
+    <div id="poPreviewBox">
+
+      <!-- Header: title + logo -->
+      <div class="po-top-bar">
+        <div style="width:130px"></div>
+        <div class="po-paper-title">Purchase Order</div>
+        <div id="poLogoSlot" style="width:130px;display:flex;justify-content:flex-end">
+          <img src="${logoSrc}" class="po-logo-img" alt="Logo" onerror="this.style.display='none'"/>
+        </div>
+      </div>
+
+      <!-- Row 1: Buyer | PO Meta -->
+      <div class="po-addr-grid" style="border-top:1px solid #999">
+        <div class="po-addr-cell">
+          <div class="cell-head">Name and Address of Buyer :</div>
+          <div class="company-name">INVENTINDIA INNOVATIONS PVT. LTD.</div>
+          Ch03, Inspire Business Park,<br/>
+          Adani Shantigram, Near Vaishnodevi Circle, Gandhinagar,<br/>
+          Ahmedabad (Gujarat) India - 382421<br/>
+          GSTIN : 24AACCI7644H1ZK<br/>
+          Contact Person: Jaimin Prajapati<br/>
+          Email: Jaimin.p@inventindia.com<br/>
+          Contact No.: 9924077107<br/>
+          Place of Supply: Gujarat.India
+        </div>
+        <div class="po-addr-cell">
+          <table style="width:100%;font-size:0.74rem">
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">PO Number :</td><td><input class="po-meta-input" id="poPreviewNum" value="${poNumber}" style="font-weight:700;font-size:0.82rem"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">PO Date :</td><td><input class="po-meta-input" id="poDate" value="${todayStr}" oninput="document.getElementById('poPreviewNum')&&recalcPO()"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Date :</td><td><input class="po-meta-input" id="poDelivery" value="${deliveryDate}"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Payment Terms :</td><td>${ptLabel}</td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Terms :</td><td>NA</td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Mode of Transport :</td><td>NA</td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Final Destination :</td><td>Inventindia</td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Quote Ref :</td><td><input class="po-meta-input" id="poQuoteRef" placeholder="—"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Indent Number :</td><td><input class="po-meta-input" id="poIndent" value="NA"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Project Code/Name :</td><td><input class="po-meta-input" id="poProjectCode" value="${pr.project_name||'NA'}"/></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Row 2: Supplier | Shipping -->
+      <div class="po-addr-grid">
+        <div class="po-addr-cell">
+          <div class="cell-head">Name and Address of Supplier :</div>
+          <div class="company-name">${vendor?.name||'—'}</div>
+          ${vendor?.address?vendor.address+'<br/>':''}
+          ${vendor?.contact_person?`Contact: ${vendor.contact_person}<br/>`:''}
+          ${vendor?.phone?`Phone: ${vendor.phone}<br/>`:''}
+          ${vendor?.email?`${vendor.email}<br/>`:''}
+          ${vendor?.gstin?`GSTIN : ${vendor.gstin}<br/>`:''}
+          ${vendor?.country?`Country : ${vendor.country}<br/>`:''}
+          ${vendor?.vendor_type?`Vendor Type : ${vendor.vendor_type}<br/>`:''}
+          Place of Supply: Gujarat.India
+        </div>
+        <div class="po-addr-cell">
+          <div class="cell-head">Shipping Details :</div>
+          <div class="company-name">INVENTINDIA INNOVATIONS PVT. LTD.</div>
+          Ch03, Inspire Business Park,<br/>
+          Adani Shantigram, Ahmedabad (Gujarat) India - 382421<br/>
+          GSTIN : 24AACC17644H1ZK<br/>
+          Contact Person: Jaimin Prajapati<br/>
+          Email: Jaimin.p@inventindia.com<br/>
+          Contact No.: 9924077107<br/>
+          Place of Supply: Gujarat.India
+        </div>
+      </div>
+
+      <!-- Items table -->
+      <table class="po-items-table">
+        <thead>
+          <tr>
+            <th style="width:42px">Sr No</th>
+            <th style="width:72px">Item Code</th>
+            <th>Description</th>
+            <th style="width:72px">HSN/SAC Code</th>
+            <th style="width:64px">Quantity</th>
+            <th style="width:52px">UOM</th>
+            <th style="width:82px">Unit Rate</th>
+            <th style="width:96px">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemRows}
+          <tr style="height:22px"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr style="height:22px"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+
+      <!-- Bottom: Bank + Terms | Amounts + Sig -->
+      <div class="po-bottom-grid">
+
+        <div class="po-left-bottom">
+          <!-- Bank Details -->
+          <div class="bank-section">
+            <div style="font-weight:700;font-size:0.71rem;margin-bottom:5px">Bank Details:</div>
+            <table style="width:100%">
+              <tr><td>Account Holder Name</td><td>: Inventindia Innovations Private Limited</td></tr>
+              <tr><td>Bank Name</td><td>: ICICI Bank</td></tr>
+              <tr><td>A/C No</td><td>: 461105000085</td></tr>
+              <tr><td>IFCS Code</td><td>: ICIC0004611</td></tr>
+            </table>
+          </div>
+          <!-- Terms & Conditions (editable) -->
+          <div class="po-terms-section">
+            <div class="terms-head">Terms &amp; Conditions:</div>
+            <div id="poTermsEditable" class="po-terms-editable" contenteditable="true">${defaultTermsHTML}</div>
+          </div>
+        </div>
+
+        <!-- Right: Amounts + Signature -->
+        <div>
+          <table class="po-amount-table">
+            <tr><td>Basic Amount :</td><td id="poBasicAmt">${currSymbol} ${baseAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
+            <tr><td>Discount (%) :</td><td id="poDiscount">0.00</td></tr>
+            <tr><td>Amount after Discount :</td><td id="poAfterDiscount">${currSymbol} ${baseAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
+            <tr><td>P&amp;F Charge :</td><td id="poPnf">${currSymbol} 0.00</td></tr>
+            <tr><td>CGST % &nbsp; <span id="poCgstPctLabel">${cgstPct}</span>.00 :</td><td id="poCgst">${currSymbol} ${cgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
+            <tr><td>SGST % &nbsp; <span id="poSgstPctLabel">${sgstPct}</span>.00 :</td><td id="poSgst">${currSymbol} ${sgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
+            <tr class="net-row"><td>Net Payable (INR) :</td><td id="poNet">${currSymbol} ${netPayable.toLocaleString('en-IN',{minimumFractionDigits:0})}</td></tr>
+            <tr class="words-row"><td colspan="2"><strong>Amount in words :</strong><br/><span id="poWords">${numToWords(netPayable)}</span></td></tr>
+          </table>
+
+          <!-- Signature -->
+          <div class="po-sig-section">
+            <div class="po-sig-img-wrap">
+              <div id="poSigSlot">
+                <img src="${sigSrc}" alt="Authorized Signatory" style="max-height:68px;max-width:100%;object-fit:contain" onerror="this.style.display='none'"/>
+              </div>
+            </div>
+            <div class="po-sig-label">(Authorized Signatory)</div>
+          </div>
+        </div>
+
+      </div><!-- /po-bottom-grid -->
+
+      <!-- Footer -->
+      <div class="po-doc-footer">
+        <span>This is a computer generated document</span>
+        <span>Jurisdiction : Subject To Ahmedabad jurisdiction only.</span>
+      </div>
+
+    </div><!-- /#poPreviewBox -->
+  `;
+
+  // Store base amount and currency symbol for recalc
+  window._poBaseAmt = baseAmt;
+  window._poCurrSymbol = currSymbol;
+  window._poCgstPct = cgstPct;
+  window._poSgstPct = sgstPct;
+
+  openModal('poModal');
+}
+
+// ── PO RECALC ────────────────────────────────────────────────
+function recalcPO() {
+  const base = window._poBaseAmt || 0;
+  const sym  = window._poCurrSymbol || '₹';
+  const cgst = parseFloat(document.getElementById('cgstInput')?.value || 9) || 0;
+  const sgst = parseFloat(document.getElementById('sgstInput')?.value || 9) || 0;
+  const pnf  = parseFloat(document.getElementById('pnfInput')?.value  || 0) || 0;
+  const discPct = parseFloat(document.getElementById('poDiscountPct')?.value || 0) || 0;
+  const other = parseFloat(document.getElementById('poOtherCharges')?.value || 0) || 0;
+
+  const discAmt = Math.round(base * discPct / 100 * 100) / 100;
+  const afterDiscount = base - discAmt;
+  const cgstAmt = Math.round(afterDiscount * cgst / 100 * 100) / 100;
+  const sgstAmt = Math.round(afterDiscount * sgst / 100 * 100) / 100;
+  const subtotal = afterDiscount + cgstAmt + sgstAmt + pnf + other;
+  const net = Math.round(subtotal);
+  const roundOff = Math.round((net - subtotal) * 100) / 100;
+
+  const s = (el, val) => { const e = document.getElementById(el); if(e) e.textContent = val; };
+  const f = v => v.toLocaleString('en-IN', {minimumFractionDigits:2});
+  s('poCgstPctLabel', cgst);
+  s('poSgstPctLabel', sgst);
+  s('poAfterDiscount', `${sym} ${f(afterDiscount)}`);
+  s('poCgst',  `${sym} ${f(cgstAmt)}`);
+  s('poSgst',  `${sym} ${f(sgstAmt)}`);
+  s('poPnf',   `${sym} ${f(pnf)}`);
+  s('poRoundOff', roundOff.toFixed(2));
+  s('poNet',   `${sym} ${net.toLocaleString('en-IN',{minimumFractionDigits:0})}`);
+  s('poWords', numToWords(net));
+  // Sync the table P&F input with the strip
+  const tableInput = document.getElementById('pnfTableInput');
+  if (tableInput && tableInput !== document.activeElement) tableInput.value = pnf;
+}
+
+function syncPnfInputs() {
+  const tableVal = document.getElementById('pnfTableInput')?.value || '0';
+  const stripInput = document.getElementById('pnfInput');
+  if (stripInput) stripInput.value = tableVal;
+  recalcPO();
+}
+
+function recalcPORow(idx, qty) {
+  const input = document.getElementById(`po-unitrate-${idx}`);
+  const totalCell = document.getElementById(`po-rowtotal-${idx}`);
+  const sym = window._poCurrSymbol || '₹';
+  if (!input || !totalCell) return;
+  const unitRate = parseFloat(input.value) || 0;
+  const rowTotal = unitRate * qty;
+  totalCell.textContent = `${sym} ${rowTotal.toLocaleString('en-IN',{minimumFractionDigits:2})}`;
+
+  // Recalculate base amount from all row unit rates
+  const partsArr = currentPR?.parts?.length ? currentPR.parts : [{qty:1}];
+  let newBase = 0;
+  partsArr.forEach((p, i) => {
+    const el = document.getElementById(`po-unitrate-${i}`);
+    newBase += (parseFloat(el?.value) || 0) * (p.qty || 1);
+  });
+  window._poBaseAmt = newBase;
+  const basicEl = document.getElementById('poBasicAmt');
+  if (basicEl) basicEl.textContent = `${sym} ${newBase.toLocaleString('en-IN',{minimumFractionDigits:2})}`;
+  const afterEl = document.getElementById('poAfterDiscount');
+  if (afterEl) afterEl.textContent = `${sym} ${newBase.toLocaleString('en-IN',{minimumFractionDigits:2})}`;
+  recalcPO();
+}
+// ── DOWNLOAD PO AS PDF ────────────────────────────────────────
+async function downloadPO() {
+  const poBox = document.getElementById('poPreviewBox');
+  if (!poBox) { showToast('PO preview not found','error'); return; }
+
+  const btn = document.querySelector('#poModal .modal-footer .btn-secondary');
+  const origText = btn?.innerHTML;
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Generating...'; }
+
+  await new Promise(r => setTimeout(r, 80));
+const frozen = _freezePOInputs(poBox);   // ← swap inputs to spans
+  try {
+    // Temporarily hide contenteditable outlines and input borders for clean capture
+    // ── PO CAPTURE HELPER: swap inputs → spans, capture, restore ──
+    
+   const canvas = await html2canvas(poBox, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    const pageW = 210, pageH = 297;
+    const imgW = pageW;
+    const imgH = (canvas.height * imgW) / canvas.width;
+
+    if (imgH <= pageH) {
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
+    } else {
+      let yOffset = 0;
+      while (yOffset < imgH) {
+        if (yOffset > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, -yOffset, imgW, imgH);
+        yOffset += pageH;
+      }
+    }
+
+    const poNum = document.getElementById('poPreviewNum')?.value || 'PO';
+    pdf.save(`${poNum.replace(/\//g,'-')}.pdf`);
+    showToast('PDF downloaded!', 'success');
+  } catch(err) {
+    showToast('PDF generation failed: ' + err.message, 'error');
+    console.error(err);
+  } finally {
+    _restorePOInputs(frozen);              // ← always restore
+    if (btn) { btn.disabled = false; btn.innerHTML = origText; }
+  }
+}
+
+// ── CONFIRM GENERATE & SAVE PO ────────────────────────────────
+
+// ── ATTACHMENT PREVIEW & SAFE DOWNLOAD ENGINE ───────────────
+let _attRegistry = [], _previewUrl = null, _previewName = null;
+
+function _registerAtts(arr) { _attRegistry = arr; }
+
+function _attIcon(name) { return (name||'').toLowerCase().includes('.pdf') ? '📄' : '🖼️'; }
+
+function _attTypeLabel(t) {
+  return {quotation:'Quotation',approval_screenshot:'Approval',grn_doc:'GRN',other:'Document',engineer_upload:'Engineer Upload'}[t] || t || 'doc';
+}
+
+function _buildAttRow(a, i) {
+  return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--off-white,#f8f9fa);border:1px solid var(--border,#e5e7eb);border-radius:6px">
+    <span style="font-size:1.1rem;flex-shrink:0">${_attIcon(a.file_name)}</span>
+    <span style="font-size:0.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${a.file_name||'Attachment'}</span>
+    <span style="font-size:0.62rem;padding:2px 6px;background:white;border:1px solid var(--border,#e5e7eb);border-radius:3px;color:#6b7280;font-family:monospace;flex-shrink:0">${_attTypeLabel(a.attachment_type)}</span>
+    <button class="btn btn-secondary btn-sm" style="flex-shrink:0" onclick="previewAttByIndex(${i})">👁 Preview</button>
+    <button class="btn btn-secondary btn-sm" style="flex-shrink:0" onclick="downloadAttByIndex(${i})">⬇ Download</button>
+  </div>`;
+}
+
+function _buildAttsSection(atts, title) {
+  if (!atts || !atts.length) return '';
+  _registerAtts(atts);
+  return `<div style="margin-top:16px;padding:14px;background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.15);border-radius:8px">
+    <div style="color:#6366f1;font-weight:600;font-size:0.82rem;margin-bottom:10px">📎 ${title||'Attachments'} (${atts.length})</div>
+    <div style="display:flex;flex-direction:column;gap:6px">${atts.map((a,i)=>_buildAttRow(a,i)).join('')}</div>
+  </div>`;
+}
+
+function previewAttByIndex(i) { const a=_attRegistry[i]; if(a) openAttPreview(a.file_url, a.file_name); }
+function downloadAttByIndex(i) { const a=_attRegistry[i]; if(a) _triggerDownload(a.file_url, a.file_name); }
+function downloadCurrentPreview() { if(_previewUrl) _triggerDownload(_previewUrl, _previewName); }
+
+function _triggerDownload(url, fileName) {
+  if (!url) return;
+  if (url.startsWith('data:')) {
+    try {
+      const arr=url.split(','), mime=arr[0].match(/:(.*?);/)[1];
+      const bstr=atob(arr[1]); let n=bstr.length; const u8=new Uint8Array(n);
+      while(n--) u8[n]=bstr.charCodeAt(n);
+      const blob=new Blob([u8],{type:mime});
+      const el=document.createElement('a'); el.href=URL.createObjectURL(blob); el.download=fileName||'attachment';
+      document.body.appendChild(el); el.click(); setTimeout(()=>{URL.revokeObjectURL(el.href);el.remove();},1000);
+    } catch(err) { window.open(url,'_blank'); }
+  } else {
+    const el=document.createElement('a'); el.href=url; el.download=fileName||'attachment'; el.target='_blank';
+    document.body.appendChild(el); el.click(); setTimeout(()=>el.remove(),500);
+  }
+}
+
+function openAttPreview(url, name) {
+  if (!url) return;
+  _previewUrl=url; _previewName=name||'Attachment';
+  const ov=document.getElementById('attPreviewOverlay');
+  const content=document.getElementById('attPreviewContent');
+  document.getElementById('attPreviewName').textContent=_previewName;
+  const isImage=/\.(png|jpe?g|gif|webp)$/i.test(name)||url.startsWith('data:image');
+  const isPDF=/\.pdf$/i.test(name)||url.startsWith('data:application/pdf');
+  if (isImage) {
+    content.innerHTML=`<img src="${url}" style="max-width:88vw;max-height:76vh;object-fit:contain;border-radius:4px"/>`;
+  } else if (isPDF) {
+    content.innerHTML=`<iframe src="${url}" style="width:82vw;height:76vh;border:none" title="${name}"></iframe>`;
+  } else {
+    content.innerHTML=`<div style="padding:48px;text-align:center;color:#6b7280"><div style="font-size:3rem;margin-bottom:12px">📄</div><div style="font-size:0.9rem;font-weight:600">${name}</div><div style="font-size:0.78rem;margin-top:8px">Preview not available — please use Download</div></div>`;
+  }
+  ov.style.display='flex';
+}
+
+function closeAttPreview() {
+  document.getElementById('attPreviewOverlay').style.display='none';
+  document.getElementById('attPreviewContent').innerHTML='';
+  _previewUrl=null; _previewName=null;
+}
+
+// ── PAYMENT REQUEST ATTACHMENT HELPERS ───────────────────────
+async function handlePRAttachFiles(e) {
+  const files = [...e.target.files];
+  const allowed = ['image/png','image/jpeg','application/pdf'];
+  for (const file of files) {
+    if (file.size > 5*1024*1024) { showToast(`${file.name} too large`,'error'); continue; }
+    if (!allowed.includes(file.type)) { showToast(`${file.name} — unsupported`,'error'); continue; }
+    const b64 = await fileToBase64(file);
+    paymentRequestFiles.push({name: file.name, type: file.type, data: b64});
+  }
+  e.target.value = '';
+  renderPRAttachList();
+}
+
+function renderPRAttachList() {
+  const el = document.getElementById('prAttachList'); if (!el) return;
+  el.innerHTML = paymentRequestFiles.map((f,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--off-white);border:1px solid var(--border);border-radius:6px">
+      <span style="font-size:0.8rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
+      <button class="btn btn-danger btn-sm" onclick="removePRAttach(${i})">✕</button>
+    </div>`).join('');
+}
+
+function removePRAttach(i) { paymentRequestFiles.splice(i,1); renderPRAttachList(); }
+
+async function confirmGeneratePO() {
+  showLoader(true);
+  const poNumber = document.getElementById('poPreviewNum')?.value || document.getElementById('poPreviewNum')?.textContent || '';
+  const cgstPct  = parseFloat(document.getElementById('cgstInput')?.value || 9);
+  const sgstPct  = parseFloat(document.getElementById('sgstInput')?.value || 9);
+  const pnf      = parseFloat(document.getElementById('pnfInput')?.value  || 0);
+  const base     = window._poBaseAmt || 0;
+  const netPayable = base + Math.round(base*cgstPct/100*100)/100 + Math.round(base*sgstPct/100*100)/100 + pnf;
+
+  const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',currentPR.id);
+  const selectedQ=quotations?.find(q=>q.is_selected)||quotations?.[0];
+
+  // Step 1: Save to purchase_orders
+  const{error:poErr}=await db.from('purchase_orders').insert({
+    pr_id:currentPR.id, po_number:poNumber, po_date:new Date().toISOString(),
+    vendor_id:currentPR.assigned_vendor_id, quotation_id:selectedQ?.id||null,
+    total_amount:netPayable, currency:selectedQ?.currency||'INR', generated_by:currentUser.id
+  });
+  if(poErr){showLoader(false);showToast('Error saving PO: '+poErr.message,'error');return;}
+
+  // Step 2: Generate PDF from the styled preview box
+  let pdfUrl = null;
+  try {
+    const previewEl = document.getElementById('poPreviewBox');
+    const frozen = _freezePOInputs(previewEl);
+    const canvas = await html2canvas(previewEl, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+    _restorePOInputs(frozen);
+
+    const {jsPDF} = window.jspdf;
+    const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+    const imgW = 210;
+    const imgH = (canvas.height * imgW) / canvas.width;
+    pdf.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', 0, 0, imgW, imgH);
+
+    const pdfBlob = pdf.output('blob');
+    const fileName = `${poNumber.replace(/\//g,'-')}_${Date.now()}.pdf`;
+    const storagePath = `po/${currentPR.id}/${fileName}`;
+
+    // Step 3: Upload to Supabase Storage (bucket: 'attachments' must exist and be public)
+    const{data:uploadData, error:uploadErr} = await db.storage
+      .from('attachments')
+      .upload(storagePath, pdfBlob, {contentType:'application/pdf', upsert:true});
+
+    if(uploadErr){
+      console.warn('Storage upload failed:', uploadErr.message, '— falling back to base64 storage');
+      // Fallback: store PDF as base64 data URI directly in pr_attachments
+      try {
+        const reader = new FileReader();
+        const base64Url = await new Promise((res,rej)=>{ reader.onload=()=>res(reader.result); reader.onerror=rej; reader.readAsDataURL(pdfBlob); });
+        await db.from('pr_attachments').insert({
+          pr_id: currentPR.id, uploaded_by: currentUser.id,
+          attachment_type: 'other',
+          file_name: `PO_${poNumber.replace(/\//g,'-')}.pdf`,
+          file_url: base64Url
+        });
+        pdfUrl = base64Url;
+      } catch(fbErr) {
+        console.warn('Base64 fallback also failed:', fbErr);
+        showToast('PO saved — PDF could not be stored: '+uploadErr.message,'error');
+      }
+    } else {
+      const{data:urlData} = db.storage.from('attachments').getPublicUrl(storagePath);
+      pdfUrl = urlData?.publicUrl;
+
+      // Step 4: Save to pr_attachments
+      await db.from('pr_attachments').insert({
+        pr_id: currentPR.id, uploaded_by: currentUser.id,
+        attachment_type: 'other',
+        file_name: `PO_${poNumber.replace(/\//g,'-')}.pdf`,
+        file_url: pdfUrl
+      });
+    }
+  } catch(pdfErr) {
+    console.warn('PDF generation failed:', pdfErr);
+    showToast('PO saved — PDF generation failed: '+pdfErr.message,'error');
+    await loadRequests();
+
+    const updatedPR = allRequests.find(r => r.id === currentPR.id);
+    if (updatedPR) {
+      currentPR = updatedPR;
+      closeModal('poModal');
+      openPR(currentPR.id);
+      }
+    }
+
+  // Step 5: Comment on PR thread
+  const commentText = pdfUrl
+    ? `📄 Purchase Order ${poNumber} generated. Net Payable: ₹${netPayable.toLocaleString('en-IN')} — [View PO PDF](${pdfUrl})`
+    : `📄 Purchase Order ${poNumber} generated. Net Payable: ₹${netPayable.toLocaleString('en-IN')}`;
+  await window.postComment(currentPR.id, currentUser.id, commentText);
+
+  showLoader(false);
+  showToast(`PO ${poNumber} generated${pdfUrl?' & saved as attachment':''}!`,'success');
+  closeModal('poModal');
+}
+
+// ── PO BRANDING ───────────────────────────────────────────────
+function openPOBranding() {
+  const logo = localStorage.getItem('po_logo');
+  const sig  = localStorage.getItem('po_sig');
+  const lw = document.getElementById('logoPreviewWrap');
+  const sw = document.getElementById('sigPreviewWrap');
+  if(logo) lw.innerHTML=`<img src="${logo}" style="max-width:100%;max-height:100%;object-fit:contain"/>`;
+  else lw.innerHTML=`<span style="font-size:0.72rem;color:var(--gray-4)">No logo</span>`;
+  if(sig)  sw.innerHTML=`<img src="${sig}" style="max-width:100%;max-height:100%;object-fit:contain"/>`;
+  else sw.innerHTML=`<span style="font-size:0.72rem;color:var(--gray-4)">No signature</span>`;
+  openModal('poBrandingModal');
+}
+
+function handleBrandingUpload(e, type) {
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const b64 = ev.target.result;
+    const wrapId = type==='logo' ? 'logoPreviewWrap' : 'sigPreviewWrap';
+    document.getElementById(wrapId).innerHTML =
+      `<img src="${b64}" style="max-width:100%;max-height:100%;object-fit:contain"/>`;
+    window[`_pending_${type}`] = b64;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearBranding(type) {
+  localStorage.removeItem(`po_${type}`);
+  window[`_pending_${type}`] = null;
+  const wrapId = type==='logo' ? 'logoPreviewWrap' : 'sigPreviewWrap';
+  document.getElementById(wrapId).innerHTML =
+    `<span style="font-size:0.72rem;color:var(--gray-4)">No ${type==='logo'?'logo':'signature'}</span>`;
+}
+
+function saveBrandingAndClose() {
+  if(window._pending_logo !== undefined) {
+    if(window._pending_logo) localStorage.setItem('po_logo', window._pending_logo);
+    window._pending_logo = undefined;
+  }
+  if(window._pending_sig !== undefined) {
+    if(window._pending_sig) localStorage.setItem('po_sig', window._pending_sig);
+    window._pending_sig = undefined;
+  }
+  closeModal('poBrandingModal');
+  applyBrandingToPO();
+  showToast('Branding saved!', 'success');
+}
+
+function applyBrandingToPO() {
+  const logo = localStorage.getItem('po_logo');
+  const sig  = localStorage.getItem('po_sig');
+  const logoSlot = document.getElementById('poLogoSlot');
+  const sigSlot  = document.getElementById('poSigSlot');
+  if (logoSlot) {
+    logoSlot.innerHTML = logo
+      ? `<img src="${logo}" class="po-logo-img" alt="Logo"/>`
+      : `<img src="../on2cooklogo-bg.png" class="po-logo-img" alt="Logo" onerror="this.style.display='none'"/>`;
+  }
+  if (sigSlot) {
+    sigSlot.innerHTML = sig
+      ? `<img src="${sig}" style="max-height:68px;max-width:100%;object-fit:contain" alt="Signature"/>`
+      : `<img src="../stamp.png" style="max-height:68px;max-width:100%;object-fit:contain" alt="Authorized Signatory" onerror="this.style.display='none'"/>`;
+  }
+}
+
+async function reRequestAdvance() {
+  const amt=parseFloat(prompt('Enter advance amount:')||'0');
+  if(!amt){return;}
+  const note=prompt('Notes to accounts (optional):');
+  showLoader(true);
+  const{error}=await db.from('advance_payment_requests').insert({pr_id:currentPR.id,amount:amt,notes:note||null,requested_by:currentUser.id,status:'pending'});
+  if(!error){
+    await db.from('procurement_requests').update({phase:'advance_requested',updated_at:new Date().toISOString(),phase_timestamps:addPhaseTimestamp(currentPR,'advance_requested')}).eq('id',currentPR.id);
+    await window.postComment(currentPR.id,currentUser.id,`📤 New advance request of ₹${amt} submitted to accounts.`);
+  }
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast('Advance re-requested!','success');closeModal('prModal');await loadRequests();
+}
+
+// ── PAYMENT REQUEST ───────────────────────────────────────────
+async function openPaymentRequestModal(prId) {
+  paymentRequestFiles = [];
+  const pr=currentPR;
+  const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',prId);
+  const selectedQ=quotations?.find(q=>q.is_selected||q.id===pr.selected_quotation_id)||quotations?.[0];
+  const{data:vendor}=pr.assigned_vendor_id?await db.from('vendors').select('*').eq('id',pr.assigned_vendor_id).single():{data:null};
+  const pt=PAYMENT_TERMS_OPTIONS.find(p=>p.value===vendor?.payment_terms);
+  const now=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  document.getElementById('payReqSub').textContent=`PR-${String(pr.request_number).padStart(4,'0')} — ${pr.project_name}`;
+  document.getElementById('payReqBody').innerHTML=`
+    <div style="background:rgba(22,163,74,0.05);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px">
+      <div style="font-size:0.8rem;font-weight:600;color:#16a34a;margin-bottom:2px"> Auto-filled from QC Passed request</div>
+      <div style="font-size:0.74rem;color:var(--gray-3)">Review and complete before submitting to accounts</div>
+    </div>
+    <div class="payment-req-form">
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Team Member</label><input class="form-control" id="prTeamMember" value="${pr.team_member_name||''}" readonly/></div>
+        <div class="form-group"><label class="form-label">Project Name</label><input class="form-control" id="prProjectName" value="${pr.project_name||''}" readonly/></div>
+        <div class="form-group"><label class="form-label">Project Manager</label><input class="form-control" id="prPMName" value="${pr.project_manager_name||''}" readonly/></div>
+        <div class="form-group"><label class="form-label">Project Phase</label><input class="form-control" id="prPhaseName" value="${pr.project_phase||''}" readonly/></div>
+        <div class="form-group"><label class="form-label">Request Date</label><input class="form-control" id="prReqDate" value="${now}" readonly/></div>
+        <div class="form-group">
+          <label class="form-label">⚡ Urgency</label>
+          <select class="form-control" id="prUrgency">
+            <option value="normal">Normal</option>
+            <option value="urgent">Urgent</option>
+            <option value="critical">Critical — Same Day</option>
+          </select>
+        </div>
+      </div>
+      <div style="padding:12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:14px">
+        <div class="detail-key" style="margin-bottom:6px">Vendor</div>
+        <div style="font-weight:600">${vendor?.name||'—'}</div>
+        <div style="font-size:0.76rem;color:var(--gray-3)">${vendor?.email||''} ${vendor?.phone?'· '+vendor.phone:''}</div>
+        ${pt?`<div style="font-size:0.76rem;color:#6366f1;margin-top:3px">💳 ${pt.label}</div>`:''}
+        ${vendor?.custom_payment_terms?`<div style="font-size:0.72rem;color:var(--gray-3)">${vendor.custom_payment_terms}</div>`:''}
+      </div>
+      ${(pr.parts||[]).length?`
+      <div style="margin-bottom:14px">
+        <div class="detail-key" style="margin-bottom:6px">BOM / Items</div>
+        <table class="parts-table" style="width:100%">
+          <thead><tr><th>#</th><th>Part</th><th>Qty</th><th>Spec</th></tr></thead>
+          <tbody>${(pr.parts||[]).map((p,i)=>`<tr><td>${i+1}</td><td>${p.name}</td><td>${p.qty}</td><td style="color:var(--gray-3)">${p.spec||'—'}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>`:''}
+      ${selectedQ?`
+      <div style="background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px">
+        <div class="detail-key" style="margin-bottom:5px">Selected Quotation</div>
+        <div style="font-weight:700;font-size:1rem">${selectedQ.currency||'AED'} ${Number(selectedQ.amount||0).toLocaleString()}</div>
+        <div style="font-size:0.72rem;color:var(--gray-3)">${selectedQ.vendor_name||''} · ${selectedQ.file_name||''}</div>
+      </div>`:''}
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Invoice Amount *</label>
+          <div class="currency-amount-wrap">
+            <select class="form-control currency-select" id="prInvCurrency">
+              ${CURRENCIES.map(c=>`<option value="${c}" ${c===(selectedQ?.currency||'AED')?'selected':''}>${c}</option>`).join('')}
+            </select>
+            <input class="form-control currency-input" id="prInvAmount" type="number" value="${selectedQ?.amount||''}" placeholder="0.00"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Shipping Fee Included?</label>
+          <select class="form-control" id="prShipping">
+            <option value="yes">Yes — Included in invoice</option>
+            <option value="no">No — Separate</option>
+            <option value="na">N/A</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Payment Terms (auto-filled)</label>
+          <input class="form-control" id="prPayTerms" value="${pt?.label||vendor?.custom_payment_terms||'As agreed'}" readonly/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Additional Notes to Accounts</label>
+          <textarea class="form-control" id="prPayNotes" placeholder="Any special instructions, partial payment status..."></textarea>
+        </div>
+        <div class="form-group full" style="margin-top:4px">
+          <label class="form-label">📎 Attach Documents (Invoice, Delivery Note, etc.)</label>
+          <div style="border:2px dashed var(--border);border-radius:var(--radius);padding:14px 16px;text-align:center;cursor:pointer;transition:border-color .15s" onclick="document.getElementById('prAttachInput').click()" onmouseenter="this.style.borderColor='#6366f1'" onmouseleave="this.style.borderColor=''">
+            <div style="font-size:1.4rem;margin-bottom:4px">📁</div>
+            <div style="font-size:0.82rem;color:var(--gray-3)">Click to upload · PNG, JPG, PDF · Max 5 MB each</div>
+            <input type="file" id="prAttachInput" accept=".png,.jpg,.jpeg,.pdf" multiple style="display:none" onchange="handlePRAttachFiles(event)"/>
+          </div>
+          <div id="prAttachList" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+      </div>
+    </div>`;
+  openModal('payReqModal');
+}
+
+async function submitPaymentRequest() {
+  const invAmt=parseFloat(document.getElementById('prInvAmount')?.value)||null;
+  const invCur=document.getElementById('prInvCurrency')?.value||'AED';
+  const urgency=document.getElementById('prUrgency')?.value||'normal';
+  const shipping=document.getElementById('prShipping')?.value||'na';
+  const notes=document.getElementById('prPayNotes')?.value.trim()||null;
+  if(!invAmt){showToast('Please enter invoice amount','error');return;}
+  showLoader(true);
+  const{data:vendor}=currentPR.assigned_vendor_id?await db.from('vendors').select('*').eq('id',currentPR.assigned_vendor_id).single():{data:null};
+  const{error}=await db.from('payment_requests').insert({
+    pr_id:currentPR.id,vendor_id:currentPR.assigned_vendor_id||null,vendor_name:vendor?.name||null,
+    project_name:currentPR.project_name,project_phase:currentPR.project_phase,project_manager_name:currentPR.project_manager_name,
+    team_member_name:currentPR.team_member_name,invoice_amount:invAmt,currency:invCur,
+    shipping_included:shipping,payment_terms:vendor?.payment_terms||null,urgency,
+    notes,requested_by:currentUser.id,status:'pending',request_date:new Date().toISOString()
+  });
+  if(!error){
+    await db.from('procurement_requests').update({phase:'payment_requested',updated_at:new Date().toISOString(),phase_timestamps:addPhaseTimestamp(currentPR,'payment_requested')}).eq('id',currentPR.id);
+  notifyPhaseChange(currentPR.id,'payment_requested',currentUser?.id);
+    await window.postComment(currentPR.id,currentUser.id,`💰 Payment request of ${invCur} ${invAmt.toLocaleString()} submitted to accounts.`);
+    if (paymentRequestFiles.length) {
+      for (const f of paymentRequestFiles) {
+        await db.from('pr_attachments').insert({
+          pr_id: currentPR.id,
+          uploaded_by: currentUser.id,
+          attachment_type: 'other',
+          file_name: f.name,
+          file_url: f.data
+        });
+      }
+      paymentRequestFiles = [];
+    }
+  }
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast('Payment request sent to accounts!','success');
+  closeModal('payReqModal');closeModal('prModal');await loadRequests();
+}
+
+// ── VENDOR RATING ────────────────────────────────────────────
+function initStarInput(id, onSet) {
+  const c=document.getElementById(id); if(!c) return;
+  c.dataset.rating='0';
+  c.innerHTML=[1,2,3,4,5].map(n=>`<span onclick="setRatingFor('${id}',${n})" data-val="${n}" style="cursor:pointer;font-size:1.4rem;color:#d1d5db;transition:color 0.1s">★</span>`).join('');
+}
+function setRatingFor(id, n){
+  const c=document.getElementById(id); if(!c) return;
+  c.dataset.rating=n;
+  c.querySelectorAll('span').forEach((s,i)=>{ s.style.color=i<n?'#f59e0b':'#d1d5db'; });
+}
+
+function openRateModal(prId, vendorId) {
+  pendingRatePRId=prId; pendingRateVendorId=vendorId;
+  const v=allVendors.find(x=>x.id===vendorId);
+  document.getElementById('rateModalTitle').textContent=`Rate Vendor — ${v?.name||''}`;
+  initStarInput('rateTATStars');
+  initStarInput('rateQualityStars');
+  document.getElementById('rateComment').value='';
+  openModal('rateModal');
+}
+
+async function submitVendorRating() {
+  const tatRating=parseInt(document.getElementById('rateTATStars').dataset.rating||'0');
+  const qualityRating=parseInt(document.getElementById('rateQualityStars').dataset.rating||'0');
+  if(!tatRating||!qualityRating){showToast('Please rate both TAT and Quality','error');return;}
+  const overallRating=Math.round((tatRating+qualityRating)/2);
+  const commentText=document.getElementById('rateComment').value.trim();
+  const encodedComment=JSON.stringify({tat:tatRating,quality:qualityRating,note:commentText||null});
+  showLoader(true);
+  await db.from('vendor_ratings').insert({
+    vendor_id:pendingRateVendorId,
+    pr_id:pendingRatePRId,
+    rated_by:currentUser.id,
+    rating:overallRating,
+    tat_rating:tatRating,
+    quality_rating:qualityRating,
+    comment:encodedComment
+  });
+  const{data:ratings}=await db.from('vendor_ratings').select('rating,tat_rating,quality_rating').eq('vendor_id',pendingRateVendorId);
+  if(ratings?.length){
+    const avg=ratings.reduce((s,r)=>s+r.rating,0)/ratings.length;
+    await db.from('vendors').update({avg_rating:Math.round(avg*100)/100,rating_count:ratings.length}).eq('id',pendingRateVendorId);
+  }
+  showLoader(false);
+  showToast('Vendor rated — TAT: '+tatRating+'★  Quality: '+qualityRating+'★','success');
+  closeModal('rateModal');await loadVendors();
+}
+
+async function addComment() {
+  const input=document.getElementById('commentInput'),text=input?.value.trim();
+  if(!text||!currentPR)return;
+  try{
+    await window.postComment(currentPR.id,currentUser.id,text);
+    input.value='';
+    const c=await loadComments(currentPR.id);
+    document.getElementById('commentsList').innerHTML=renderComments(c);
+  }catch(e){showToast('Comment failed','error');}
+}
+function buildAdvanceRejectedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO) {
+  const hasPO = !!existingPO;
+  return `<div class="action-section" style="border:1px solid rgba(214,43,43,0.25);background:rgba(214,43,43,0.04);border-radius:var(--radius);padding:14px">
+    <div class="action-section-title" style="color:var(--red)">✗ Advance Rejected — Action Required</div>
+    <div style="padding:10px 12px;background:rgba(214,43,43,0.06);border:1px solid rgba(214,43,43,0.18);border-radius:var(--radius-sm);margin-bottom:14px;font-size:0.8rem;color:var(--red)">
+      Advance payment was rejected by accounts. You can request again or proceed without advance.
+    </div>
+
+    ${selectedQ ? `<div style="margin-bottom:14px;padding:9px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <div class="detail-key" style="margin-bottom:3px">Selected Quote</div>
+      <div style="font-weight:600;font-size:0.88rem">${selectedQ.vendor_name || vendorObj?.name || '—'} — ${selectedQ.currency || 'INR'} ${Number(selectedQ.amount || 0).toLocaleString()}</div>
+      ${pt ? `<div style="font-size:0.72rem;color:#6366f1;margin-top:2px">💳 ${pt.label}</div>` : ''}
+    </div>` : ''}
+
+    <!-- PO info -->
+    <div style="padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;
+      background:${hasPO ? 'rgba(22,163,74,0.04)' : 'rgba(245,158,11,0.05)'};
+      border:1px solid ${hasPO ? 'rgba(22,163,74,0.22)' : 'rgba(245,158,11,0.22)'}">
+      ${hasPO
+        ? `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+             <div>
+               <div style="font-size:0.78rem;font-weight:700;color:#16a34a">📄 PO Already Generated</div>
+               <div style="font-family:var(--font-mono);font-size:0.82rem;font-weight:700">${existingPO.po_number}</div>
+             </div>
+             <div style="text-align:right;font-size:0.72rem;color:var(--gray-3)">${existingPO.currency || 'INR'} ${Number(existingPO.total_amount || 0).toLocaleString()}</div>
+           </div>`
+        : `<div style="font-size:0.78rem;color:#b45309;font-weight:600">⚠ No PO found — generate before placing order</div>
+           <div style="margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="openPOModal('${id}')">📄 Generate PO</button></div>`
+      }
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn btn-primary btn-sm" onclick="reRequestAdvance()">📤 Request Advance Again</button>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">Order Notes</label>
+      <textarea class="form-control" id="orderNotes" placeholder="PO number, confirmation, expected delivery..."></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="placeOrder()">Confirm Order Placed Without Advance →</button>
+  </div>`;
+}
+
+function buildAdvanceApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, advRec, existingPO) {
+  const hasPO = !!existingPO;
+  return `<div class="action-section" style="border:1px solid rgba(22,163,74,0.25);background:rgba(22,163,74,0.04);border-radius:var(--radius);padding:14px">
+    <div class="action-section-title" style="color:#16a34a">✅ Advance Approved — Ready to Place Order</div>
+
+    ${selectedQ ? `<div style="margin:10px 0;padding:9px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <div class="detail-key" style="margin-bottom:3px">Selected Quote</div>
+      <div style="font-weight:600;font-size:0.88rem">${selectedQ.vendor_name || vendorObj?.name || '—'} — ${selectedQ.currency || 'INR'} ${Number(selectedQ.amount || 0).toLocaleString()}</div>
+      ${pt ? `<div style="font-size:0.72rem;color:#6366f1;margin-top:2px">💳 ${pt.label}</div>` : ''}
+    </div>` : ''}
+
+    ${advRec ? `<div style="margin-bottom:14px;padding:9px 12px;background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:0.88rem;color:#16a34a">
+      ✅ Advance of AED ${Number(advRec.amount || 0).toLocaleString()} approved by accounts
+    </div>` : ''}
+
+    <!-- PO info (already generated) -->
+    <div style="padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;
+      background:${hasPO ? 'rgba(22,163,74,0.04)' : 'rgba(245,158,11,0.05)'};
+      border:1px solid ${hasPO ? 'rgba(22,163,74,0.22)' : 'rgba(245,158,11,0.22)'}">
+      ${hasPO
+        ? `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+             <div>
+               <div style="font-size:0.78rem;font-weight:700;color:#16a34a">📄 Purchase Order Already Generated</div>
+               <div style="font-family:var(--font-mono);font-size:0.82rem;font-weight:700">${existingPO.po_number}</div>
+             </div>
+             <div style="text-align:right;font-size:0.72rem;color:var(--gray-3)">${existingPO.currency || 'INR'} ${Number(existingPO.total_amount || 0).toLocaleString()}<br/>${fmtDate(existingPO.po_date || existingPO.created_at)}</div>
+           </div>`
+        : `<div style="font-size:0.78rem;color:#b45309;font-weight:600">⚠ No PO found — generate PO before placing order</div>
+           <div style="margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="openPOModal('${id}')">📄 Generate PO Now</button></div>`
+      }
+    </div>
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">Order Notes</label>
+      <textarea class="form-control" id="orderNotes" placeholder="PO number, confirmation, expected delivery..."></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="placeOrder()">Confirm Order Placed →</button>
+  </div>`;
+}
+function _freezePOInputs(container) {
+      const inputs = [...container.querySelectorAll('input.po-meta-input')];
+      const snapshots = inputs.map(inp => {
+        const span = document.createElement('span');
+        span.textContent = inp.value || inp.placeholder || '';
+        span.style.cssText = `display:inline-block;font-size:inherit;font-family:inherit;
+          color:inherit;width:100%;padding:0;background:transparent;`;
+        inp.parentNode.replaceChild(span, inp);
+        return { span, inp };
+      });
+      // Also hide the tax input borders
+      const taxInputs = [...container.querySelectorAll('.po-tax-input')];
+      taxInputs.forEach(i => { i._origBorder = i.style.border; i.style.border = 'none'; });
+      const terms = container.querySelector('#poTermsEditable');
+      if (terms) { terms._origBorder = terms.style.border; terms._origShadow = terms.style.boxShadow;
+        terms.style.border = 'none'; terms.style.boxShadow = 'none'; }
+      return { snapshots, taxInputs, terms };
+    }
+
+    function _restorePOInputs({ snapshots, taxInputs, terms }) {
+      snapshots.forEach(({ span, inp }) => span.parentNode.replaceChild(inp, span));
+      taxInputs.forEach(i => { i.style.border = i._origBorder || ''; });
+      if (terms) { terms.style.border = terms._origBorder || ''; terms.style.boxShadow = terms._origShadow || ''; }
+    }
+
+function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO) {
+  const currency = selectedQ?.currency || 'AED';
+  const hasPO = !!existingPO;
+
+  return `<div class="action-section">
+    <div class="action-section-title">🛒 Place Order <span class="action-badge">ACTION REQUIRED</span></div>
+    <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Follow the two steps below: first generate the PO, then confirm the order.</p>
+
+    ${selectedQ ? `<div style="margin-bottom:14px;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <div class="detail-key" style="margin-bottom:4px">Selected Quote</div>
+      <div style="font-weight:600">${selectedQ.vendor_name || vendorObj?.name || '—'} — ${currency} ${Number(selectedQ.amount || 0).toLocaleString()}</div>
+      ${pt ? `<div style="font-size:0.72rem;color:#6366f1;margin-top:3px">💳 Payment Terms: ${pt.label}</div>` : ''}
+    </div>` : ''}
+
+    <!-- STEP 1: PO -->
+    <div style="border:1px solid ${hasPO ? 'rgba(22,163,74,0.3)' : 'var(--border)'};border-radius:var(--radius);padding:14px;margin-bottom:14px;background:${hasPO ? 'rgba(22,163,74,0.04)' : 'white'}">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:${hasPO ? '0' : '10px'}">
+        <div style="font-size:0.82rem;font-weight:700;color:${hasPO ? '#16a34a' : '#111'}">
+          ${hasPO ? `✅ Step 1 — PO Generated` : '📋 Step 1 — Generate Purchase Order (Required)'}
+        </div>
+        ${hasPO ? `<div style="font-family:var(--font-mono);font-size:0.78rem;font-weight:700;color:#16a34a">${existingPO.po_number}</div>` : ''}
+      </div>
+      ${hasPO
+        ? `<div style="font-size:0.72rem;color:var(--gray-3)">
+            Generated ${fmtDate(existingPO.po_date || existingPO.created_at)} · 
+            ${existingPO.currency || 'INR'} ${Number(existingPO.total_amount || 0).toLocaleString()}
+           </div>`
+        : `<p style="font-size:0.78rem;color:var(--gray-3);margin-bottom:10px">Generate and save the PO before confirming the order.</p>
+           <button class="btn btn-secondary" onclick="openPOModal('${id}')">📄 Preview &amp; Generate PO</button>`
+      }
+    </div>
+
+    <!-- STEP 2: Place Order -->
+    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:white;${!hasPO ? 'opacity:0.45;pointer-events:none' : ''}">
+      <div style="font-size:0.82rem;font-weight:700;margin-bottom:10px;color:${hasPO ? '#111' : 'var(--gray-4)'}">
+        🛒 Step 2 — Confirm Order Placed ${!hasPO ? '<span style="font-size:0.72rem;font-weight:400">(generate PO first)</span>' : ''}
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Order Notes</label>
+        <textarea class="form-control" id="orderNotes" placeholder="PO number, confirmation reference, expected delivery..."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="placeOrder()" ${!hasPO ? 'disabled' : ''}>Confirm Order Placed →</button>
+    </div>
+
+    <!-- STEP 3: Advance Options -->
+    <div style="margin-top:16px">
+      <div class="form-label" style="margin-bottom:8px">💳 Step 3 — Advance Payment Options (optional)</div>
+      <div class="advance-options">
+        <div class="advance-option" id="advOptNone" onclick="selectAdvanceOption('none')">
+          <div style="font-size:1.2rem;margin-bottom:4px">✓</div>
+          <div style="font-weight:600;font-size:0.8rem">No Advance Required</div>
+          <div style="font-size:0.72rem;color:var(--gray-4)">Pay on delivery</div>
+        </div>
+
+        <div class="advance-option" id="advOptRequest" onclick="selectAdvanceOption('request')">
+          <div style="font-size:1.2rem;margin-bottom:4px">📤</div>
+          <div style="font-weight:600;font-size:0.8rem">Request Advance from Accounts</div>
+          <div style="font-size:0.72rem;color:var(--gray-4)">Send request to accounts first</div>
+        </div>
+      </div>
+      <div id="advRequestDetails" style="display:none;margin-top:10px;padding:12px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius-sm)">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Advance Amount (${currency})</label><input class="form-control" id="advanceAmt" type="number" placeholder="0.00"/></div>
+          <div class="form-group"><label class="form-label">Notes to Accounts</label><input class="form-control" id="advanceNote" placeholder="Reason, urgency..."/></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="requestAdvance()">Send Request to Accounts →</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+init();
+</script>
+</body>
+</html>
+

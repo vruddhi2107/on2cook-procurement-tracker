@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ProcureX — Engineer</title>
+<link rel="icon" type="image/x-icon" href="../on2cook no bg.png">
+<link rel="stylesheet" href="../css/styles.css"/>
+<style>
+.sourcing-options{display:flex;gap:8px;flex-wrap:wrap}
+.sourcing-chip{display:flex;align-items:center;gap:6px;padding:6px 12px;border:1.5px solid var(--border);border-radius:20px;cursor:pointer;font-size:0.8rem;transition:all 0.15s;user-select:none}
+.sourcing-chip.selected{border-color:var(--red);background:rgba(214,43,43,0.06);color:var(--red);font-weight:600}
+.sourcing-chip input{display:none}
+.pm-approval-choice{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pm-approval-option{border:2px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all 0.15s;text-align:center}
+.pm-approval-option:hover{border-color:var(--red)}
+.pm-approval-option.selected{border-color:var(--red);background:rgba(214,43,43,0.04)}
+.pm-approval-option-icon{font-size:1.5rem;margin-bottom:6px}
+.pm-approval-option-label{font-weight:600;font-size:0.82rem;margin-bottom:2px}
+.pm-approval-option-sub{font-size:0.72rem;color:var(--gray-4)}
+.bom-upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center;cursor:pointer;transition:all 0.15s;position:relative}
+.bom-upload-zone:hover,.bom-upload-zone.dragover{border-color:var(--red);background:rgba(214,43,43,0.03)}
+.bom-upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.approval-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.approval-option{border:2px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all 0.15s;text-align:center}
+.approval-option:hover{border-color:var(--red)}
+.approval-option.selected{border-color:var(--red);background:rgba(214,43,43,0.04)}
+.approval-option-icon{font-size:1.4rem;margin-bottom:5px}
+.approval-option-label{font-weight:600;font-size:0.82rem;margin-bottom:2px}
+.approval-option-sub{font-size:0.72rem;color:var(--gray-4)}
+.screenshot-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:14px;text-align:center;cursor:pointer;position:relative;transition:all 0.15s}
+.screenshot-zone:hover{border-color:#6366f1}
+.screenshot-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="navbarMount"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<main class="page-container">
+  <div class="page-header">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div><h1 class="page-title">My <span>Requests</span></h1><p class="page-sub">Submit and track procurement requests through the full lifecycle</p></div>
+      <button class="btn btn-primary" onclick="openNewPR()">+ New Request</button>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-card-value" id="sTotal">—</div><div class="stat-card-label">Total</div><div class="stat-card-icon">📋</div></div>
+    <div class="stat-card" style="--accent:#3b82f6"><div class="stat-card-value" id="sActive">—</div><div class="stat-card-label">In Progress</div><div class="stat-card-icon">⚡</div></div>
+    <div class="stat-card" style="--accent:#D62B2B"><div class="stat-card-value" id="sAction">—</div><div class="stat-card-label">Needs Action</div><div class="stat-card-icon">🔔</div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sClosed">—</div><div class="stat-card-label">Closed</div><div class="stat-card-icon">✔</div></div>
+  </div>
+
+  <div id="actionBanner" style="display:none;margin-bottom:16px"></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('all')">All</button>
+    <button class="tab-btn" onclick="switchTab('action')">🔔 Action Needed</button>
+    <button class="tab-btn" onclick="switchTab('closed')">Closed</button>
+    <!-- <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendors</button> -->
+  </div>
+
+  <div id="tabRequests">
+    <div class="filter-bar">
+<input type="text" id="searchInput" placeholder="Search by project or PR #..." oninput="filterTable()" autocomplete="off"/>      <select id="filterPhase" onchange="filterTable()">
+        <option value="">All Phases</option>
+        <option value="submitted">Submitted</option>
+        <option value="pending_initial_pm_approval">Awaiting PM Clearance</option>
+        <option value="procurement_active">Procurement Active</option>
+        <option value="quotations_shared">Quotations Shared</option>
+        <option value="pending_pm_final_approval">Pending PM Approval</option>
+        <option value="approved">Approved</option>
+        <option value="order_placed">Order Placed</option>
+        <option value="grn_pending">GRN / QC Pending</option>
+        <option value="qc_passed">QC Passed</option>
+        <option value="accepted">Accepted</option>
+        <option value="rejected">Rejected</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Clear</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>PM</th><th>Updated</th><th></th></tr></thead>
+          <tbody id="requestsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tabVendors" style="display:none">
+    <div class="filter-bar"><input type="text" id="vendorSearch" placeholder="Search vendors..."/></div>
+    <p style="font-size:0.78rem;color:var(--gray-4);margin-bottom:14px">Read-only view — contact the Procurement Manager to add or enquire about vendors.</p>
+    <div class="vendor-grid" id="vendorGrid"><div style="color:var(--gray-4);padding:24px;grid-column:1/-1">Loading...</div></div>
+  </div>
+</main>
+
+<!-- ════════════════════════════════════════════════════════
+     NEW / EDIT REQUEST MODAL
+     ════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="prFormModal">
+  <div class="modal" style="max-width:820px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="prFormTitle">New Procurement Request</div><div class="modal-title-sub" id="prFormSub">All starred fields are required</div></div>
+      <button class="modal-close" onclick="closeModal('prFormModal')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:82vh;overflow-y:auto;padding-right:4px">
+
+      <!-- ── PM Approval Status ── -->
+      <div id="pmApprovalSection" style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius);padding:14px;margin-bottom:18px">
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:10px">Do you already have Project Manager approval for this requirement?</div>
+        <div class="pm-approval-choice">
+          <div class="pm-approval-option" id="pmOptYes" onclick="selectPMApproval('already_approved')">
+            <div class="pm-approval-option-icon"></div>
+            <div class="pm-approval-option-label">Yes — I have PM approval</div>
+            <div class="pm-approval-option-sub">Procurement starts immediately</div>
+          </div>
+          <div class="pm-approval-option" id="pmOptNo" onclick="selectPMApproval('needs_approval')">
+            <div class="pm-approval-option-icon">📋</div>
+            <div class="pm-approval-option-label">No — Need PM approval first</div>
+            <div class="pm-approval-option-sub">PM will be notified to approve</div>
+          </div>
+        </div>
+        <div id="vendorInfoNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.18);border-radius:var(--radius-sm);font-size:0.78rem;color:#6d28d9">
+          ℹ Vendor Info requests go directly to the Procurement Manager — no PM clearance needed.
+        </div>
+      </div>
+
+      <!-- ── Screenshot if PM Already Approved ── -->
+      <div id="pmScreenshotSection" style="display:none;padding:14px;border:1.5px solid rgba(99,102,241,0.25);border-radius:var(--radius);margin-bottom:18px;background:rgba(99,102,241,0.03)">
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;color:#6366f1">📎 Upload PM Approval Screenshot <span style="color:var(--red)">*</span></div>
+        <p style="font-size:0.76rem;color:var(--gray-3);margin-bottom:10px">Please attach the screenshot or proof of PM approval (WhatsApp message, email, etc.)</p>
+        <div class="screenshot-zone" id="pmSsZone">
+          <input type="file" id="pmSsFile" accept="image/png,image/jpeg,image/jpg" onchange="handlePMScreenshot(event)"/>
+          <div style="font-size:1.4rem;margin-bottom:4px">📷</div>
+          <div style="font-size:0.8rem;font-weight:600">Click or drag to upload</div>
+          <div style="font-size:0.72rem;color:var(--gray-4)">PNG or JPG — max 5MB</div>
+        </div>
+        <div id="pmSsPreview" style="display:none;margin-top:8px">
+          <img id="pmSsImg" style="max-width:100%;max-height:180px;object-fit:contain;border-radius:6px;border:1px solid var(--border)"/>
+          <button class="btn btn-ghost btn-sm" style="margin-top:4px" onclick="clearPMScreenshot()">✕ Remove</button>
+        </div>
+      </div>
+
+      <!-- ── Core Fields ── -->
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Request Type *</label>
+          <select class="form-control" id="fCategory" onchange="onCategoryChange()">
+            <option value="">Select</option>
+            <option value="RFQ">RFQ — Request for Quotation</option>
+            <option value="vendor_info">Request for Vendor Information</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Department *</label>
+          <select class="form-control" id="fDept">
+            <option value="">Select</option>
+            <option value="mech">Mechanical</option>
+            <option value="id">Industrial Design</option>
+            <option value="electronics">Electronics</option>
+          </select>
+        </div>
+
+        <!-- Project name — dropdown from DB -->
+        <div class="form-group">
+          <label class="form-label">Project Name *</label>
+          <select class="form-control" id="fProjectSelect" onchange="onProjectChange()">
+            <option value="">Select Project...</option>
+          </select>
+        </div>
+
+        <!-- Project Phase — dropdown based on selected project -->
+        <div class="form-group">
+          <label class="form-label">Project Phase *</label>
+          <select class="form-control" id="fPhaseSelect">
+            <option value="">Select project first...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Project Manager *</label>
+          <select class="form-control" id="fPMSelect">
+            <option value="">Loading PMs...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Your Name</label>
+          <input class="form-control" id="fTeam" readonly/>
+        </div>
+
+        <div class="form-group" id="orderTypeGroup">
+          <label class="form-label">Order Type <span style="color:var(--red)">*</span></label>
+          <select class="form-control" id="fOrderType">
+            <option value="">Select</option>
+            <option value="repeat">Repeat Order</option>
+            <option value="custom">Custom Order</option>
+            <option value="modification">Modification Request</option>
+            <option value="inventory">Inventory Item</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Vendor Suggestion <span style="color:var(--gray-4);font-weight:400">(optional)</span></label>
+          <input class="form-control" id="fVendor" placeholder="Preferred vendor, if any"/>
+        </div>
+
+        <!-- Product Link -->
+        <div class="form-group full">
+          <label class="form-label">Product Link <span style="color:var(--gray-4);font-weight:400">(optional)</span></label>
+          <input class="form-control" id="fProductLink" type="url" placeholder="https://example.com/product"/>
+        </div>
+
+        <!-- Sourcing -->
+        <div class="form-group full">
+          <label class="form-label">Sourcing</label>
+          <div class="sourcing-options">
+            <label class="sourcing-chip" id="srcDomestic" onclick="toggleSourcing('domestic')">
+              🏠 Domestic
+            </label>
+            <label class="sourcing-chip" id="srcInternational" onclick="toggleSourcing('international')">
+              🌍 International
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group full">
+          <label class="form-label">Additional Notes / Description</label>
+          <textarea class="form-control" id="fDesc" placeholder="Any additional context, special requirements, or references..." style="min-height:60px"></textarea>
+        </div>
+      </div>
+
+      <!-- ── QC Criteria ── -->
+      <div style="margin-top:14px;padding:14px;border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius);background:rgba(99,102,241,0.03)">
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:10px;color:#6366f1">🔍 QC Criteria <span style="color:var(--gray-4);font-weight:400;font-size:0.72rem">(optional — helps engineer during quality check)</span></div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Preferred Color / Finish</label>
+            <input class="form-control" id="fQcColor" placeholder="e.g. Matte black, RAL 7016, Silver"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Preferred Material</label>
+            <input class="form-control" id="fQcMaterial" placeholder="e.g. Stainless steel 316L, ABS plastic"/>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Additional QC Notes</label>
+            <textarea class="form-control" id="fQcCustom" placeholder="Dimensional tolerances, certifications, compliance standards..." style="min-height:54px"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Attachment / Supporting Docs ── -->
+      <div style="margin-top:14px">
+        <label class="form-label" style="margin-bottom:6px;display:block">Attachments <span style="color:var(--gray-4);font-weight:400;font-size:0.72rem">(drawings, specs, reference images)</span></label>
+        <div class="bom-upload-zone" id="attachZone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleAttachDrop(event)">
+          <input type="file" id="attachFile" accept="image/*,.pdf,.doc,.docx" multiple onchange="handleAttachFiles(event)"/>
+          <div style="font-size:1.3rem;margin-bottom:4px">📎</div>
+          <div style="font-size:0.8rem;font-weight:600">Drag & drop or click to attach files</div>
+          <div style="font-size:0.72rem;color:var(--gray-4)">Images, PDF, DOC — max 5MB each</div>
+        </div>
+        <div id="attachList" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
+      </div>
+
+      <!-- ── BOM Upload ── -->
+      <div style="margin-top:14px;padding:14px;border:1.5px dashed rgba(34,197,94,0.4);border-radius:var(--radius);background:rgba(34,197,94,0.03)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+          <div style="font-size:0.82rem;font-weight:600;color:#16a34a">📊 Upload BOM (Bill of Materials) — Auto-fills parts below</div>
+          <a id="bomTemplateLink" href="#" onclick="downloadBOMTemplate(event)" style="font-size:0.72rem;font-weight:600;color:#6366f1;text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border:1px solid #6366f130;border-radius:6px;background:#6366f108;white-space:nowrap">⬇ Download Template</a>
+        </div>
+        <p style="font-size:0.74rem;color:var(--gray-3);margin-bottom:10px">Use the template above, then upload your filled <strong>CSV or Excel (.xlsx)</strong>. Key columns: <code>Part Name</code> · <code>Quantity&nbsp;(per&nbsp;Set)</code> · <code>Unit&nbsp;of&nbsp;Measurement</code> · <code>Material&nbsp;Specifications</code>.</p>
+        <div class="bom-upload-zone" id="bomZone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleBOMDrop(event)">
+          <input type="file" id="bomFile" accept=".csv,.xlsx,.xls,.xlsm" onchange="handleBOMFile(event)"/>
+          <div style="font-size:1.3rem;margin-bottom:4px">📊</div>
+          <div style="font-size:0.8rem;font-weight:600">Upload BOM CSV</div>
+          <div style="font-size:0.72rem;color:var(--gray-4)">CSV or Excel (.xlsx) — auto-parses into parts table</div>
+        </div>
+        <div id="bomStatus" style="margin-top:8px;font-size:0.78rem"></div>
+      </div>
+
+      <!-- ── Parts / Items Table ── -->
+      <div style="margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label class="form-label" style="margin:0">Parts / Items *</label>
+          <span style="font-size:0.72rem;color:var(--gray-4)">Add at least one part or upload a BOM</span>
+        </div>
+        <div id="partsEditorContainer"></div>
+      </div>
+
+      <!-- ── Modification Note ── -->
+      <div id="modificationNoteSection" style="display:none;margin-top:16px;padding:14px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius)">
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;color:#6366f1">↺ Resubmitting as a Modified Request</div>
+        <div class="form-group">
+          <label class="form-label">What changed? *</label>
+          <textarea class="form-control" id="fModNote" placeholder="Briefly describe what was changed from the original request..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('prFormModal')">Cancel</button>
+      <button class="btn btn-primary" id="prFormSubmitBtn" onclick="submitPR()">Submit Request →</button>
+    </div>
+  </div>
+</div>
+
+<!-- PR DETAIL MODAL -->
+<div class="modal-overlay" id="prModal">
+  <div class="modal" style="max-width:860px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="prModalTitle">Request</div><div class="modal-title-sub" id="prModalSub"></div></div>
+      <button class="modal-close" onclick="closeModal('prModal')">✕</button>
+    </div>
+    <div class="modal-body" id="prModalBody" style="max-height:80vh;overflow-y:auto"></div>
+    <div class="modal-footer" id="prModalFooter"><button class="btn btn-secondary" onclick="closeModal('prModal')">Close</button></div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="footerMount"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../js/supabase-config.js"></script>
+<script src="../js/shared.js"></script>
+<script>
+let currentUser, myRequests=[], prQuotations=[], allPMs=[], allProjects=[];
+function addPhaseTimestamp(pr, phaseName) {
+  var existing = (pr && pr.phase_timestamps) ? pr.phase_timestamps : {};
+  var ts = Object.assign({}, existing);
+  ts[phaseName] = new Date().toISOString();
+  return ts;
+}
+let activeTab='all', selectedPMApproval=null, currentPR=null;
+let selectedQuotationId=null, screenshotBase64=null, selectedApprovalPath=null;
+let isEditMode=false, editingParentId=null;
+let pmScreenshotBase64=null, selectedSourcing=[], attachedFiles=[];
+
+function handleAttachmentDownload(e, url, fileName) {
+  if (!url) return;
+  if (url.startsWith('data:')) {
+    e.preventDefault();
+    try {
+      const arr = url.split(','), mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]); let n = bstr.length; const u8 = new Uint8Array(n);
+      while(n--) u8[n] = bstr.charCodeAt(n);
+      const blob = new Blob([u8], {type: mime});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fileName;
+      document.body.appendChild(a); a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    } catch(err) { window.open(url, '_blank'); }
+  }
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+async function init() {
+  currentUser=Session.require(['engineer']); if(!currentUser) return;
+  document.getElementById('navbarMount').innerHTML=buildNavbar(currentUser);
+  document.getElementById('footerMount').innerHTML=buildFooter();
+  initNavbar(currentUser);
+  document.getElementById('fTeam').value=currentUser.name;
+  if(currentUser.department) document.getElementById('fDept').value=currentUser.department;
+  initPartsEditor('partsEditorContainer',[{_id:1,name:'',qty:1,spec:''}]);
+  showLoader(true);
+  await Promise.all([loadRequests(), loadPMs(), loadProjects()]);
+  showLoader(false);
+}
+
+async function loadRequests() {
+  const{data}=await db.from('procurement_requests').select('*, users!procurement_requests_assigned_pm_id_fkey(name)').eq('created_by',currentUser.id).order('updated_at',{ascending:false});
+  myRequests=data||[];
+  updateStats(); renderBanner(); filterTable();
+}
+
+async function loadPMs() {
+  const{data}=await db.from('users').select('id,name').eq('role','project_manager').order('name');
+  allPMs=data||[];
+  const sel=document.getElementById('fPMSelect');
+  sel.innerHTML='<option value="">Select Project Manager</option>'+allPMs.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+}
+
+async function loadProjects() {
+  const{data}=await db.from('projects').select('*,project_phases(id,name)').eq('is_active',true).order('name');
+  allProjects=data||[];
+  populateProjectDropdown();
+}
+
+function populateProjectDropdown() {
+  const sel=document.getElementById('fProjectSelect');
+  sel.innerHTML='<option value="">Select Project...</option>'+allProjects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+}
+
+function onProjectChange() {
+  const pid=document.getElementById('fProjectSelect').value;
+  const project=allProjects.find(p=>p.id===pid);
+  const phSel=document.getElementById('fPhaseSelect');
+  if(!project){phSel.innerHTML='<option value="">Select project first...</option>';return;}
+  const phases=project.project_phases||[];
+  if(!phases.length){phSel.innerHTML='<option value="">No phases added yet</option>';return;}
+  phSel.innerHTML='<option value="">Select Phase...</option>'+phases.map(ph=>`<option value="${ph.name}">${ph.name}</option>`).join('');
+  // Auto-fill PM if project has a default PM
+  if(project.default_pm_id) document.getElementById('fPMSelect').value=project.default_pm_id;
+}
+
+// ── STATS / BANNER ───────────────────────────────────────────
+function updateStats() {
+  const closed=['qc_passed','accepted','rejected','payment_requested'], action=['quotations_shared','grn_pending','vendor_info_shared'];
+  document.getElementById('sTotal').textContent=myRequests.length;
+  document.getElementById('sActive').textContent=myRequests.filter(r=>!closed.includes(r.phase)).length;
+  document.getElementById('sAction').textContent=myRequests.filter(r=>action.includes(r.phase)).length;
+  document.getElementById('sClosed').textContent=myRequests.filter(r=>closed.includes(r.phase)).length;
+}
+
+function renderBanner() {
+  const items=myRequests.filter(r=>['quotations_shared','grn_pending','vendor_info_shared'].includes(r.phase));
+  const b=document.getElementById('actionBanner');
+  if(!items.length){b.style.display='none';return;}
+  b.style.display='block';
+  b.innerHTML=`<div style="background:rgba(214,43,43,0.06);border:1.5px solid rgba(214,43,43,0.22);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:1.1rem">🔔</span>
+    <div style="flex:1"><strong style="font-size:0.85rem">${items.length} request${items.length>1?'s':''} need your attention</strong>
+    <div style="font-size:0.75rem;color:var(--gray-3);margin-top:2px">${items.map(r=>`PR-${String(r.request_number).padStart(4,'0')}`).join(' · ')}</div></div>
+    <button class="btn btn-primary btn-sm" onclick="switchTab('action')">Review Now</button>
+  </div>`;
+}
+
+function switchTab(t) {
+  activeTab=t;
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['all','action','closed','vendors'][i]===t));
+  document.getElementById('tabRequests').style.display=t==='vendors'?'none':'block';
+  document.getElementById('tabVendors').style.display=t==='vendors'?'block':'none';
+  if(t==='vendors') loadAndRenderVendors('vendorGrid','vendorSearch');
+  else filterTable();
+}
+
+function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterPhase').value='';filterTable();}
+
+function filterTable() {
+  const s=document.getElementById('searchInput').value.toLowerCase(), ph=document.getElementById('filterPhase').value;
+  const closed=['qc_passed','accepted','rejected','payment_requested'], action=['quotations_shared','grn_pending','vendor_info_shared'];
+  let reqs=myRequests;
+  if(activeTab==='action') reqs=reqs.filter(r=>action.includes(r.phase));
+  if(activeTab==='closed') reqs=reqs.filter(r=>closed.includes(r.phase));
+  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
+  if(ph) reqs=reqs.filter(r=>r.phase===ph);
+  renderTable(reqs);
+}
+
+function renderTable(reqs) {
+  const tbody=document.getElementById('requestsBody');
+  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>${activeTab==='action'?'All caught up!':'No requests found'}</h3><p>${activeTab==='action'?'No actions needed right now.':'Submit a new request to get started.'}</p></div></td></tr>`;return;}
+  tbody.innerHTML=reqs.map(r=>{
+    const needsAction=['quotations_shared','grn_pending','vendor_info_shared'].includes(r.phase);
+    const pmName=r.users?.name||r.project_manager_name||'—';
+    return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
+      <td>
+        <span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span>
+        ${needsAction?`<span style="margin-left:6px;font-size:0.6rem;background:var(--red);color:white;padding:1px 5px;border-radius:2px;font-family:var(--font-mono)">ACT</span>`:''}
+      </td>
+      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div></td>
+      <td><span style="font-size:0.72rem;background:var(--off-white);border:1px solid var(--border);padding:1px 7px;border-radius:3px">${r.request_category==='vendor_info'?'Vendor Info':'RFQ'}</span></td>
+      <td>${getPhaseBadge(r.phase)}</td>
+      <td style="font-size:0.78rem;color:var(--gray-3)">${pmName}</td>
+      <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gray-4)">${fmtDate(r.updated_at||r.created_at)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn ${needsAction?'btn-primary':'btn-ghost'} btn-sm" onclick='openPR("${r.id}")'>${needsAction?'Action':'View'}</button>
+        ${['submitted','pending_initial_pm_approval'].includes(r.phase)?`<button class="btn btn-ghost btn-sm" onclick='openEditPR("${r.id}")' style="margin-left:4px">Edit</button>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── FORM HELPERS ─────────────────────────────────────────────
+function onCategoryChange() {
+  const cat=document.getElementById('fCategory').value;
+  const isVI=cat==='vendor_info';
+  document.getElementById('pmApprovalSection').style.opacity=isVI?'0.5':'1';
+  document.getElementById('pmApprovalSection').style.pointerEvents=isVI?'none':'auto';
+  document.getElementById('vendorInfoNote').style.display=isVI?'block':'none';
+  document.getElementById('orderTypeGroup').style.display=isVI?'none':'flex';
+  if(isVI){document.getElementById('pmScreenshotSection').style.display='none';}
+}
+
+function selectPMApproval(v) {
+  selectedPMApproval=v;
+  document.getElementById('pmOptYes').classList.toggle('selected',v==='already_approved');
+  document.getElementById('pmOptNo').classList.toggle('selected',v==='needs_approval');
+  document.getElementById('pmScreenshotSection').style.display=v==='already_approved'?'block':'none';
+}
+
+function handlePMScreenshot(e) {
+  const file=e.target.files[0]; if(!file) return;
+  if(file.size>5*1024*1024){showToast('File too large (max 5MB)','error');return;}
+  fileToBase64(file).then(b64=>{
+    pmScreenshotBase64=b64;
+    document.getElementById('pmSsImg').src=b64;
+    document.getElementById('pmSsPreview').style.display='block';
+    document.getElementById('pmSsZone').style.display='none';
+  });
+}
+
+function clearPMScreenshot() {
+  pmScreenshotBase64=null;
+  document.getElementById('pmSsPreview').style.display='none';
+  document.getElementById('pmSsZone').style.display='block';
+  document.getElementById('pmSsFile').value='';
+}
+
+function toggleSourcing(val) {
+  const idx=selectedSourcing.indexOf(val);
+  if(idx>=0) selectedSourcing.splice(idx,1); else selectedSourcing.push(val);
+  document.getElementById('srcDomestic').classList.toggle('selected',selectedSourcing.includes('domestic'));
+  document.getElementById('srcInternational').classList.toggle('selected',selectedSourcing.includes('international'));
+}
+
+// ── ATTACHMENT HANDLING ──────────────────────────────────────
+function handleAttachDrop(e){e.preventDefault();document.getElementById('attachZone').classList.remove('dragover');handleAttachFiles({target:{files:e.dataTransfer.files}});}
+async function handleAttachFiles(e) {
+  for(const file of [...e.target.files]){
+    if(file.size>5*1024*1024){showToast(`${file.name} too large`,'error');continue;}
+    const b64=await fileToBase64(file);
+    attachedFiles.push({name:file.name,type:file.type,data:b64});
+  }
+  document.getElementById('attachFile').value='';
+  renderAttachList();
+}
+function renderAttachList() {
+  document.getElementById('attachList').innerHTML=attachedFiles.map((f,i)=>`
+    <div class="upload-item">
+      <span>${f.type.includes('pdf')?'📄':f.type.includes('image')?'🖼️':'📎'}</span>
+      <span class="upload-item-name">${f.name}</span>
+      <button class="btn btn-danger btn-sm" onclick="removeAttach(${i})">✕</button>
+    </div>`).join('');
+}
+function removeAttach(i){attachedFiles.splice(i,1);renderAttachList();}
+
+// ── BOM TEMPLATE DOWNLOAD ────────────────────────────────────
+function downloadBOMTemplate(e) {
+  e.preventDefault();
+  const rows = [
+    ['Sr. No.','Part Number','Part Name','Material Specifications','Department','Quantity (per Set)','Unit of Measurement','Total Qty','Unit of Measurement','Vendor Name','Vendor Contact Details','Country','Cost','Purchase Link','Attachment (if Any)'],
+    ['1','NA','Example Part — M Size Gloves','Nitrile Latex Powder Free','Mech','8','Box','400','Pair','Surgical House','NA','India','NA','NA','NA'],
+    ['2','NA','Example Part — Steel Rod','SS 304, 6mm dia x 500mm','ID','4','pcs','4','pcs','','','','NA','',''],
+    ['3','','Enter your part here','Enter material spec / grade / finish','Electronics','1','pcs','1','pcs','','','','','',''],
+  ];
+  const csv = rows.map(r => r.map(c => '"'+String(c).replace(/"/g,'""')+'"').join(',')).join('');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'BOM_Template.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1000);
+}
+
+// ── BOM UPLOAD ───────────────────────────────────────────────
+function handleBOMDrop(e){e.preventDefault();document.getElementById('bomZone').classList.remove('dragover');handleBOMFile({target:{files:e.dataTransfer.files}});}
+async function handleBOMFile(e) {
+  const file=e.target.files[0]; if(!file) return;
+  const status=document.getElementById('bomStatus');
+  status.innerHTML=`<span style="color:#6366f1">⏳ Parsing BOM...</span>`;
+  try {
+    const parts=await parseBOMFile(file);
+    if(!parts.length){status.innerHTML=`<span style="color:var(--red)">No valid rows found in file</span>`;return;}
+    initPartsEditor('partsEditorContainer',parts.map((p,i)=>({...p,_id:i+1})));
+    status.innerHTML=`<span style="color:#16a34a">✓ ${parts.length} part${parts.length>1?'s':''} imported from BOM!</span>`;
+    showToast(`${parts.length} parts imported from BOM!`,'success');
+  } catch(err) {
+    status.innerHTML=`<span style="color:var(--red)">⚠ ${err.message}</span>`;
+  }
+  document.getElementById('bomFile').value='';
+}
+
+// ── NEW / EDIT PR ─────────────────────────────────────────────
+ function openNewPR() {
+  isEditMode=false; editingParentId=null;
+  selectedPMApproval=null; selectedSourcing=[]; attachedFiles=[]; pmScreenshotBase64=null;
+  document.getElementById('prFormTitle').textContent='New Procurement Request';
+  document.getElementById('prFormSub').textContent='All starred fields are required';
+  document.getElementById('prFormSubmitBtn').textContent='Submit Request →';
+  document.getElementById('modificationNoteSection').style.display='none';
+  document.getElementById('pmApprovalSection').style.display='block';
+  document.getElementById('pmScreenshotSection').style.display='none';
+  document.getElementById('pmSsPreview').style.display='none';
+  document.getElementById('pmSsZone').style.display='block';
+  document.getElementById('srcDomestic').classList.remove('selected');
+  document.getElementById('srcInternational').classList.remove('selected');
+  document.getElementById('attachList').innerHTML='';
+  document.getElementById('bomStatus').innerHTML='';
+  document.getElementById('pmOptYes').classList.remove('selected');
+  document.getElementById('pmOptNo').classList.remove('selected');
+  ['fCategory','fProjectSelect','fPhaseSelect','fPMSelect','fOrderType','fVendor','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  document.getElementById('fTeam').value=currentUser.name;
+  if(currentUser.department) document.getElementById('fDept').value=currentUser.department;
+  document.getElementById('fPhaseSelect').innerHTML='<option value="">Select project first...</option>';
+  initPartsEditor('partsEditorContainer',[{_id:1,name:'',qty:1,spec:''}]);
+  onCategoryChange();
+  openModal('prFormModal');
+}
+
+function openEditPR(id) {
+  const pr=myRequests.find(r=>r.id===id); if(!pr) return;
+  isEditMode=true; editingParentId=id;
+  selectedSourcing=pr.sourcing?(Array.isArray(pr.sourcing)?pr.sourcing:JSON.parse(pr.sourcing||'[]')):[];
+  attachedFiles=[]; pmScreenshotBase64=null;
+  document.getElementById('prFormTitle').textContent='Edit & Resubmit Request';
+  document.getElementById('prFormSub').textContent=`Based on PR-${String(pr.request_number).padStart(4,'0')}`;
+  document.getElementById('prFormSubmitBtn').textContent='↺ Resubmit as Modified →';
+  document.getElementById('modificationNoteSection').style.display='block';
+  document.getElementById('pmApprovalSection').style.display='none';
+  document.getElementById('pmScreenshotSection').style.display='none';
+  document.getElementById('fCategory').value=pr.request_category;
+  document.getElementById('fDept').value=pr.department;
+  document.getElementById('fPhaseSelect').innerHTML=`<option value="${pr.project_phase}" selected>${pr.project_phase}</option>`;
+  document.getElementById('fPMSelect').value=pr.assigned_pm_id||'';
+  document.getElementById('fOrderType').value=pr.order_type||'';
+  document.getElementById('fVendor').value=pr.vendor_suggestion||'';
+  document.getElementById('fDesc').value=pr.description||'';
+  document.getElementById('fProductLink').value=pr.product_link||'';
+  document.getElementById('fQcColor').value=pr.qc_criteria?.preferred_color||'';
+  document.getElementById('fQcMaterial').value=pr.qc_criteria?.preferred_material||'';
+  document.getElementById('fQcCustom').value=pr.qc_criteria?.custom||'';
+  document.getElementById('fTeam').value=currentUser.name;
+  document.getElementById('fModNote').value='';
+  document.getElementById('attachList').innerHTML='';
+  document.getElementById('bomStatus').innerHTML='';
+  // Set sourcing chips
+  document.getElementById('srcDomestic').classList.toggle('selected',selectedSourcing.includes('domestic'));
+  document.getElementById('srcInternational').classList.toggle('selected',selectedSourcing.includes('international'));
+  // Set project dropdown — try to find project
+  const proj=allProjects.find(p=>p.name===pr.project_name);
+  if(proj){document.getElementById('fProjectSelect').value=proj.id;}
+  const parts=(pr.parts||[]).map((p,i)=>({...p,_id:i+1}));
+  if(!parts.length) parts.push({_id:1,name:'',qty:1,spec:''});
+  initPartsEditor('partsEditorContainer',parts);
+  onCategoryChange();
+  openModal('prFormModal');
+}
+
+async function submitPR() {
+  const cat=document.getElementById('fCategory').value;
+  const isVI=cat==='vendor_info';
+  if(!isEditMode&&!isVI&&!selectedPMApproval){showToast('Please indicate PM approval status','error');return;}
+  if(!isEditMode&&!isVI&&selectedPMApproval==='already_approved'&&!pmScreenshotBase64){showToast('Please upload PM approval screenshot','error');return;}
+  const pmId=document.getElementById('fPMSelect').value;
+  if(!pmId){showToast('Please select a Project Manager','error');return;}
+  const projectId=document.getElementById('fProjectSelect').value;
+  const projectObj=allProjects.find(p=>p.id===projectId);
+  const projectName=projectObj?.name||document.getElementById('fProjectSelect').options[document.getElementById('fProjectSelect').selectedIndex]?.text||'';
+  const projectPhase=document.getElementById('fPhaseSelect').value;
+  const dept=document.getElementById('fDept').value;
+  const orderType=document.getElementById('fOrderType').value;
+  if(!cat||!projectName||!projectPhase||!dept){showToast('Please fill all required fields','error');return;}
+  if(!isVI&&!orderType){showToast('Please select an order type','error');return;}
+  const parts=getPartsFromEditor();
+  if(!parts.length){showToast('Please add at least one part or item','error');return;}
+  if(isEditMode){const modNote=document.getElementById('fModNote').value.trim();if(!modNote){showToast('Please describe what changed','error');return;}}
+  const pmUser=allPMs.find(p=>p.id===pmId);
+  const qcCriteria={
+    preferred_color:document.getElementById('fQcColor').value.trim()||null,
+    preferred_material:document.getElementById('fQcMaterial').value.trim()||null,
+    custom:document.getElementById('fQcCustom').value.trim()||null
+  };
+  const vals={
+    request_category:cat,
+    project_name:projectName,
+    project_phase:projectPhase,
+    assigned_pm_id:pmId,
+    project_manager_name:pmUser?.name||'',
+    team_member_name:currentUser.name,
+    department:dept,
+    vendor_suggestion:document.getElementById('fVendor').value.trim()||null,
+    description:document.getElementById('fDesc').value.trim()||null,
+    product_link:document.getElementById('fProductLink').value.trim()||null,
+    sourcing:selectedSourcing,
+    qc_criteria:qcCriteria,
+    pm_approval_screenshot:selectedPMApproval==='already_approved'?pmScreenshotBase64:null,
+    parts,
+    attachments:attachedFiles.map(f=>({name:f.name,type:f.type,data:f.data})),
+    created_by:currentUser.id,
+    phase:isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval',
+    initial_pm_approval:isEditMode?'already_approved':(isVI?null:selectedPMApproval),
+    is_modification:isEditMode,
+    parent_request_id:isEditMode?editingParentId:null,
+    modification_note:isEditMode?document.getElementById('fModNote').value.trim():null,
+    phase_timestamps:(function(){var ts={'submitted':new Date().toISOString()};var ph=isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval';if(ph!=='submitted')ts[ph]=new Date().toISOString();return ts;})()
+  };
+  if(!isVI) vals.order_type=orderType;
+  showLoader(true);
+  const{error,data}=await db.from('procurement_requests').insert(vals).select().single();
+  if(!error&&isEditMode&&editingParentId){
+    await postComment(editingParentId,currentUser.id,`↺ Modified and resubmitted as PR-${String(data.request_number).padStart(4,'0')}`);
+  }
+  showLoader(false);
+  if(error){showToast('Submit failed: '+error.message,'error');return;}
+  showToast(isEditMode?'↺ Resubmitted as a new modified request!':isVI?'Vendor Info request sent to Procurement!':'Request submitted!','success');
+  if(newPR?.id) notifyPhaseChange(newPR.id, newPR.phase||'submitted', currentUser?.id);
+  closeModal('prFormModal');
+  await loadRequests();
+}
+
+// ── PR DETAIL ─────────────────────────────────────────────────
+async function openPR(id) {
+  currentPR=myRequests.find(r=>r.id===id); if(!currentPR) return;
+  selectedQuotationId=currentPR.selected_quotation_id;
+  screenshotBase64=null; selectedApprovalPath=null;
+  document.getElementById('prModalTitle').textContent=`PR-${String(currentPR.request_number).padStart(4,'0')} — ${currentPR.project_name}`;
+  document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${fmtDate(currentPR.created_at)}`;
+  showLoader(true);
+  const[comments,quotations,vd,poRes,advRes,payRes]=await Promise.all([
+    loadComments(id),
+    db.from('pr_quotations').select('*').eq('pr_id',id).order('created_at').then(r=>r.data||[]),
+    currentPR.assigned_vendor_id?db.from('vendors').select('name').eq('id',currentPR.assigned_vendor_id).single():Promise.resolve({data:null}),
+    db.from('purchase_orders').select('*').eq('pr_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
+    db.from('advance_payment_requests').select('*').eq('pr_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
+    db.from('payment_requests').select('*').eq('pr_id',id).order('request_date',{ascending:false}).limit(1).maybeSingle()
+  ]);
+  prQuotations=quotations;
+  showLoader(false);
+  const pmName=allPMs.find(p=>p.id===currentPR.assigned_pm_id)?.name||currentPR.project_manager_name||'';
+  const footer=document.getElementById('prModalFooter');
+  footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('prModal')">Close</button>`;
+  let actionSection='';
+
+  if(currentPR.phase==='vendor_info_shared') {
+    actionSection=`<div class="action-section">
+      <div class="action-section-title">🏢 Vendor Information Received <span class="action-badge">ACTION REQUIRED</span></div>
+      <div style="background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.18);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px;white-space:pre-wrap;font-size:0.83rem;line-height:1.5">${currentPR.vendor_info_details||'No details provided.'}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-success" onclick="resolveVendorInfo('close')">✓ Close Request</button>
+        <button class="btn btn-secondary" onclick="resolveVendorInfo('more_vendors')">↻ Request More Vendors</button>
+        <button class="btn btn-primary" onclick="resolveVendorInfo('convert_to_rfq')">→ Convert to RFQ</button>
+      </div>
+    </div>`;
+  }
+
+  if(currentPR.phase==='quotations_shared') {
+    actionSection=buildQuoteReview(quotations);
+    footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('prModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitApprovalPath()">Submit →</button>`;
+  }
+
+  if(currentPR.phase==='grn_pending') {
+    const qcCriteria=currentPR.qc_criteria;
+    const parts=currentPR.parts||[];
+    const today=new Date().toLocaleDateString('en-GB');
+    // build GRN rows from PR parts
+    const grnRows=parts.map((p,i)=>`
+      <tr>
+        <td style="text-align:center;font-family:var(--font-mono);font-weight:600;color:var(--gray-3);font-size:0.8rem">${i+1}</td>
+        <td><input class="form-control" style="min-width:90px;font-size:0.78rem" placeholder="Item code" id="grnCode_${i}"/></td>
+        <td style="font-size:0.82rem;font-weight:500">${p.name||'—'}</td>
+        <td style="text-align:center;font-family:var(--font-mono);font-size:0.8rem">${p.spec?p.spec.split('Unit:')[1]?.split('|')[0]?.trim()||'pcs':'pcs'}</td>
+        <td style="text-align:center;font-family:var(--font-mono);font-weight:700;color:#6366f1">${p.qty||1}</td>
+        <td><input class="form-control" type="number" min="0" style="font-size:0.82rem" placeholder="0" id="grnRcvd_${i}" oninput="calcGRNRow(${i})"/></td>
+        <td><input class="form-control" type="number" min="0" style="font-size:0.82rem" placeholder="0" id="grnAccpt_${i}" oninput="calcGRNRow(${i})"/></td>
+        <td><input class="form-control" type="number" min="0" style="background:rgba(239,68,68,0.05);font-size:0.82rem" placeholder="0" id="grnRejct_${i}" readonly/></td>
+      </tr>`).join('');
+
+    actionSection=`<div class="action-section">
+      <div class="action-section-title">📦 Goods Receipt Note (GRN) &amp; Quality Check <span class="action-badge">ACTION REQUIRED</span></div>
+
+      <!-- GRN Header Info -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;padding:12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius)">
+        <div><label class="form-label" style="font-size:0.7rem">GRN NUMBER *</label>
+          <input class="form-control" id="grnNumber" placeholder="e.g. GRN/25-26/0001" style="font-family:var(--font-mono);font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">GRN DATE</label>
+          <input class="form-control" id="grnDate" value="${today}" style="font-family:var(--font-mono);font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">INVOICE NO</label>
+          <input class="form-control" id="grnInvoice" placeholder="Invoice number" style="font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">TRANSPORTER</label>
+          <input class="form-control" id="grnTransport" placeholder="Transporter name" style="font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">GATE INWARD NO</label>
+          <input class="form-control" id="grnGateNo" placeholder="Gate inward number" style="font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">GATE INWARD DATE</label>
+          <input class="form-control" id="grnGateDate" placeholder="${today}" style="font-family:var(--font-mono);font-size:0.82rem"/></div>
+      </div>
+
+      ${qcCriteria&&(qcCriteria.preferred_color||qcCriteria.preferred_material||qcCriteria.custom)?`
+      <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px">
+        <div style="font-size:0.75rem;font-weight:600;color:#6366f1;margin-bottom:4px">🔍 Expected QC Criteria</div>
+        ${qcCriteria.preferred_color?`<div style="font-size:0.78rem">Color/Finish: <strong>${qcCriteria.preferred_color}</strong></div>`:''}
+        ${qcCriteria.preferred_material?`<div style="font-size:0.78rem">Material: <strong>${qcCriteria.preferred_material}</strong></div>`:''}
+        ${qcCriteria.custom?`<div style="font-size:0.78rem">Other: ${qcCriteria.custom}</div>`:''}
+      </div>`:''}
+      <!-- GRN Items Matrix -->
+      <div style="margin-bottom:14px;overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+          <thead>
+            <tr style="background:var(--gray-6)">
+              <th style="padding:7px 10px;text-align:center;border:1px solid var(--border);font-size:0.7rem;width:42px">SR#</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);font-size:0.7rem">ITEM CODE</th>
+              <th style="padding:7px 10px;border:1px solid var(--border);font-size:0.7rem">ITEM NAME &amp; DESCRIPTION</th>
+              <th style="padding:7px 10px;text-align:center;border:1px solid var(--border);font-size:0.7rem">UOM</th>
+              <th style="padding:7px 10px;text-align:center;border:1px solid var(--border);font-size:0.7rem;background:rgba(99,102,241,0.06)">PO QTY</th>
+              <th style="padding:7px 10px;text-align:center;border:1px solid var(--border);font-size:0.7rem">QTY RECEIVED</th>
+              <th style="padding:7px 10px;text-align:center;border:1px solid var(--border);font-size:0.7rem;background:rgba(34,197,94,0.06)">QTY ACCEPTED</th>
+              <th style="padding:7px 10px;text-align:center;border:1px solid var(--border);font-size:0.7rem;background:rgba(239,68,68,0.06)">QTY REJECTED</th>
+            </tr>
+          </thead>
+          <tbody id="grnTableBody">
+            ${parts.length?grnRows:`<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--gray-4);font-size:0.82rem">No parts found on this PR</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- QC Result + Remarks -->
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="form-group">
+          <label class="form-label">QC Result *</label>
+          <select class="form-control" id="qcResult">
+            <option value="">Select result</option>
+            <option value="qc_passed">✔ QC Passed — meets all specs</option>
+            <option value="rejected">✖ Rejected — does not meet specs</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Inspection Notes / Remarks *</label>
+          <textarea class="form-control" id="qcNotes" rows="3" placeholder="Quantities verified, dimensions checked, defects noted..."></textarea>
+        </div>
+      </div>
+
+      <!-- Signatures row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius)">
+        <div><label class="form-label" style="font-size:0.7rem">RECEIVED BY</label>
+          <input class="form-control" id="grnReceivedBy" placeholder="Name / Signature" style="font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">QC CHECKED BY</label>
+          <input class="form-control" id="grnQCBy" placeholder="Name / Signature" style="font-size:0.82rem"/></div>
+      </div>
+    </div>`;
+    footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('prModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitQC()">Submit GRN &amp; QC →</button>`;
+  }
+
+  document.getElementById('prModalBody').innerHTML=
+    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',pmName,{poData:poRes.data||null,advPayRec:advRes.data||null,payRec:payRes.data||null})+actionSection+
+    `<div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
+      <div class="section-title" style="margin-bottom:10px">💬 Comments</div>
+      <div id="commentsList">${renderComments(comments)}</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input class="form-control" id="commentInput" placeholder="Add a comment..." style="flex:1" onkeydown="if(event.key==='Enter')addComment()"/>
+        <button class="btn btn-secondary btn-sm" onclick="addComment()">Post</button>
+      </div>
+    </div>`;
+  openModal('prModal');
+}
+
+async function resolveVendorInfo(action) {
+  showLoader(true);
+  let updates={updated_at:new Date().toISOString()},comment='';
+  if(action==='close'){updates.phase='qc_passed';updates.phase_timestamps=addPhaseTimestamp(currentPR,'qc_passed');comment='✓ Engineer closed request after reviewing vendor information.';}
+  else if(action==='more_vendors'){updates.phase='procurement_active';updates.vendor_info_details=null;comment='↻ Engineer requested more vendor options.';}
+  else if(action==='convert_to_rfq'){updates.phase='procurement_active';updates.request_category='RFQ';comment='→ Engineer converted to RFQ.';}
+  const{error}=await db.from('procurement_requests').update(updates).eq('id',currentPR.id);
+  if(!error&&comment) await postComment(currentPR.id,currentUser.id,comment);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast('Done!','success');closeModal('prModal');await loadRequests();
+}
+
+function buildQuoteReview(quotations) {
+  if(!quotations.length) return `<div class="action-section"><div class="action-section-title">📨 Review Quotations <span class="action-badge">ACTION REQUIRED</span></div><p style="color:var(--gray-4);font-size:0.82rem">No quotations yet.</p></div>`;
+  return `<div class="action-section">
+    <div class="action-section-title">📨 Review Quotations <span class="action-badge">ACTION REQUIRED</span></div>
+    <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Review ${quotations.length} quotation${quotations.length>1?'s':''} then choose an approval path.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">${quotations.map(q=>renderQuotationCard(q,false)).join('')}</div>
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:16px">
+      <div class="form-label" style="margin-bottom:10px">Who should approve this? *</div>
+      <div class="approval-options">
+        <div class="approval-option" id="pathClient" onclick="selectApprovalPath('client')">
+          <div class="approval-option-icon">👤</div>
+          <div class="approval-option-label">Client Approval</div>
+          <div class="approval-option-sub">Select quote + attach client screenshot, then goes to PM</div>
+        </div>
+        <div class="approval-option" id="pathPM" onclick="selectApprovalPath('project_manager')">
+          <div class="approval-option-icon">👔</div>
+          <div class="approval-option-label">Project Manager</div>
+          <div class="approval-option-sub">Forward directly — PM selects quote and approves</div>
+        </div>
+      </div>
+    </div>
+    <div id="clientPathFields" style="display:none">
+      <div class="form-label" style="margin-bottom:8px">Select Final Quotation *</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${quotations.map(q=>renderQuotationCard(q,true,selectedQuotationId)).join('')}</div>
+      <div class="form-label" style="margin-bottom:6px">Client Approval Screenshot *</div>
+      <div class="screenshot-zone" id="screenshotZone"><input type="file" id="screenshotFile" accept="image/png,image/jpeg" onchange="handleScreenshot(event)"/>
+        <div style="font-size:1.3rem;margin-bottom:4px">📷</div><div style="font-size:0.8rem;font-weight:600">Upload screenshot</div><div style="font-size:0.72rem;color:var(--gray-4)">PNG or JPG, max 5MB</div></div>
+      <div id="screenshotPreview" style="display:none;margin-top:8px">
+        <img id="screenshotImg" style="max-width:100%;max-height:200px;object-fit:contain;border-radius:6px;border:1px solid var(--border)"/>
+        <button class="btn btn-ghost btn-sm" style="margin-top:4px" onclick="clearScreenshot()">✕ Remove</button>
+      </div>
+      <div class="form-group" style="margin-top:10px">
+        <label class="form-label">Client Approval Notes</label>
+        <textarea class="form-control" id="clientNotes" placeholder="Client name, reference, date..."></textarea>
+      </div>
+    </div>
+    <div id="pmPathFields" style="display:none">
+      <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius-sm);padding:12px;display:flex;gap:10px">
+        <span style="font-size:1.2rem">👔</span>
+        <div><div style="font-size:0.85rem;font-weight:600;margin-bottom:3px">Forwarding to PM</div>
+        <p style="font-size:0.78rem;color:var(--gray-3)">PM will receive all quotations, select the final one, and give approval.</p></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function selectApprovalPath(path) {
+  selectedApprovalPath=path;
+  document.getElementById('pathClient').classList.toggle('selected',path==='client');
+  document.getElementById('pathPM').classList.toggle('selected',path==='project_manager');
+  document.getElementById('clientPathFields').style.display=path==='client'?'block':'none';
+  document.getElementById('pmPathFields').style.display=path==='project_manager'?'block':'none';
+  if(path!=='client') selectedQuotationId=null;
+}
+
+function selectQuotation(qId) {
+  selectedQuotationId=qId;
+  prQuotations.forEach(q=>{
+    const card=document.getElementById(`qcard-${q.id}`);if(!card)return;
+    const isNow=q.id===qId;
+    card.classList.toggle('selected',isNow);
+    const ob=card.querySelector('.sel-badge');if(ob)ob.remove();
+    if(isNow)card.querySelector('.quotation-card-header').insertAdjacentHTML('beforeend',`<span class="sel-badge" style="background:#22c55e14;color:#16a34a;border:1px solid #22c55e30;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-size:0.62rem;font-weight:600">✓ SELECTED</span>`);
+    card.querySelectorAll('button').forEach(btn=>{
+      if(btn.textContent.includes('Select as Final')||btn.textContent.includes('Deselect')){
+        btn.textContent=isNow?'Deselect':'✓ Select as Final';
+        btn.className=`btn btn-sm ${isNow?'btn-danger':'btn-primary'}`;
+        btn.onclick=()=>selectQuotation(isNow?null:q.id);
+      }
+    });
+  });
+}
+
+function handleScreenshot(e) {
+  const file=e.target.files[0];if(!file)return;
+  fileToBase64(file).then(b64=>{screenshotBase64=b64;document.getElementById('screenshotImg').src=b64;document.getElementById('screenshotPreview').style.display='block';document.getElementById('screenshotZone').style.display='none';});
+}
+function clearScreenshot(){screenshotBase64=null;document.getElementById('screenshotPreview').style.display='none';document.getElementById('screenshotZone').style.display='block';document.getElementById('screenshotFile').value='';}
+
+async function submitApprovalPath() {
+  if(!selectedApprovalPath){showToast('Please select an approval path','error');return;}
+  if(selectedApprovalPath==='client'){
+    if(!selectedQuotationId){showToast('Please select a final quotation','error');return;}
+    if(!screenshotBase64){showToast('Please attach client approval screenshot','error');return;}
+    showLoader(true);
+    await db.from('pr_quotations').update({is_selected:false}).eq('pr_id',currentPR.id);
+    await db.from('pr_quotations').update({is_selected:true}).eq('id',selectedQuotationId);
+    const{error}=await db.from('procurement_requests').update({
+      phase:'pending_pm_final_approval',approval_path:'client',selected_quotation_id:selectedQuotationId,
+      client_approval_screenshot:screenshotBase64,client_approval_notes:document.getElementById('clientNotes')?.value.trim()||null,
+      updated_at:new Date().toISOString()
+    }).eq('id',currentPR.id);
+    showLoader(false);
+    if(error){showToast('Error: '+error.message,'error');return;}
+    showToast('Client approval submitted — forwarded to PM.','success');
+  } else {
+    showLoader(true);
+    const{error}=await db.from('procurement_requests').update({
+      phase:'pending_pm_final_approval',approval_path:'project_manager',client_approval_screenshot:null,selected_quotation_id:null,
+      updated_at:new Date().toISOString()
+    }).eq('id',currentPR.id);
+    await db.from('pr_quotations').update({is_selected:false}).eq('pr_id',currentPR.id);
+    showLoader(false);
+    if(error){showToast('Error: '+error.message,'error');return;}
+    showToast('Forwarded directly to Project Manager.','success');
+  }
+  screenshotBase64=null;selectedQuotationId=null;selectedApprovalPath=null;
+  closeModal('prModal');await loadRequests();
+}
+
+// Calculate rejected = received - accepted for a GRN row
+function calcGRNRow(i) {
+  const rcvd = parseInt(document.getElementById('grnRcvd_'+i)?.value||'0')||0;
+  const acpt = parseInt(document.getElementById('grnAccpt_'+i)?.value||'0')||0;
+  const rjEl = document.getElementById('grnRejct_'+i);
+  if(rjEl) rjEl.value = Math.max(0, rcvd - acpt);
+}
+
+async function submitQC() {
+  const result=document.getElementById('qcResult').value;
+  const notes=document.getElementById('qcNotes').value.trim();
+  if(!result){showToast('Please select QC result','error');return;}
+  if(!notes){showToast('Please add inspection notes','error');return;}
+
+  // Collect GRN header fields
+  const grnNumber = document.getElementById('grnNumber')?.value.trim()||'';
+  const grnDate   = document.getElementById('grnDate')?.value.trim()||'';
+  const grnInvoice= document.getElementById('grnInvoice')?.value.trim()||'';
+  const grnTransport=document.getElementById('grnTransport')?.value.trim()||'';
+  const grnGateNo = document.getElementById('grnGateNo')?.value.trim()||'';
+  const grnGateDate=document.getElementById('grnGateDate')?.value.trim()||'';
+  const grnRecvBy = document.getElementById('grnReceivedBy')?.value.trim()||'';
+  const grnQCBy   = document.getElementById('grnQCBy')?.value.trim()||'';
+  if(!grnNumber){showToast('Please enter a GRN Number','error');return;}
+
+  // Collect GRN rows
+  const parts = currentPR.parts||[];
+  const grnLines = parts.map((p,i)=>({
+    sr: i+1,
+    item_code: document.getElementById('grnCode_'+i)?.value.trim()||'—',
+    item_name: p.name,
+    uom: p.spec?p.spec.split('Unit:')[1]?.split('|')[0]?.trim()||'pcs':'pcs',
+    po_qty: p.qty||1,
+    received: parseInt(document.getElementById('grnRcvd_'+i)?.value||'0')||0,
+    accepted: parseInt(document.getElementById('grnAccpt_'+i)?.value||'0')||0,
+    rejected: parseInt(document.getElementById('grnRejct_'+i)?.value||'0')||0
+  }));
+
+  const grnData = {
+    grn_number: grnNumber, grn_date: grnDate,
+    invoice_no: grnInvoice, transporter: grnTransport,
+    gate_inward_no: grnGateNo, gate_inward_date: grnGateDate,
+    received_by: grnRecvBy, qc_checked_by: grnQCBy,
+    lines: grnLines
+  };
+
+  showLoader(true);
+  const qcResultValue = result==='qc_passed' ? 'accepted' : 'rejected';
+  const fullNotes = `GRN# ${grnNumber} | ${notes}`;
+  const{error}=await db.from('procurement_requests').update({
+    phase: result,
+    qc_result: qcResultValue,
+    qc_notes: fullNotes,
+    qc_criteria: Object.assign({}, currentPR.qc_criteria||{}, {grn: grnData}),
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR, result)
+  }).eq('id',currentPR.id);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  notifyPhaseChange(currentPR.id,result,currentUser?.id);
+  showToast(result==='qc_passed'?'✔ GRN submitted & QC Passed!':'✖ GRN submitted — QC rejected.','success');
+  closeModal('prModal');await loadRequests();
+}
+
+async function addComment() {
+  const input=document.getElementById('commentInput'),text=input?.value.trim();
+  if(!text||!currentPR)return;
+  try{await postComment(currentPR.id,currentUser.id,text);input.value='';const c=await loadComments(currentPR.id);document.getElementById('commentsList').innerHTML=renderComments(c);}catch(e){showToast('Comment failed','error');}
+}
+
+init();
+</script>
+</body>
+</html>

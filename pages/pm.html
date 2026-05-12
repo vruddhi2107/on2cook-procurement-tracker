@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ProcureX — Project Manager</title>
+<link rel="icon" type="image/x-icon" href="../on2cook no bg.png">
+<link rel="stylesheet" href="../css/styles.css"/>
+</head>
+<body>
+<div id="navbarMount"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<main class="page-container">
+  <div class="page-header">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div><h1 class="page-title">Project Manager <span>Portal</span></h1><p class="page-sub">Review, approve, and track procurement requests assigned to you</p></div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-card-value" id="sClearance">—</div><div class="stat-card-label">Needs Clearance</div><div class="stat-card-icon">🔐</div></div>
+    <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sFinal">—</div><div class="stat-card-label">Pending Final</div><div class="stat-card-icon">✍️</div></div>
+    <div class="stat-card" style="--accent:#7c3aed"><div class="stat-card-value" id="sEscalated">—</div><div class="stat-card-label">Sent to Director</div><div class="stat-card-icon">👤</div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sApproved">—</div><div class="stat-card-label">Approved</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#dc2626"><div class="stat-card-value" id="sRejected">—</div><div class="stat-card-label">Rejected</div><div class="stat-card-icon"></div></div>
+  </div>
+
+  <div id="pendingBanner" style="display:none;margin-bottom:16px"></div>
+
+  <div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('clearance')">🔐 Clearance</button>
+  <button class="tab-btn" onclick="switchTab('final')">✍️ Final Approval</button>
+  <button class="tab-btn" onclick="switchTab('all')">All Requests</button>
+  <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendors</button>
+
+  <button class="tab-btn" onclick="goToProjects()">📋 Projects</button>
+</div>
+
+  <div id="tabContent">
+    <div class="filter-bar">
+      <input type="text" id="searchInput" placeholder="Search by project or PR #..." oninput="filterTable()"/>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('searchInput').value='';filterTable()">✕</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>PR #</th><th>Project</th><th>Requester</th><th>Dept</th><th>Type</th><th>Phase</th><th>Submitted</th><th></th></tr></thead>
+          <tbody id="requestsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tabVendors" style="display:none">
+    <div class="filter-bar"><input type="text" id="vendorSearch" placeholder="Search vendors..."/></div>
+    <p style="font-size:0.78rem;color:var(--gray-4);margin-bottom:14px">Read-only — contact Procurement Manager to add or update vendor details.</p>
+    <div class="vendor-grid" id="vendorGrid"></div>
+  </div>
+</main>
+
+<!-- PR DETAIL MODAL -->
+<div class="modal-overlay" id="prModal">
+  <div class="modal" style="max-width:860px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="prModalTitle">Request</div><div class="modal-title-sub" id="prModalSub"></div></div>
+      <button class="modal-close" onclick="closeModal('prModal')">✕</button>
+    </div>
+    <div class="modal-body" id="prModalBody" style="max-height:78vh;overflow-y:auto"></div>
+    <div class="modal-footer" id="prModalFooter"><button class="btn btn-secondary" onclick="closeModal('prModal')">Close</button></div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="footerMount"></div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../js/supabase-config.js"></script>
+<script src="../js/shared.js"></script>
+<script>
+let currentUser, allRequests=[], activeTab='clearance', currentPR=null;
+function addPhaseTimestamp(pr, phaseName) {
+  var existing = (pr && pr.phase_timestamps) ? pr.phase_timestamps : {};
+  var ts = Object.assign({}, existing);
+  ts[phaseName] = new Date().toISOString();
+  return ts;
+}
+let pmSelectedQuotationId=null, prQuotations=[];
+
+function handleAttachmentDownload(e, url, fileName) {
+  if (!url) return;
+  if (url.startsWith('data:')) {
+    e.preventDefault();
+    try {
+      const arr = url.split(','), mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]); let n = bstr.length; const u8 = new Uint8Array(n);
+      while(n--) u8[n] = bstr.charCodeAt(n);
+      const blob = new Blob([u8], {type: mime});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fileName;
+      document.body.appendChild(a); a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    } catch(err) { window.open(url, '_blank'); }
+  }
+}
+
+async function init() {
+  currentUser=Session.require(['project_manager']); if(!currentUser) return;
+  document.getElementById('navbarMount').innerHTML=buildNavbar(currentUser);
+  document.getElementById('footerMount').innerHTML=buildFooter();
+  initNavbar(currentUser);
+  showLoader(true);
+  await loadRequests();
+  showLoader(false);
+}
+
+async function loadRequests() {
+  // Load requests assigned to this specific PM
+  const{data}=await db.from('procurement_requests')
+    .select('*, users!procurement_requests_created_by_fkey(name,email)')
+    .eq('assigned_pm_id', currentUser.id)
+    .order('updated_at',{ascending:false});
+  allRequests=data||[];
+  updateStats(); renderBanner(); filterTable();
+}
+
+function updateStats() {
+  document.getElementById('sClearance').textContent=allRequests.filter(r=>r.phase==='pending_initial_pm_approval').length;
+  document.getElementById('sFinal').textContent=allRequests.filter(r=>r.phase==='pending_pm_final_approval').length;
+  document.getElementById('sEscalated').textContent=allRequests.filter(r=>r.phase==='pending_sandy_approval').length;
+  document.getElementById('sApproved').textContent=allRequests.filter(r=>r.pm_final_approval_status==='approved').length;
+  document.getElementById('sRejected').textContent=allRequests.filter(r=>r.pm_final_approval_status==='rejected').length;
+}
+
+function renderBanner() {
+  const clearance=allRequests.filter(r=>r.phase==='pending_initial_pm_approval');
+  const final=allRequests.filter(r=>r.phase==='pending_pm_final_approval');
+  const total=clearance.length+final.length;
+  const b=document.getElementById('pendingBanner');
+  if(!total){b.style.display='none';return;}
+  b.style.display='block';
+  b.innerHTML=`<div style="background:rgba(214,43,43,0.06);border:1.5px solid rgba(214,43,43,0.22);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:1.1rem">⏳</span>
+    <div style="flex:1"><strong style="font-size:0.85rem">${total} request${total>1?'s':''} awaiting your decision</strong>
+    <div style="font-size:0.75rem;color:var(--gray-3);margin-top:2px">${clearance.length?`${clearance.length} clearance`:''}${clearance.length&&final.length?' · ':''}${final.length?`${final.length} final approval`:''}</div></div>
+    <button class="btn btn-primary btn-sm" onclick="switchTab('clearance')">Review Now</button>
+  </div>`;
+}
+
+function switchTab(t) {
+  activeTab=t;
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['clearance','final','all','vendors'][i]===t));
+  document.getElementById('tabContent').style.display=t==='vendors'?'none':'block';
+  document.getElementById('tabVendors').style.display=t==='vendors'?'block':'none';
+  if(t==='vendors') loadAndRenderVendors('vendorGrid','vendorSearch');
+  else filterTable();
+}
+
+function filterTable() {
+  const s=document.getElementById('searchInput').value.toLowerCase();
+  let reqs=allRequests;
+  if(activeTab==='clearance') reqs=reqs.filter(r=>r.phase==='pending_initial_pm_approval');
+  else if(activeTab==='final') reqs=reqs.filter(r=>r.phase==='pending_pm_final_approval');
+  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
+  renderTable(reqs);
+}
+
+function renderTable(reqs) {
+  const tbody=document.getElementById('requestsBody');
+  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${activeTab==='clearance'?'🔐':'✍️'}</div><h3>No requests here</h3><p>${activeTab==='clearance'?'No pending clearance requests.':activeTab==='final'?'No final approvals pending.':'No requests assigned to you yet.'}</p></div></td></tr>`;return;}
+  tbody.innerHTML=reqs.map(r=>{
+    const needsAction=['pending_initial_pm_approval','pending_pm_final_approval'].includes(r.phase);
+    const isClearance=r.phase==='pending_initial_pm_approval', isFinal=r.phase==='pending_pm_final_approval';
+    return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
+      <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
+      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div></td>
+      <td style="font-size:0.8rem">${r.users?.name||'—'}</td>
+      <td style="font-size:0.78rem">${DEPARTMENTS[r.department]||r.department}</td>
+      <td><span style="font-size:0.72rem;background:var(--off-white);border:1px solid var(--border);padding:1px 7px;border-radius:3px">${r.request_category==='vendor_info'?'Vendor Info':'RFQ'}</span></td>
+      <td>${getPhaseBadge(r.phase)}</td>
+      <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gray-4)">${fmtDate(r.created_at)}</td>
+      <td><button class="btn ${needsAction?'btn-primary':'btn-ghost'} btn-sm" onclick='openPR("${r.id}")'>${isClearance?'Approve/Deny':isFinal?'Review':'View'}</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function openPR(id) {
+  currentPR=allRequests.find(r=>r.id===id); if(!currentPR) return;
+  pmSelectedQuotationId=null; prQuotations=[];
+  document.getElementById('prModalTitle').textContent=`PR-${String(currentPR.request_number).padStart(4,'0')} — ${currentPR.project_name}`;
+  document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${currentPR.users?.name||''}`;
+  showLoader(true);
+  const[comments,quotations,vd,poRes,advRes,payRes]=await Promise.all([
+    loadComments(id),
+    db.from('pr_quotations').select('*').eq('pr_id',id).order('created_at').then(r=>r.data||[]),
+    currentPR.assigned_vendor_id?db.from('vendors').select('name').eq('id',currentPR.assigned_vendor_id).single():Promise.resolve({data:null}),
+    db.from('purchase_orders').select('*').eq('pr_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
+    db.from('advance_payment_requests').select('*').eq('pr_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
+    db.from('payment_requests').select('*').eq('pr_id',id).order('request_date',{ascending:false}).limit(1).maybeSingle()
+  ]);
+  prQuotations=quotations;
+  showLoader(false);
+
+  const footer=document.getElementById('prModalFooter');
+  footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('prModal')">Close</button>`;
+  let actionSection='';
+
+  // ── INITIAL CLEARANCE ──
+  if(currentPR.phase==='pending_initial_pm_approval') {
+    actionSection=`<div class="action-section">
+      <div class="action-section-title">🔐 Requirement Clearance <span class="action-badge">ACTION REQUIRED</span></div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">The engineer indicated they <strong>do not yet have PM approval</strong> for this requirement. Review the request and grant or deny clearance to begin procurement.</p>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Decision Notes *</label>
+        <textarea class="form-control" id="clearanceNotes" placeholder="State your rationale, conditions, or reason for denial..."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-success" onclick="grantClearance('approved')" style="flex:1"> Grant Clearance</button>
+        <button class="btn btn-danger" onclick="grantClearance('rejected')" style="flex:1">✗ Deny</button>
+      </div>
+    </div>`;
+  }
+
+  // ── FINAL APPROVAL ──
+  if(currentPR.phase==='pending_pm_final_approval') {
+    const isPMPath=currentPR.approval_path==='project_manager';
+    const selectedQ=quotations.find(q=>q.id===currentPR.selected_quotation_id)||quotations.find(q=>q.is_selected);
+
+    if(isPMPath) {
+      // PM selects final quote + approves/rejects
+      actionSection=`<div class="action-section">
+        <div class="action-section-title">✍️ Select Quote & Approve <span class="action-badge">ACTION REQUIRED</span></div>
+        <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:4px">Engineer forwarded directly to you. <strong>Select a final quotation</strong>, then make your decision.</p>
+        <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius-sm);padding:9px 12px;margin-bottom:14px;font-size:0.78rem;color:#6d28d9">No client approval required — your decision is final.</div>
+        <div class="form-label" style="margin-bottom:8px">Select Final Quotation *</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+          ${quotations.map(q=>renderQuotationCard(q,true,pmSelectedQuotationId)).join('')}
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Decision Notes *</label>
+          <textarea class="form-control" id="approvalNotes" placeholder="Approval rationale or reason for rejection..."></textarea>
+        </div>
+        ${rejectOptionsHTML()}
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-success" onclick="finalDecision('approved')" style="flex:1"> Approve — Allow Order</button>
+          <button class="btn btn-danger" onclick="showRejectionOptions()" style="flex:1">✗ Reject</button>
+        </div>
+      </div>`;
+    } else {
+      // Client path: engineer + client already approved, PM just reviews
+      actionSection=`<div class="action-section">
+        <div class="action-section-title">✍️ Final Approval <span class="action-badge">ACTION REQUIRED</span></div>
+        <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Engineer selected a quote and client has approved. Review below and make your final decision.</p>
+        ${selectedQ?`<div style="margin-bottom:14px"><div class="detail-key" style="margin-bottom:8px">Engineer's Selected Quote</div>${renderQuotationCard(selectedQ,false)}</div>`:''}
+        ${currentPR.client_approval_screenshot?`<div style="margin-bottom:14px;padding:12px;background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div class="detail-key" style="color:#16a34a">✓ Client Approval Screenshot</div>
+            <button class="btn btn-secondary btn-sm" onclick="(function(url){if(!url)return;if(url.startsWith('data:')){try{const arr=url.split(','),mime=arr[0].match(/:(.*?);/)[1],bstr=atob(arr[1]);let n=bstr.length;const u8=new Uint8Array(n);while(n--)u8[n]=bstr.charCodeAt(n);const blob=new Blob([u8],{type:mime}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='client_approval.'+mime.split('/')[1];document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);}catch(e){window.open(url,'_blank');}}else{window.open(url,'_blank');}}('${currentPR.client_approval_screenshot}'))">⬇ Download</button>
+          </div>
+          <img src="${currentPR.client_approval_screenshot}" style="max-width:100%;max-height:260px;object-fit:contain;border-radius:6px;border:1px solid var(--border)" onerror="this.style.display='none'"/>
+          ${currentPR.client_approval_notes?`<p style="margin-top:6px;font-size:0.8rem;color:var(--gray-3)">${currentPR.client_approval_notes}</p>`:''}
+        </div>`:''}
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Decision Notes *</label>
+          <textarea class="form-control" id="approvalNotes" placeholder="Approval rationale or reason for rejection..."></textarea>
+        </div>
+        ${rejectOptionsHTML()}
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-success" onclick="finalDecision('approved')" style="flex:1"> Approve — Allow Order</button>
+          <button class="btn btn-danger" onclick="showRejectionOptions()" style="flex:1">✗ Reject</button>
+        </div>
+      </div>`;
+    }
+  }
+
+  // ── PENDING DIRECTOR (SANDY) APPROVAL ──
+  if(currentPR.phase==='pending_sandy_approval') {
+    const selQ=quotations.find(q=>q.is_selected)||quotations.find(q=>q.id===currentPR.selected_quotation_id);
+    const amt=selQ?.amount?`₹${parseFloat(selQ.amount).toLocaleString('en-IN')}`:'—';
+    actionSection=`<div class=\"action-section\" style=\"border-color:#7c3aed33;background:rgba(124,58,237,0.04)\">
+      <div class=\"action-section-title\" style=\"color:#7c3aed\">👤 Awaiting Director Approval <span class=\"action-badge\" style=\"background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35\">ESCALATED</span></div>
+      <p style=\"font-size:0.82rem;color:var(--gray-3);margin-bottom:12px\">This request has been escalated to the Director (sandy@on2cook.com) because the selected quotation amount <strong>${amt}</strong> exceeds the PM approval limit of <strong>₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}</strong>.</p>
+      <div style=\"background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.18);border-radius:var(--radius-sm);padding:9px 12px;font-size:0.78rem;color:#6d28d9\">
+        The Director has been notified by email. No further action required from you.
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('prModalBody').innerHTML=
+    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',currentPR.project_manager_name||'',{poData:poRes.data||null,advPayRec:advRes.data||null,payRec:payRes.data||null})
+    +actionSection+
+    `<div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
+      <div class="section-title" style="margin-bottom:10px">💬 Comments</div>
+      <div id="commentsList">${renderComments(comments)}</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input class="form-control" id="commentInput" placeholder="Add a comment..." style="flex:1" onkeydown="if(event.key==='Enter')addComment()"/>
+        <button class="btn btn-secondary btn-sm" onclick="addComment()">Post</button>
+      </div>
+    </div>`;
+  openModal('prModal');
+}
+
+function rejectOptionsHTML() {
+  return `<div id="rejectionExtra" style="display:none;margin-bottom:12px;padding:12px;background:rgba(214,43,43,0.05);border:1px solid rgba(214,43,43,0.18);border-radius:var(--radius)">
+    <div class="form-label" style="margin-bottom:8px">What should happen next?</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem">
+        <input type="radio" name="rejectAction" value="more_vendors" style="accent-color:var(--red)"/> Request more vendor options
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem">
+        <input type="radio" name="rejectAction" value="close" style="accent-color:var(--red)"/> Close the request
+      </label>
+    </div>
+  </div>`;
+}
+
+function showRejectionOptions(){const e=document.getElementById('rejectionExtra');if(e)e.style.display='block';}
+
+// PM selects a quotation (PM path only)
+function selectQuotation(qId) {
+  pmSelectedQuotationId=qId;
+  prQuotations.forEach(q=>{
+    const card=document.getElementById(`qcard-${q.id}`); if(!card) return;
+    const isNow=q.id===qId;
+    card.classList.toggle('selected',isNow);
+    const ob=card.querySelector('.sel-badge'); if(ob) ob.remove();
+    if(isNow) card.querySelector('.quotation-card-header').insertAdjacentHTML('beforeend',
+      `<span class="sel-badge" style="background:#22c55e14;color:#16a34a;border:1px solid #22c55e30;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-size:0.62rem;font-weight:600;white-space:nowrap">✓ SELECTED</span>`);
+    card.querySelectorAll('button').forEach(btn=>{
+      if(btn.textContent.includes('Select as Final')||btn.textContent.includes('Deselect')){
+        btn.textContent=isNow?'Deselect':'✓ Select as Final';
+        btn.className=`btn btn-sm ${isNow?'btn-danger':'btn-primary'}`;
+        btn.onclick=()=>selectQuotation(isNow?null:q.id);
+      }
+    });
+  });
+}
+
+async function grantClearance(decision) {
+  const notes=document.getElementById('clearanceNotes')?.value.trim();
+  if(!notes){showToast('Please add decision notes','error');return;}
+  const approved=decision==='approved';
+  showLoader(true);
+  const{error}=await db.from('procurement_requests').update({
+    phase:approved?'procurement_active':'rejected',
+    rejection_reason:approved?null:notes,
+    updated_at:new Date().toISOString(),
+    phase_timestamps:addPhaseTimestamp(currentPR,approved?'procurement_active':'rejected')
+  }).eq('id',currentPR.id);
+  notifyPhaseChange(currentPR.id,approved?'procurement_active':'rejected',currentUser?.id);
+  if(!error) await postComment(currentPR.id,currentUser.id,`${approved?'':''} PM Clearance ${approved?'Granted':'Denied'}: ${notes}`);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast(approved?'Clearance granted — procurement can begin.':'Requirement denied.', approved?'success':'error');
+  closeModal('prModal'); await loadRequests();
+}
+
+// ── APPROVAL THRESHOLD ─────────────────────────────────────
+// PM can approve final quote only up to ₹5,000.
+// Anything above is escalated to the Director (sandy@on2cook.com).
+const PM_APPROVAL_LIMIT = 5000;
+
+async function finalDecision(decision) {
+  const notes=document.getElementById('approvalNotes')?.value.trim();
+  if(!notes){showToast('Please add decision notes','error');return;}
+  const isPMPath=currentPR.approval_path==='project_manager';
+  if(isPMPath&&decision==='approved'&&!pmSelectedQuotationId){showToast('Please select the final quotation','error');return;}
+  let needsMoreVendors=false;
+  if(decision==='rejected'){
+    const ra=[...document.querySelectorAll('input[name="rejectAction"]')].find(r=>r.checked)?.value;
+    if(!ra){showToast('Please select what happens after rejection','error');return;}
+    needsMoreVendors=ra==='more_vendors';
+  }
+  showLoader(true);
+
+  // ── Determine selected quotation amount ─────────────────
+  let selectedAmount = 0;
+  if(decision==='approved') {
+    const qId = isPMPath ? pmSelectedQuotationId : currentPR.selected_quotation_id;
+    if(qId) {
+      const selectedQ = prQuotations.find(q=>q.id===qId);
+      selectedAmount = parseFloat(selectedQ?.amount || 0);
+    }
+  }
+
+  // ── Escalate to Director if amount > ₹5,000 ─────────────
+  const needsDirectorApproval = decision==='approved' && selectedAmount > PM_APPROVAL_LIMIT;
+
+  if(isPMPath&&decision==='approved'&&pmSelectedQuotationId){
+    await db.from('pr_quotations').update({is_selected:false}).eq('pr_id',currentPR.id);
+    await db.from('pr_quotations').update({is_selected:true}).eq('id',pmSelectedQuotationId);
+  }
+
+  let newPhase;
+  if(decision==='rejected') newPhase='rejected';
+  else if(needsDirectorApproval) newPhase='pending_sandy_approval';
+  else newPhase='approved';
+
+  const{error}=await db.from('procurement_requests').update({
+    phase:newPhase,
+    pm_final_approval_status:needsDirectorApproval?'pending':decision,
+    pm_final_approval_notes:notes,
+    selected_quotation_id:isPMPath&&decision==='approved'?pmSelectedQuotationId:currentPR.selected_quotation_id,
+    rejection_reason:decision==='rejected'?notes:null,
+    needs_more_vendors:needsMoreVendors,
+    updated_at:new Date().toISOString(),
+    phase_timestamps:addPhaseTimestamp(currentPR,newPhase)
+  }).eq('id',currentPR.id);
+
+  notifyPhaseChange(currentPR.id,newPhase,currentUser?.id);
+
+  let commentText;
+  if(needsDirectorApproval)
+    commentText=`⬆️ Escalated to Director for approval — amount ₹${selectedAmount.toLocaleString('en-IN')} exceeds PM limit of ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}. PM notes: ${notes}`;
+  else if(decision==='approved')
+    commentText=`✅ PM Final Approved: ${notes}`;
+  else
+    commentText=`❌ PM Final Rejected: ${notes}${needsMoreVendors?' — more vendors requested.':''}`;
+
+  if(!error) await postComment(currentPR.id,currentUser.id,commentText);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+
+  if(needsDirectorApproval)
+    showToast(`⬆️ Amount ₹${selectedAmount.toLocaleString('en-IN')} exceeds ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')} — escalated to Director for approval.`,'info');
+  else
+    showToast(decision==='approved'?'✅ Approved! Procurement may now place the order.':needsMoreVendors?'Rejected — Procurement will find more vendors.':'Rejected — request closed.',decision==='approved'?'success':'error');
+  closeModal('prModal'); await loadRequests();
+}
+
+async function addComment(){
+  const input=document.getElementById('commentInput'),text=input?.value.trim();
+  if(!text||!currentPR) return;
+  try{await postComment(currentPR.id,currentUser.id,text);input.value='';
+    const c=await loadComments(currentPR.id);document.getElementById('commentsList').innerHTML=renderComments(c);
+  }catch(e){showToast('Comment failed','error');}
+}
+function goToProjects() {
+  window.location.href = 'projects.html';
+}
+init();
+</script>
+</body>
+</html>

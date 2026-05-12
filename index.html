@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>ProcureX — Sign In</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="icon" type="image/x-icon" href="on2cook no bg.png">
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --red:        #C8281A;
+            --red-dark:   #A31F14;
+            --red-muted:  rgba(200,40,26,0.07);
+            --black:      #141414;
+            --gray-1:     #1e1e1e;
+            --gray-2:     #2a2a2a;
+            --gray-3:     #606060;
+            --gray-4:     #909090;
+            --gray-5:     #b8b8b8;
+            --gray-6:     #e6e6e6;
+            --white:      #ffffff;
+            --off-white:  #f5f5f5;
+            --border:     #e2e2e2;
+            --font:       'Outfit', sans-serif;
+            --mono:       'JetBrains Mono', monospace;
+            --r-sm:       4px;
+            --r:          7px;
+            --r-lg:       10px;
+            --ease:       cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        html { font-size: 14px; }
+
+        body {
+            font-family: var(--font);
+            background: var(--black);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-font-smoothing: antialiased;
+            overflow: hidden;
+        }
+
+        /* ── Background ── */
+        .bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .bg-grid {
+            position: absolute;
+            inset: -80px;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+            background-size: 64px 64px;
+            animation: gridMove 36s linear infinite;
+        }
+        @keyframes gridMove { to { transform: translate(64px, 64px); } }
+
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(110px);
+            animation: blobDrift ease-in-out infinite alternate;
+        }
+        .b1 {
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(200,40,26,0.16), transparent 68%);
+            top: -160px; left: -120px;
+            animation-duration: 10s;
+        }
+        .b2 {
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(200,40,26,0.09), transparent 68%);
+            bottom: -60px; right: 5%;
+            animation-duration: 14s; animation-delay: -5s;
+        }
+        @keyframes blobDrift {
+            from { transform: translate(0,0) scale(1); }
+            to   { transform: translate(30px,-30px) scale(1.1); }
+        }
+
+        .pt {
+            position: absolute;
+            width: 2px; height: 2px;
+            border-radius: 50%;
+            background: rgba(200,40,26,0.55);
+            animation: ptFloat linear infinite;
+        }
+        @keyframes ptFloat {
+            0%   { transform: translateY(105vh); opacity: 0; }
+            6%   { opacity: 1; }
+            94%  { opacity: 0.35; }
+            100% { transform: translateY(-5vh); opacity: 0; }
+        }
+
+        /* ── Scene ── */
+        .scene {
+            perspective: 1600px;
+            z-index: 10;
+            position: relative;
+            animation: sceneEnter 0.65s var(--ease) both;
+        }
+        @keyframes sceneEnter {
+            from { opacity: 0; transform: translateY(24px) scale(0.95); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .card {
+            width: 420px;
+            transform-style: preserve-3d;
+            transition: transform 0.82s var(--ease);
+            position: relative;
+        }
+        .card.flipped { transform: rotateY(180deg); }
+
+        .face {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 14px;
+            overflow: hidden;
+        }
+        .back-face {
+            position: absolute;
+            inset: 0;
+            transform: rotateY(180deg);
+        }
+
+        /* ────────── FRONT ────────── */
+        .front-face {
+            background: var(--gray-1);
+            border: 1px solid rgba(255,255,255,0.065);
+            box-shadow: 0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.065);
+            padding: 34px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* sheen pass */
+        .front-face::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(108deg, transparent 38%, rgba(255,255,255,0.025) 50%, transparent 62%);
+            background-size: 300% 100%;
+            background-position: 200% 0;
+            animation: sheen 6s ease-in-out infinite 1.2s;
+            border-radius: inherit;
+            pointer-events: none;
+        }
+        @keyframes sheen {
+            0%, 55%, 100% { background-position: 200% 0; }
+            28% { background-position: -60% 0; }
+        }
+
+        /* logo row */
+        .fl-logo {
+            display: flex; align-items: center; gap: 9px;
+        }
+        .fl-mark {
+    width: 32px;
+    height: 32px;
+    background: url("on2cook no bg.png") center/cover no-repeat;
+    border-radius: var(--r);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: markPulse 3.5s ease-in-out infinite;
+    flex-shrink: 0;
+}
+        @keyframes markPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(200,40,26,0.5); }
+            50%       { box-shadow: 0 0 0 7px rgba(200,40,26,0); }
+        }
+        .fl-name {
+            font-weight: 700; font-size: 0.93rem; color: white; letter-spacing: -0.02em;
+        }
+        .fl-name span { color: var(--red); }
+
+        /* decorative rings (top-right) */
+        .fl-rings {
+            position: absolute;
+            top: 30px; right: 30px;
+            width: 76px; height: 76px;
+            pointer-events: none;
+        }
+        .fl-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 1px solid rgba(200,40,26,0.17);
+            animation: ringPulse 4s ease-in-out infinite;
+        }
+        .fl-ring:nth-child(1) { inset: 0; animation-delay: 0s; }
+        .fl-ring:nth-child(2) { inset: 14px; border-color: rgba(200,40,26,0.11); animation-delay: 0.4s; }
+        .fl-ring:nth-child(3) { inset: 28px; background: rgba(200,40,26,0.05); border-color: rgba(200,40,26,0.22); animation-delay: 0.8s; }
+        @keyframes ringPulse {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50%       { transform: scale(1.07); opacity: 0.45; }
+        }
+
+        /* hero */
+        .fl-hero { flex: 1; padding: 44px 0 32px; }
+        .fl-eyebrow {
+            font-family: var(--mono);
+            font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase;
+            color: var(--red); margin-bottom: 13px;
+            display: flex; align-items: center; gap: 7px;
+        }
+        .fl-eyebrow::before { content: ''; width: 18px; height: 1px; background: var(--red); }
+        .fl-h1 {
+            font-size: 2.55rem; font-weight: 800; letter-spacing: -0.045em;
+            line-height: 0.97; color: white;
+        }
+        .fl-h1 .r { color: var(--red); display: block; }
+        .fl-desc {
+            margin-top: 13px; font-size: 0.77rem;
+            color: rgba(255,255,255,0.35); line-height: 1.6; max-width: 280px;
+        }
+
+        /* stats */
+        .fl-stats {
+            display: flex;
+            border-top: 1px solid rgba(255,255,255,0.065);
+            padding-top: 18px;
+            margin-bottom: 20px;
+        }
+        .fl-stat { flex: 1; }
+        .fl-stat + .fl-stat {
+            padding-left: 16px;
+            border-left: 1px solid rgba(255,255,255,0.065);
+        }
+        .fl-sn {
+            font-size: 1.25rem; font-weight: 800; color: white; letter-spacing: -0.04em; line-height: 1;
+        }
+        .fl-sn sup { color: var(--red); font-size: 0.65em; }
+        .fl-sl {
+            font-family: var(--mono); font-size: 0.56rem;
+            color: rgba(255,255,255,0.28); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 3px;
+        }
+
+        /* CTA */
+        .fl-btn {
+            width: 100%; padding: 12px;
+            background: var(--red); border: none; border-radius: var(--r);
+            color: white; font-family: var(--font); font-size: 0.83rem; font-weight: 700;
+            letter-spacing: -0.01em; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 7px;
+            transition: all 0.15s; position: relative; overflow: hidden;
+        }
+        .fl-btn::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 55%);
+            opacity: 0; transition: opacity 0.15s;
+        }
+        .fl-btn:hover { background: var(--red-dark); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(200,40,26,0.32); }
+        .fl-btn:hover::before { opacity: 1; }
+        .fl-btn:hover .arr { transform: translateX(3px); }
+        .fl-btn:active { transform: translateY(0); }
+        .arr { transition: transform 0.15s; }
+
+        /* ────────── BACK ────────── */
+        .back-face {
+            background: var(--white);
+            box-shadow: 0 24px 64px rgba(0,0,0,0.45);
+            display: flex;
+            flex-direction: column;
+            padding: 32px;
+        }
+
+        .bk-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 26px;
+        }
+        .bk-logo { display: flex; align-items: center; gap: 7px; }
+        .bk-mark {
+            width: 30px;
+            height: 30px;
+            background: url("on2cook favicon.png") center/cover no-repeat;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 9px;
+            color: white;
+        }
+        .bk-name { font-size: 0.83rem; font-weight: 700; color: var(--black); letter-spacing: -0.02em; }
+        .bk-name span { color: var(--red); }
+
+        .bk-back {
+            width: 27px; height: 27px;
+            background: var(--off-white); border: 1px solid var(--border);
+            border-radius: var(--r-sm);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 0.7rem; color: var(--gray-4);
+            transition: all 0.13s;
+        }
+        .bk-back:hover { background: var(--red-muted); color: var(--red); border-color: rgba(200,40,26,0.2); }
+
+        .bk-title {
+            font-size: 1.35rem; font-weight: 700; letter-spacing: -0.03em; color: var(--black); margin-bottom: 2px;
+        }
+        .bk-sub { font-size: 0.74rem; color: var(--gray-4); margin-bottom: 22px; }
+
+        /* error */
+        .bk-err {
+            display: none; align-items: center; gap: 7px;
+            background: var(--red-muted); border: 1px solid rgba(200,40,26,0.18);
+            color: var(--red); padding: 8px 10px; border-radius: var(--r-sm);
+            font-size: 0.74rem; font-weight: 500; margin-bottom: 14px;
+        }
+        .bk-err.on { display: flex; animation: errSlide 0.18s ease; }
+        @keyframes errSlide {
+            from { opacity: 0; transform: translateY(-5px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* fields */
+        .fg { margin-bottom: 13px; }
+        .lbl {
+            display: block; font-size: 0.61rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.04em; color: var(--gray-3); margin-bottom: 5px;
+        }
+        .iw { position: relative; }
+        .ii {
+            position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+            font-size: 0.73rem; color: var(--gray-5); pointer-events: none; transition: color 0.13s;
+        }
+        .fc {
+            width: 100%; padding: 9px 10px 9px 32px;
+            border: 1px solid var(--border); border-radius: var(--r-sm);
+            font-family: var(--font); font-size: 0.8rem; color: var(--black);
+            background: var(--off-white); outline: none;
+            transition: border-color 0.13s, background 0.13s, box-shadow 0.13s;
+            letter-spacing: -0.01em;
+        }
+        .fc:focus { border-color: var(--red); background: var(--white); box-shadow: 0 0 0 3px rgba(200,40,26,0.07); }
+        .fc:focus ~ .ii { color: var(--red); }
+
+        .fgt {
+            display: block; text-align: right; margin-top: 6px;
+            font-size: 0.69rem; font-weight: 600; color: var(--red); text-decoration: none;
+        }
+        .fgt:hover { opacity: 0.7; }
+
+        .sub-btn {
+            width: 100%; margin-top: 8px; padding: 11px;
+            background: var(--red); border: none; border-radius: var(--r-sm);
+            color: white; font-family: var(--font); font-size: 0.83rem; font-weight: 700;
+            letter-spacing: -0.01em; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 7px;
+            transition: all 0.13s; position: relative; overflow: hidden;
+        }
+        .sub-btn::after {
+            content: '';
+            position: absolute; top: 0; left: -110%; width: 55%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.09), transparent);
+            transition: left 0.45s ease;
+        }
+        .sub-btn:hover { background: var(--red-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(200,40,26,0.28); }
+        .sub-btn:hover::after { left: 160%; }
+        .sub-btn:active { transform: translateY(0); }
+        .sub-btn:disabled { opacity: 0.62; cursor: not-allowed; transform: none; }
+
+        /* footer strip */
+        .bk-foot {
+            margin-top: auto; padding-top: 18px;
+            border-top: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .bk-copy { font-family: var(--mono); font-size: 0.56rem; color: var(--gray-5); }
+        .bk-links { display: flex; gap: 11px; }
+        .bk-links a { font-family: var(--mono); font-size: 0.56rem; color: var(--gray-5); text-decoration: none; }
+        .bk-links a:hover { color: var(--red); }
+
+        /* ── Responsive ── */
+        @media (max-width: 480px) {
+            body { align-items: flex-start; }
+            .scene { width: 100vw; }
+            .card { width: 100vw; }
+            .face, .back-face, .front-face { border-radius: 0; }
+            .front-face { min-height: 100svh; padding: 28px 22px; }
+            .back-face  { min-height: 100svh; padding: 28px 22px; }
+            .fl-h1 { font-size: 2.1rem; }
+        }
+
+        @media (min-width: 481px) and (max-width: 720px) {
+            .card { width: 390px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Background -->
+<div class="bg">
+    <div class="bg-grid"></div>
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+</div>
+
+<div class="scene">
+    <div class="card" id="card">
+
+        <!-- FRONT -->
+        <div class="face front-face">
+            <div class="fl-rings">
+                <div class="fl-ring"></div>
+                <div class="fl-ring"></div>
+                <div class="fl-ring"></div>
+            </div>
+
+            <div class="fl-logo">
+                <div class="fl-mark"></div>
+                <div class="fl-name">Procure<span>X</span></div>
+            </div>
+
+            <div class="fl-hero">
+                <p class="fl-eyebrow">Procurement Tracker</p>
+                <h1 class="fl-h1">
+                    Modernize<br/>your
+                    <span class="r">supply chain.</span>
+                </h1>
+                <p class="fl-desc">End-to-end procurement intelligence system</p>
+            </div>
+
+            <!-- <div class="fl-stats">
+                <div class="fl-stat">
+                    <div class="fl-sn">98<sup>%</sup></div>
+                    <div class="fl-sl">Uptime SLA</div>
+                </div>
+                <div class="fl-stat">
+                    <div class="fl-sn">2.4<sup>×</sup></div>
+                    <div class="fl-sl">Faster Cycles</div>
+                </div>
+                <div class="fl-stat">
+                    <div class="fl-sn">500<sup>+</sup></div>
+                    <div class="fl-sl">Enterprises</div>
+                </div>
+            </div> -->
+
+            <button class="fl-btn" onclick="flip()">
+                Sign In to Dashboard
+                <i class="fas fa-arrow-right arr"></i>
+            </button>
+        </div>
+
+        <!-- BACK -->
+        <div class="face back-face">
+            <div class="bk-header">
+                <div class="bk-logo">
+                    <div class="bk-mark"></div>
+                    <div class="bk-name">Procure<span>X</span></div>
+                </div>
+                <button class="bk-back" onclick="flip()" aria-label="Back">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+            </div>
+
+            <h2 class="bk-title">Welcome back</h2>
+            <p class="bk-sub">Enter your credentials to continue.</p>
+
+            <div id="loginError" class="bk-err">
+                <i class="fas fa-circle-exclamation"></i>
+                <span>Invalid email or password.</span>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="fg">
+                    <label class="lbl" for="email">Email Address</label>
+                    <div class="iw">
+                        <input type="email" id="email" class="fc" placeholder="name@company.com" required />
+                        <i class="fas fa-envelope ii"></i>
+                    </div>
+                </div>
+
+                <div class="fg">
+                    <label class="lbl" for="password">Password</label>
+                    <div class="iw">
+                        <input type="password" id="password" class="fc" placeholder="••••••••" required />
+                        <i class="fas fa-lock ii"></i>
+                    </div>
+                    <a href="pages/change-password.html" class="fgt">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="sub-btn" id="loginBtn">
+                    <span>Sign In</span>
+                    <i class="fas fa-arrow-right arr"></i>
+                </button>
+            </form>
+
+            <div class="bk-foot">
+                <span class="bk-copy">&copy; 2026 Invent India</span>
+                <div class="bk-links">
+                    <a href="#">Privacy</a>
+                    <a href="#">Support</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-config.js"></script>
+
+<script>
+    /* particles */
+    const bg = document.querySelector('.bg');
+    for (let i = 0; i < 20; i++) {
+        const d = document.createElement('div');
+        d.className = 'pt';
+        d.style.cssText = `left:${Math.random()*100}%;width:${1.5+Math.random()*1.5}px;height:${1.5+Math.random()*1.5}px;animation-duration:${11+Math.random()*15}s;animation-delay:-${Math.random()*22}s`;
+        bg.appendChild(d);
+    }
+
+    function flip() { document.getElementById('card').classList.toggle('flipped'); }
+
+    if (typeof Session !== 'undefined') {
+        const s = Session.get();
+        if (s) redirectByRole(s.role);
+    }
+
+    async function handleLogin(e) {
+        e.preventDefault();
+        const email    = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const btn      = document.getElementById('loginBtn');
+        const err      = document.getElementById('loginError');
+
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Signing in…</span>';
+        btn.disabled  = true;
+        err.classList.remove('on');
+
+        try {
+            const { data, error } = await db
+                .from('users').select('*')
+                .eq('email', email).eq('password', password).single();
+
+            if (error || !data) {
+                err.classList.add('on');
+                btn.innerHTML = '<span>Sign In</span><i class="fas fa-arrow-right arr"></i>';
+                btn.disabled  = false;
+                return;
+            }
+            Session.set(data);
+            redirectByRole(data.role);
+        } catch {
+            err.querySelector('span').textContent = 'Connection error.';
+            err.classList.add('on');
+            btn.innerHTML = '<span>Sign In</span><i class="fas fa-arrow-right arr"></i>';
+            btn.disabled  = false;
+        }
+    }
+
+    function redirectByRole(role) {
+        const r = {
+            master: 'pages/master.html',
+            procurement_manager: 'pages/procurement.html',
+            engineer: 'pages/engineer.html',
+            project_manager: 'pages/pm.html',
+            accounts: 'pages/accounts.html'
+        };
+        window.location.href = r[role] || 'pages/engineer.html';
+    }
+</script>
+</body>
+</html>

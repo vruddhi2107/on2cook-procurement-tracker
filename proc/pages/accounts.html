@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ProcureX — Accounts</title>
+<link rel="icon" type="image/x-icon" href="../on2cook no bg.png">
+<link rel="stylesheet" href="../css/styles.css"/>
+<style>
+.urgency-badge{padding:2px 8px;border-radius:3px;font-size:0.65rem;font-family:var(--font-mono);font-weight:700;text-transform:uppercase;letter-spacing:0.3px}
+.urgency-normal{background:rgba(100,116,139,0.1);color:#475569}
+.urgency-urgent{background:rgba(245,158,11,0.12);color:#b45309;border:1px solid rgba(245,158,11,0.25)}
+.urgency-critical{background:rgba(214,43,43,0.1);color:var(--red);border:1px solid rgba(214,43,43,0.25)}
+.payment-status-bar{height:6px;border-radius:3px;background:var(--off-white);overflow:hidden;margin-top:4px}
+.payment-status-fill{height:100%;border-radius:3px;background:#22c55e;transition:width 0.3s}
+.adv-card{padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius);background:white;display:flex;align-items:flex-start;gap:14px;transition:box-shadow 0.15s}
+.adv-card:hover{box-shadow:0 2px 10px rgba(0,0,0,0.07)}
+.adv-card.pending{border-left:3px solid #f59e0b}
+.adv-card.approved{border-left:3px solid #22c55e}
+.adv-card.rejected{border-left:3px solid var(--red)}
+.advance-grid{display:flex;flex-direction:column;gap:10px}
+.adv-confirm-choice{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.adv-confirm-option{border:2px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:all 0.15s;text-align:center}
+.adv-confirm-option:hover{border-color:var(--red)}
+.adv-confirm-option.approve:hover,.adv-confirm-option.approve.selected{border-color:#16a34a;background:rgba(22,163,74,0.05)}
+.adv-confirm-option.reject:hover,.adv-confirm-option.reject.selected{border-color:var(--red);background:rgba(214,43,43,0.04)}
+
+/* Full detail sections */
+.detail-section { margin-top:18px; padding-top:16px; border-top:1px solid var(--border); }
+.detail-section-title { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--gray-4); margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+.approval-chain-item { display:flex; align-items:flex-start; gap:10px; padding:9px 12px; background:var(--off-white); border:1px solid var(--border); border-radius:6px; margin-bottom:6px; }
+.approval-chain-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+.po-summary-card { padding:12px 14px; background:rgba(59,130,246,0.06); border:1px solid rgba(59,130,246,0.22); border-radius:var(--radius); }
+</style>
+</head>
+<body>
+<div id="navbarMount"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<main class="page-container">
+  <div class="page-header">
+    <h1 class="page-title">Accounts <span>Dashboard</span></h1>
+    <p class="page-sub">Track payment requests, advance requests, and manage payment status</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-card-value" id="sPending">—</div><div class="stat-card-label">Payment Due</div><div class="stat-card-icon">💰</div></div>
+    <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sAdvance">—</div><div class="stat-card-label">Advance Pending</div><div class="stat-card-icon">📤</div></div>
+    <div class="stat-card" style="--accent:#f59e0b"><div class="stat-card-value" id="sPartial">—</div><div class="stat-card-label">Partial Paid</div><div class="stat-card-icon">⏳</div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sPaid">—</div><div class="stat-card-label">Fully Paid</div><div class="stat-card-icon"></div></div>
+  </div>
+
+  <div id="advanceBanner" style="display:none;margin-bottom:16px"></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('due')">💰 Payment Due</button>
+    <button class="tab-btn" onclick="switchTab('advance')">📤 Advance Requests <span id="advBadge" style="display:none;background:var(--red);color:white;border-radius:10px;padding:0 6px;font-size:0.65rem;font-family:var(--font-mono);margin-left:4px"></span></button>
+    <button class="tab-btn" onclick="switchTab('all')">All Payments</button>
+  </div>
+
+  <div id="tabPayments">
+    <div class="filter-bar">
+      <input type="text" id="searchInput" placeholder="Search by project or vendor..." oninput="filterPayments()"/>
+      <select id="filterUrgency" onchange="filterPayments()">
+        <option value="">All Urgency</option>
+        <option value="critical">🔴 Critical</option>
+        <option value="urgent">🟡 Urgent</option>
+        <option value="normal">⚪ Normal</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>PR</th><th>Project</th><th>Vendor</th><th>Amount</th><th>Payment Terms</th><th>Urgency</th><th>Status</th><th>Date</th><th></th></tr></thead>
+          <tbody id="paymentsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tabAdvance" style="display:none">
+    <div id="advanceContent"></div>
+  </div>
+</main>
+
+<!-- PAYMENT DETAIL MODAL — full width for comprehensive view -->
+<div class="modal-overlay" id="payDetailModal">
+  <div class="modal" style="max-width:860px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="payDetailTitle">Payment Request</div><div class="modal-title-sub" id="payDetailSub"></div></div>
+      <button class="modal-close" onclick="closeModal('payDetailModal')">✕</button>
+    </div>
+    <div class="modal-body" id="payDetailBody" style="max-height:82vh;overflow-y:auto"></div>
+    <div class="modal-footer" id="payDetailFooter"><button class="btn btn-secondary" onclick="closeModal('payDetailModal')">Close</button></div>
+  </div>
+</div>
+
+<!-- ADVANCE APPROVAL CONFIRMATION MODAL -->
+<div class="modal-overlay" id="advConfirmModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">📤 Review Advance Request</div>
+        <div class="modal-title-sub" id="advConfirmSub"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('advConfirmModal')">✕</button>
+    </div>
+    <div class="modal-body" id="advConfirmBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('advConfirmModal')">Cancel</button>
+      <button class="btn btn-primary" id="advConfirmBtn" onclick="confirmAdvanceDecision()">Confirm →</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="footerMount"></div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../js/supabase-config.js"></script>
+<script src="../js/shared.js"></script>
+<script>
+let currentUser, allPayments=[], allAdvances=[], activeTab='due';
+function addPhaseTimestamp(existingTs, phaseName) {
+  var ts = Object.assign({}, existingTs || {});
+  ts[phaseName] = new Date().toISOString();
+  return ts;
+}
+let pendingAdvanceId=null, pendingAdvanceDecision=null;
+
+
+// ── ATTACHMENT PREVIEW & SAFE DOWNLOAD ENGINE ───────────────
+let _attRegistry = [], _previewUrl = null, _previewName = null;
+
+function _registerAtts(arr) { _attRegistry = arr; }
+
+function _attIcon(name) { return (name||'').toLowerCase().includes('.pdf') ? '📄' : '🖼️'; }
+
+function _attTypeLabel(t) {
+  return {quotation:'Quotation',approval_screenshot:'Approval',grn_doc:'GRN',other:'Document',engineer_upload:'Engineer Upload'}[t] || t || 'doc';
+}
+
+function _buildAttRow(a, i) {
+  return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--off-white,#f8f9fa);border:1px solid var(--border,#e5e7eb);border-radius:6px">
+    <span style="font-size:1.1rem;flex-shrink:0">${_attIcon(a.file_name)}</span>
+    <span style="font-size:0.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${a.file_name||'Attachment'}</span>
+    <span style="font-size:0.62rem;padding:2px 6px;background:white;border:1px solid var(--border,#e5e7eb);border-radius:3px;color:#6b7280;font-family:monospace;flex-shrink:0">${_attTypeLabel(a.attachment_type)}</span>
+    <button class="btn btn-secondary btn-sm" style="flex-shrink:0" onclick="previewAttByIndex(${i})">👁 Preview</button>
+    <button class="btn btn-secondary btn-sm" style="flex-shrink:0" onclick="downloadAttByIndex(${i})">⬇ Download</button>
+  </div>`;
+}
+
+function _buildAttsSection(atts, title) {
+  if (!atts || !atts.length) return '';
+  _registerAtts(atts);
+  return `<div style="margin-top:16px;padding:14px;background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.15);border-radius:8px">
+    <div style="color:#6366f1;font-weight:600;font-size:0.82rem;margin-bottom:10px">📎 ${title||'Attachments'} (${atts.length})</div>
+    <div style="display:flex;flex-direction:column;gap:6px">${atts.map((a,i)=>_buildAttRow(a,i)).join('')}</div>
+  </div>`;
+}
+
+function previewAttByIndex(i) { const a=_attRegistry[i]; if(a) openAttPreview(a.file_url, a.file_name); }
+function downloadAttByIndex(i) { const a=_attRegistry[i]; if(a) _triggerDownload(a.file_url, a.file_name); }
+function downloadCurrentPreview() { if(_previewUrl) _triggerDownload(_previewUrl, _previewName); }
+
+function _triggerDownload(url, fileName) {
+  if (!url) return;
+  if (url.startsWith('data:')) {
+    try {
+      const arr=url.split(','), mime=arr[0].match(/:(.*?);/)[1];
+      const bstr=atob(arr[1]); let n=bstr.length; const u8=new Uint8Array(n);
+      while(n--) u8[n]=bstr.charCodeAt(n);
+      const blob=new Blob([u8],{type:mime});
+      const el=document.createElement('a'); el.href=URL.createObjectURL(blob); el.download=fileName||'attachment';
+      document.body.appendChild(el); el.click(); setTimeout(()=>{URL.revokeObjectURL(el.href);el.remove();},1000);
+    } catch(err) { window.open(url,'_blank'); }
+  } else {
+    const el=document.createElement('a'); el.href=url; el.download=fileName||'attachment'; el.target='_blank';
+    document.body.appendChild(el); el.click(); setTimeout(()=>el.remove(),500);
+  }
+}
+
+function openAttPreview(url, name) {
+  if (!url) return;
+  _previewUrl=url; _previewName=name||'Attachment';
+  const ov=document.getElementById('attPreviewOverlay');
+  const content=document.getElementById('attPreviewContent');
+  document.getElementById('attPreviewName').textContent=_previewName;
+  const isImage=/\.(png|jpe?g|gif|webp)$/i.test(name)||url.startsWith('data:image');
+  const isPDF=/\.pdf$/i.test(name)||url.startsWith('data:application/pdf');
+  if (isImage) {
+    content.innerHTML=`<img src="${url}" style="max-width:88vw;max-height:76vh;object-fit:contain;border-radius:4px"/>`;
+  } else if (isPDF) {
+    content.innerHTML=`<iframe src="${url}" style="width:82vw;height:76vh;border:none" title="${name}"></iframe>`;
+  } else {
+    content.innerHTML=`<div style="padding:48px;text-align:center;color:#6b7280"><div style="font-size:3rem;margin-bottom:12px">📄</div><div style="font-size:0.9rem;font-weight:600">${name}</div><div style="font-size:0.78rem;margin-top:8px">Preview not available — please use Download</div></div>`;
+  }
+  ov.style.display='flex';
+}
+
+function closeAttPreview() {
+  document.getElementById('attPreviewOverlay').style.display='none';
+  document.getElementById('attPreviewContent').innerHTML='';
+  _previewUrl=null; _previewName=null;
+}
+
+
+async function init() {
+  currentUser=Session.require(['accounts','master']); if(!currentUser) return;
+  document.getElementById('navbarMount').innerHTML=buildNavbar(currentUser);
+  document.getElementById('footerMount').innerHTML=buildFooter();
+  initNavbar(currentUser);
+  showLoader(true);
+  await Promise.all([loadPayments(), loadAdvances()]);
+  showLoader(false);
+  renderAdvanceBanner();
+}
+
+// ── DATA LOAD ────────────────────────────────────────────────
+async function loadPayments() {
+  const{data,error}=await db.from('payment_requests').select('*').order('request_date',{ascending:false});
+  if(error){showToast('Error loading payments: '+error.message,'error');return;}
+  allPayments=data||[];
+  updateStats();
+  filterPayments();
+}
+
+async function loadAdvances() {
+  const{data,error}=await db.from('advance_payment_requests')
+    .select('*, users!advance_payment_requests_requested_by_fkey(name), procurement_requests(project_name,request_number,project_phase)')
+    .order('created_at',{ascending:false});
+  if(error){
+    const{data:d2}=await db.from('advance_payment_requests').select('*').order('created_at',{ascending:false});
+    allAdvances=d2||[];
+  } else {
+    allAdvances=data||[];
+  }
+  const pendingCount=allAdvances.filter(a=>a.status==='pending').length;
+  document.getElementById('sAdvance').textContent=pendingCount;
+  const badge=document.getElementById('advBadge');
+  if(pendingCount>0){badge.style.display='inline';badge.textContent=pendingCount;}
+  else{badge.style.display='none';}
+  if(activeTab==='advance') renderAdvanceTab();
+}
+
+function updateStats() {
+  document.getElementById('sPending').textContent=allPayments.filter(p=>p.status==='pending').length;
+  document.getElementById('sPartial').textContent=allPayments.filter(p=>p.status==='partial').length;
+  document.getElementById('sPaid').textContent=allPayments.filter(p=>p.status==='paid').length;
+}
+
+function renderAdvanceBanner() {
+  const pending=allAdvances.filter(a=>a.status==='pending');
+  const b=document.getElementById('advanceBanner');
+  if(!pending.length){b.style.display='none';return;}
+  b.style.display='block';
+  b.innerHTML=`<div style="background:rgba(245,158,11,0.07);border:1.5px solid rgba(245,158,11,0.3);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:1.1rem">📤</span>
+    <div style="flex:1"><strong style="font-size:0.85rem">${pending.length} advance payment request${pending.length>1?'s':''} awaiting approval</strong>
+    <div style="font-size:0.75rem;color:var(--gray-3);margin-top:2px">${pending.map(a=>a.procurement_requests?.project_name||'Unknown project').join(' · ')}</div></div>
+    <button class="btn btn-primary btn-sm" onclick="switchTab('advance')">Review Now →</button>
+  </div>`;
+}
+
+// ── TABS ─────────────────────────────────────────────────────
+function switchTab(t) {
+  activeTab=t;
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['due','advance','all'][i]===t));
+  document.getElementById('tabPayments').style.display=t==='advance'?'none':'block';
+  document.getElementById('tabAdvance').style.display=t==='advance'?'block':'none';
+  if(t==='advance') renderAdvanceTab();
+  else filterPayments();
+}
+
+function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterUrgency').value='';filterPayments();}
+
+// ── PAYMENTS TABLE ────────────────────────────────────────────
+function filterPayments() {
+  const s=document.getElementById('searchInput')?.value.toLowerCase()||'';
+  const urg=document.getElementById('filterUrgency')?.value||'';
+  let pays=allPayments;
+  if(activeTab==='due') pays=pays.filter(p=>p.status==='pending'||p.status==='partial');
+  if(s) pays=pays.filter(p=>(p.project_name||'').toLowerCase().includes(s)||(p.vendor_name||'').toLowerCase().includes(s));
+  if(urg) pays=pays.filter(p=>p.urgency===urg);
+  renderPaymentsTable(pays);
+}
+
+function renderPaymentsTable(pays) {
+  const tbody=document.getElementById('paymentsBody');
+  if(!pays.length){
+    tbody.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">💰</div><h3>${activeTab==='due'?'No payments due!':'No payment requests'}</h3><p>${activeTab==='due'?'All payments are up to date.':'No payment requests have been created yet.'}</p></div></td></tr>`;
+    return;
+  }
+  const ptMap=Object.fromEntries(PAYMENT_TERMS_OPTIONS.map(p=>[p.value,p.label]));
+  tbody.innerHTML=pays.map(p=>{
+    const urgCls={normal:'urgency-normal',urgent:'urgency-urgent',critical:'urgency-critical'}[p.urgency||'normal'];
+    const isCritPending=p.status==='pending'&&p.urgency==='critical';
+    const stBadge={
+      pending:`<span class="badge badge-orange">Pending</span>`,
+      partial:`<span class="badge badge-blue">Partial Paid</span>`,
+      paid:`<span class="badge badge-green">Paid ✓</span>`
+    }[p.status]||'';
+    const paidPct=p.amount_paid&&p.invoice_amount?Math.min(100,Math.round(Number(p.amount_paid)/Number(p.invoice_amount)*100)):0;
+    return `<tr style="${isCritPending?'background:rgba(214,43,43,0.025)':''}">
+      <td><span style="font-family:var(--font-mono);font-size:0.74rem;font-weight:600;color:var(--gray-3)">…${String(p.pr_id||'').slice(-4)}</span></td>
+      <td>
+        <div style="font-weight:600;font-size:0.8rem">${p.project_name||'—'}</div>
+        <div style="font-size:0.7rem;color:var(--gray-4)">${p.project_phase||''}</div>
+      </td>
+      <td style="font-size:0.8rem">${p.vendor_name||'—'}</td>
+      <td>
+        <div style="font-weight:700;font-family:var(--font-mono);font-size:0.88rem">${p.currency||'AED'} ${Number(p.invoice_amount||0).toLocaleString()}</div>
+        ${p.amount_paid?`<div style="font-size:0.7rem;color:#16a34a">Paid: ${p.currency||'AED'} ${Number(p.amount_paid).toLocaleString()}</div>
+         <div class="payment-status-bar"><div class="payment-status-fill" style="width:${paidPct}%"></div></div>`:''}
+      </td>
+      <td style="font-size:0.72rem;color:#6366f1;max-width:160px">${ptMap[p.payment_terms]||p.payment_terms||'—'}</td>
+      <td><span class="urgency-badge ${urgCls}">${p.urgency||'normal'}</span></td>
+      <td>${stBadge}</td>
+      <td style="font-family:var(--font-mono);font-size:0.7rem;color:var(--gray-4)">${fmtDate(p.request_date)}</td>
+      <td><button class="btn btn-primary btn-sm" onclick="openPayDetail('${p.id}')">Manage</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── ADVANCE REQUESTS TAB ──────────────────────────────────────
+function renderAdvanceTab() {
+  const el=document.getElementById('advanceContent');
+  if(!allAdvances.length){
+    el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">📤</div><h3>No advance requests</h3><p>Advance payment requests from the procurement team will appear here.</p></div>`;
+    return;
+  }
+  const pending=allAdvances.filter(a=>a.status==='pending');
+  const done=allAdvances.filter(a=>a.status!=='pending');
+  let html='';
+  if(pending.length){
+    html+=`<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#b45309;margin-bottom:10px">⏳ Awaiting Approval (${pending.length})</div>`;
+    html+=`<div class="advance-grid" style="margin-bottom:20px">${pending.map(a=>advCardHTML(a)).join('')}</div>`;
+  }
+  if(done.length){
+    html+=`<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray-4);margin-bottom:10px">Processed (${done.length})</div>`;
+    html+=`<div class="advance-grid">${done.map(a=>advCardHTML(a)).join('')}</div>`;
+  }
+  el.innerHTML=html;
+}
+
+function advCardHTML(a) {
+  const stColor={pending:'#f59e0b',approved:'#22c55e',rejected:'var(--red)'}[a.status]||'#6b7280';
+  const stLabel={pending:'⏳ Pending',approved:' Approved',rejected:'✗ Rejected'}[a.status]||a.status;
+  const projectName=a.procurement_requests?.project_name||'Unknown Project';
+  const prNum=a.procurement_requests?.request_number?`PR-${String(a.procurement_requests.request_number).padStart(4,'0')}`:'';
+  const reqName=a.users?.name||'Procurement';
+  return `<div class="adv-card ${a.status}">
+    <div style="width:38px;height:38px;border-radius:8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">📤</div>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+        <div>
+          <div style="font-weight:700;font-size:0.88rem">${projectName}</div>
+          <div style="font-size:0.72rem;color:var(--gray-4)">${prNum} · Requested by ${reqName} · ${fmtDate(a.created_at)}</div>
+        </div>
+        <span style="font-size:0.72rem;font-weight:700;color:${stColor};white-space:nowrap">${stLabel}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="font-weight:800;font-size:1rem;font-family:var(--font-mono)">AED ${Number(a.amount||0).toLocaleString()}</div>
+        ${a.notes?`<div style="font-size:0.76rem;color:var(--gray-3);flex:1">${a.notes}</div>`:''}
+      </div>
+      ${a.status==='pending'?`
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-success btn-sm" onclick="openAdvanceConfirm('${a.id}','approved')">✓ Approve</button>
+        <button class="btn btn-danger btn-sm" onclick="openAdvanceConfirm('${a.id}','rejected')">✗ Reject</button>
+        ${a.pr_id?`<button class="btn btn-ghost btn-sm" onclick="openAdvancePRDetail('${a.pr_id}')">📋 View Full PR</button>`:''}
+      </div>`:''}
+      ${a.status!=='pending'?`<div style="font-size:0.72rem;color:var(--gray-4);margin-top:6px">Processed ${fmtDate(a.confirmed_at)}</div>`:''}
+    </div>
+  </div>`;
+}
+
+// ── ADVANCE: VIEW FULL PR CONTEXT ────────────────────────────
+async function openAdvancePRDetail(prId) {
+  showLoader(true);
+  const [prRes, quotesRes, poRes, attRes] = await Promise.all([
+    db.from('procurement_requests').select('*, users!procurement_requests_created_by_fkey(name)').eq('id', prId).single(),
+    db.from('pr_quotations').select('*').eq('pr_id', prId).order('created_at'),
+    db.from('purchase_orders').select('*').eq('pr_id', prId).order('created_at', {ascending:false}).limit(1).maybeSingle(),
+    db.from('pr_attachments').select('*').eq('pr_id', prId).order('created_at')
+  ]);
+  showLoader(false);
+
+  const pr = prRes.data;
+  if (!pr) { showToast('Could not load PR details', 'error'); return; }
+
+  let ov = document.getElementById('_advPRDetailModal');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = '_advPRDetailModal';
+    ov.className = 'modal-overlay';
+    ov.onclick = e => { if(e.target===ov) ov.classList.remove('active'); };
+    document.body.appendChild(ov);
+  }
+  const po = poRes.data;
+  const quotes = quotesRes.data || [];
+  const jsonbAtts1 = (pr?.attachments || []).map(a => ({
+    file_name: a.name || 'Attachment', file_url: a.data,
+    attachment_type: 'engineer_upload', file_type: a.type
+  }));
+  const attachments = [...jsonbAtts1, ...(attRes.data || [])];
+
+  ov.innerHTML = `<div class="modal" style="max-width:800px">
+    <div class="modal-header">
+      <div><div class="modal-title">PR-${String(pr.request_number).padStart(4,'0')} — ${pr.project_name}</div><div class="modal-title-sub">Full procurement context for advance review</div></div>
+      <button class="modal-close" onclick="document.getElementById('_advPRDetailModal').classList.remove('active')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:78vh;overflow-y:auto">
+      ${buildPRDetailHTML(pr, quotes, '', pr.project_manager_name||'')}
+      ${po ? `<div class="detail-section">
+        <div class="detail-section-title">📄 Purchase Order</div>
+        <div class="po-summary-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div>
+              <div style="font-weight:700;font-size:0.9rem">${po.po_number}</div>
+              <div style="font-size:0.73rem;color:var(--gray-3)">Generated ${fmtDate(po.po_date||po.created_at)}</div>
+            </div>
+            <div style="font-family:var(--font-mono);font-weight:800;font-size:1rem">${po.currency||'INR'} ${Number(po.total_amount||0).toLocaleString()}</div>
+          </div>
+        </div>
+      </div>` : ''}
+      ${_buildAttsSection(attachments, 'Attachments')}
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('_advPRDetailModal').classList.remove('active')">Close</button>
+    </div>
+  </div>`;
+  ov.classList.add('active');
+}
+
+// ── ADVANCE CONFIRM MODAL ─────────────────────────────────────
+function openAdvanceConfirm(advId, decision) {
+  pendingAdvanceId = advId;
+  pendingAdvanceDecision = decision;
+
+  const adv = allAdvances.find(a=>a.id===advId);
+  const projectName = adv?.procurement_requests?.project_name || 'Unknown Project';
+  const prNum = adv?.procurement_requests?.request_number
+    ? `PR-${String(adv.procurement_requests.request_number).padStart(4,'0')}` : '';
+  const isApprove = decision === 'approved';
+
+  document.getElementById('advConfirmSub').textContent = `${prNum}${prNum?' — ':''}${projectName}`;
+
+  document.getElementById('advConfirmBody').innerHTML = `
+    <div style="padding:14px 16px;border-radius:var(--radius);margin-bottom:18px;
+      background:${isApprove?'rgba(22,163,74,0.07)':'rgba(214,43,43,0.06)'};
+      border:1.5px solid ${isApprove?'rgba(22,163,74,0.3)':'rgba(214,43,43,0.25)'}">
+      <div style="font-size:0.95rem;font-weight:700;color:${isApprove?'#16a34a':'var(--red)'};margin-bottom:4px">
+        ${isApprove?' Approve Advance Payment':'✗ Reject Advance Payment'}
+      </div>
+      <div style="font-size:0.8rem;color:var(--gray-3)">
+        ${isApprove
+          ? 'Approving will notify the Procurement Manager to proceed with placing the order.'
+          : 'Rejecting will notify the Procurement Manager that this advance was not approved.'}
+      </div>
+    </div>
+    <div class="detail-grid" style="margin-bottom:16px">
+      <div class="detail-item">
+        <div class="detail-key">Project</div>
+        <div class="detail-value" style="font-weight:600">${projectName}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-key">Requested By</div>
+        <div class="detail-value">${adv?.users?.name||'Procurement'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-key">Advance Amount</div>
+        <div class="detail-value" style="font-family:var(--font-mono);font-weight:700;font-size:1rem">
+          AED ${Number(adv?.amount||0).toLocaleString()}
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-key">Date Requested</div>
+        <div class="detail-value">${fmtDate(adv?.created_at)}</div>
+      </div>
+      ${adv?.notes?`<div class="detail-item" style="grid-column:1/-1">
+        <div class="detail-key">Notes from Procurement</div>
+        <div class="detail-value">${adv.notes}</div>
+      </div>`:''}
+    </div>
+    <div style="padding:12px 14px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:16px;font-size:0.78rem">
+      <div style="font-weight:600;margin-bottom:6px;font-size:0.74rem;text-transform:uppercase;letter-spacing:0.4px;color:var(--gray-4)">This action will update:</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div>✔ <strong>Advance request</strong> status → <span style="color:${isApprove?'#16a34a':'var(--red)'}"><strong>${isApprove?'Approved':'Rejected'}</strong></span></div>
+        <div>✔ <strong>Procurement request</strong> phase → <span style="color:${isApprove?'#16a34a':'var(--red)'}"><strong>${isApprove?'Advance Approved — ready to order':'Advance Rejected — procurement notified'}</strong></span></div>
+      </div>
+    </div>
+    ${adv?.pr_id?`<div style="margin-bottom:14px"><button class="btn btn-ghost btn-sm" onclick="openAdvancePRDetail('${adv.pr_id}')">📋 View Full PR Context & Documents</button></div>`:''}
+    <div class="form-group">
+      <label class="form-label">Remarks <span style="color:var(--gray-4);font-weight:400">(optional — visible to procurement)</span></label>
+      <textarea class="form-control" id="advConfirmRemarks" placeholder="${isApprove?'e.g. Approved, funds transferred on DD/MM/YYYY...':'e.g. Budget not available, please seek alternative...'}" style="min-height:72px"></textarea>
+    </div>`;
+
+  const btn = document.getElementById('advConfirmBtn');
+  btn.textContent = isApprove ? ' Confirm Approval' : '✗ Confirm Rejection';
+  btn.className = `btn ${isApprove?'btn-success':'btn-danger'}`;
+  openModal('advConfirmModal');
+}
+
+async function confirmAdvanceDecision() {
+  if (!pendingAdvanceId || !pendingAdvanceDecision) return;
+  const remarks = document.getElementById('advConfirmRemarks')?.value.trim() || null;
+  const decision = pendingAdvanceDecision;
+  const adv = allAdvances.find(a=>a.id===pendingAdvanceId);
+  showLoader(true);
+
+  const { error: advErr } = await db.from('advance_payment_requests').update({
+    status: decision, confirmed_by: currentUser.id, confirmed_at: new Date().toISOString()
+  }).eq('id', pendingAdvanceId);
+
+  if (advErr) { showLoader(false); showToast('Error updating advance: ' + advErr.message, 'error'); return; }
+
+  if (adv?.pr_id) {
+    const newPhase = decision === 'approved' ? 'advance_approved' : 'advance_rejected';
+    const { data: prData } = await db.from('procurement_requests').select('phase_timestamps').eq('id', adv.pr_id).single();
+    const { error: prErr } = await db.from('procurement_requests').update({
+      phase: newPhase, updated_at: new Date().toISOString(),
+      phase_timestamps: addPhaseTimestamp(prData?.phase_timestamps, newPhase)
+    }).eq('id', adv.pr_id);
+    notifyPhaseChange(adv.pr_id, newPhase, currentUser?.id);
+    if (prErr) { showLoader(false); showToast('Advance saved but PR update failed: ' + prErr.message, 'error'); return; }
+
+    try {
+      await window.postComment(adv.pr_id, currentUser.id,
+        decision === 'approved'
+          ? ` Accounts approved advance payment of AED ${Number(adv.amount||0).toLocaleString()}.${remarks?' Note: '+remarks:''}`
+          : `✗ Accounts rejected advance payment request.${remarks?' Reason: '+remarks:''}`
+      );
+    } catch(e) { console.warn('Comment post failed:', e); }
+  }
+
+  showLoader(false);
+  closeModal('advConfirmModal');
+  pendingAdvanceId = null; pendingAdvanceDecision = null;
+  showToast(
+    decision === 'approved' ? ' Advance approved — Procurement can now place the order.' : 'Advance rejected — Procurement has been notified.',
+    decision === 'approved' ? 'success' : 'error'
+  );
+  await loadAdvances(); renderAdvanceBanner();
+}
+
+// ── PAYMENT DETAIL MODAL — COMPREHENSIVE VIEW ─────────────────
+async function openPayDetail(id) {
+  const pay = allPayments.find(p=>p.id===id); if(!pay) return;
+
+  document.getElementById('payDetailTitle').textContent = `Payment — ${pay.project_name||''}`;
+  document.getElementById('payDetailSub').textContent = `${pay.vendor_name||'Vendor'} · Requested ${fmtDateTime(pay.request_date)}`;
+  document.getElementById('payDetailBody').innerHTML = `<div style="text-align:center;padding:32px;color:var(--gray-4)">Loading full details...</div>`;
+  document.getElementById('payDetailFooter').innerHTML = `<button class="btn btn-secondary" onclick="closeModal('payDetailModal')">Close</button>`;
+  openModal('payDetailModal');
+
+  // Fetch comprehensive data in parallel
+  showLoader(true);
+  let prData=null, prQuotes=[], prPO=null, prAttachments=[], prComments=[], vendorData=null, advanceData=null;
+
+  if (pay.pr_id) {
+    const [prRes, quotesRes, poRes, attRes, commRes, advRes] = await Promise.all([
+      db.from('procurement_requests').select('*, users!procurement_requests_created_by_fkey(name)').eq('id', pay.pr_id).single(),
+      db.from('pr_quotations').select('*').eq('pr_id', pay.pr_id).order('created_at'),
+      db.from('purchase_orders').select('*').eq('pr_id', pay.pr_id).order('created_at', {ascending:false}).limit(1).maybeSingle(),
+      db.from('pr_attachments').select('*').eq('pr_id', pay.pr_id).order('created_at'),
+      db.from('pr_comments').select('*, users(name)').eq('pr_id', pay.pr_id).order('created_at'),
+      db.from('advance_payment_requests').select('*').eq('pr_id', pay.pr_id).order('created_at', {ascending:false}).limit(1).maybeSingle()
+    ]);
+    prData = prRes.data;
+    prQuotes = quotesRes.data || [];
+    prPO = poRes.data;
+    const jsonbAtts2 = (prData?.attachments || []).map(a => ({
+      file_name: a.name || 'Attachment', file_url: a.data,
+      attachment_type: 'engineer_upload', file_type: a.type
+    }));
+    prAttachments = [...jsonbAtts2, ...(attRes.data || [])];
+    prComments = commRes.data || [];
+    advanceData = advRes.data;
+  }
+
+  if (pay.vendor_id) {
+    const vRes = await db.from('vendors').select('*').eq('id', pay.vendor_id).single();
+    vendorData = vRes.data;
+  }
+  showLoader(false);
+
+  const ptMap = Object.fromEntries(PAYMENT_TERMS_OPTIONS.map(p=>[p.value,p.label]));
+  const isPaid = pay.status==='paid';
+  const isPartial = pay.status==='partial';
+  const urgCls = {normal:'urgency-normal',urgent:'urgency-urgent',critical:'urgency-critical'}[pay.urgency||'normal'];
+  const paidPct = pay.amount_paid&&pay.invoice_amount ? Math.min(100,Math.round(Number(pay.amount_paid)/Number(pay.invoice_amount)*100)) : 0;
+
+  const selectedQ = prQuotes.find(q=>q.is_selected||(prData&&q.id===prData.selected_quotation_id));
+
+  document.getElementById('payDetailBody').innerHTML = `
+
+    <!-- ── PAYMENT REQUEST SUMMARY ── -->
+    <div style="padding:14px 16px;border-radius:var(--radius);background:${isPaid?'rgba(22,163,74,0.06)':isPartial?'rgba(59,130,246,0.06)':'rgba(214,43,43,0.04)'};border:1px solid ${isPaid?'rgba(22,163,74,0.2)':isPartial?'rgba(59,130,246,0.18)':'rgba(214,43,43,0.15)'};margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:1.1rem;font-weight:800;font-family:var(--font-mono)">${pay.currency||'AED'} ${Number(pay.invoice_amount||0).toLocaleString()}</div>
+        <div style="font-size:0.76rem;color:var(--gray-3);margin-top:2px">${pay.vendor_name||'—'} · <span class="urgency-badge ${urgCls}">${pay.urgency||'normal'}</span></div>
+      </div>
+      <div style="text-align:right">
+        ${isPaid?`<div style="font-weight:700;color:#16a34a;font-size:0.88rem"> Fully Paid</div><div style="font-size:0.72rem;color:var(--gray-4)">Paid ${fmtDate(pay.paid_at)}</div>`:
+          isPartial?`<div style="font-weight:700;color:#3b82f6;font-size:0.88rem">Partial — ${paidPct}% paid</div><div class="payment-status-bar" style="width:140px;margin-top:4px"><div class="payment-status-fill" style="width:${paidPct}%"></div></div>`:
+          `<div style="font-weight:700;color:var(--red);font-size:0.88rem">⏳ Payment Pending</div>`}
+      </div>
+    </div>
+
+    <!-- ── PAYMENT DETAILS GRID ── -->
+    <div class="detail-grid">
+      <div class="detail-item"><div class="detail-key">Team Member</div><div class="detail-value">${pay.team_member_name||'—'}</div></div>
+      <div class="detail-item"><div class="detail-key">Project</div><div class="detail-value">${pay.project_name||'—'}</div></div>
+      <div class="detail-item"><div class="detail-key">Project Phase</div><div class="detail-value">${pay.project_phase||'—'}</div></div>
+      <div class="detail-item"><div class="detail-key">Project Manager</div><div class="detail-value">${pay.project_manager_name||'—'}</div></div>
+      <div class="detail-item"><div class="detail-key">Payment Terms</div><div class="detail-value" style="color:#6366f1">${ptMap[pay.payment_terms]||pay.payment_terms||'—'}</div></div>
+      <div class="detail-item"><div class="detail-key">Shipping</div><div class="detail-value">${{yes:'✓ Included in invoice',no:'No — separate',na:'N/A'}[pay.shipping_included]||'—'}</div></div>
+      <div class="detail-item"><div class="detail-key">Request Date</div><div class="detail-value">${fmtDateTime(pay.request_date)}</div></div>
+      ${pay.notes?`<div class="detail-item" style="grid-column:1/-1"><div class="detail-key">Notes from Procurement</div><div class="detail-value">${pay.notes}</div></div>`:''}
+    </div>
+
+    <!-- ── VENDOR DETAILS ── -->
+    ${vendorData?`<div class="detail-section">
+      <div class="detail-section-title">🏢 Vendor Details</div>
+      <div style="padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-weight:700;font-size:0.88rem">${vendorData.name}</div>
+            <div style="font-size:0.73rem;color:var(--gray-3)">${vendorData.email||''} ${vendorData.phone?'· '+vendorData.phone:''}</div>
+            ${vendorData.address?`<div style="font-size:0.71rem;color:var(--gray-4);margin-top:2px">${vendorData.address}</div>`:''}
+          </div>
+          ${vendorData.payment_terms?`<div style="font-size:0.72rem;padding:3px 9px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:4px;color:#6366f1">
+            💳 ${ptMap[vendorData.payment_terms]||vendorData.payment_terms}
+          </div>`:''}
+        </div>
+      </div>
+    </div>`:''}
+
+    <!-- ── PURCHASE ORDER ── -->
+    ${prPO?`<div class="detail-section">
+      <div class="detail-section-title">📄 Purchase Order</div>
+      <div class="po-summary-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-weight:700;font-size:0.95rem">${prPO.po_number}</div>
+            <div style="font-size:0.73rem;color:var(--gray-3)">Generated ${fmtDate(prPO.po_date||prPO.created_at)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:var(--font-mono);font-weight:800;font-size:1.05rem">${prPO.currency||'INR'} ${Number(prPO.total_amount||0).toLocaleString()}</div>
+          </div>
+        </div>
+      </div>
+    </div>` : `<div class="detail-section">
+      <div class="detail-section-title">📄 Purchase Order</div>
+      <div style="padding:10px 12px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius-sm);font-size:0.78rem;color:#b45309">No PO on record for this request.</div>
+    </div>`}
+
+    <!-- ── SELECTED QUOTATION ── -->
+    ${selectedQ?`<div class="detail-section">
+      <div class="detail-section-title"> Approved Quotation</div>
+      ${renderQuotationCard(selectedQ, false)}
+    </div>`:''}
+
+    <!-- ── ALL QUOTATIONS ── -->
+    ${prQuotes.length>1?`<div class="detail-section">
+      <div class="detail-section-title">📎 All Quotations (${prQuotes.length})</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${prQuotes.map(q=>renderQuotationCard(q, false, prData?.selected_quotation_id)).join('')}
+      </div>
+    </div>`:''}
+
+    <!-- ── ADVANCE PAYMENT RECORD ── -->
+    ${advanceData?`<div class="detail-section">
+      <div class="detail-section-title">💳 Advance Payment Record</div>
+      <div style="padding:10px 12px;border-radius:var(--radius-sm);background:${advanceData.status==='approved'?'rgba(22,163,74,0.06)':advanceData.status==='rejected'?'rgba(214,43,43,0.06)':'rgba(245,158,11,0.06)'};border:1px solid ${advanceData.status==='approved'?'rgba(22,163,74,0.22)':advanceData.status==='rejected'?'rgba(214,43,43,0.22)':'rgba(245,158,11,0.22)'}">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-weight:700;font-family:var(--font-mono)">AED ${Number(advanceData.amount||0).toLocaleString()}</div>
+            ${advanceData.notes?`<div style="font-size:0.73rem;color:var(--gray-3);margin-top:2px">${advanceData.notes}</div>`:''}
+          </div>
+          <span style="font-size:0.72rem;font-weight:700;color:${advanceData.status==='approved'?'#16a34a':advanceData.status==='rejected'?'var(--red)':'#b45309'}">
+            ${{approved:' Approved',rejected:'✗ Rejected',pending:'⏳ Pending'}[advanceData.status]||advanceData.status}
+          </span>
+        </div>
+        ${advanceData.confirmed_at?`<div style="font-size:0.71rem;color:var(--gray-4);margin-top:4px">Processed ${fmtDate(advanceData.confirmed_at)}</div>`:''}
+      </div>
+    </div>`:''}
+
+    <!-- ── APPROVAL CHAIN ── -->
+    <div class="detail-section">
+      <div class="detail-section-title"> Approval Chain</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${prData?.initial_pm_approval?`<div class="approval-chain-item">
+          <div class="approval-chain-dot" style="background:${prData.initial_pm_approval==='already_approved'?'#16a34a':'#6366f1'}"></div>
+          <div>
+            <div style="font-size:0.78rem;font-weight:600">PM Clearance</div>
+            <div style="font-size:0.72rem;color:var(--gray-3)">${prData.initial_pm_approval==='already_approved'?'Pre-approved by PM before submission':'Submitted for PM clearance'}</div>
+          </div>
+        </div>`:''}
+        ${prData?.pm_final_approval_status?`<div class="approval-chain-item">
+          <div class="approval-chain-dot" style="background:${prData.pm_final_approval_status==='approved'?'#16a34a':'var(--red)'}"></div>
+          <div style="flex:1">
+            <div style="font-size:0.78rem;font-weight:600">PM Final Approval — ${prData.pm_final_approval_status==='approved'?' Approved':'✗ Rejected'}</div>
+            ${prData.pm_final_approval_notes?`<div style="font-size:0.72rem;color:var(--gray-3)">${prData.pm_final_approval_notes}</div>`:''}
+          </div>
+        </div>`:''}
+        ${prData?.client_approval_screenshot?`<div class="approval-chain-item">
+          <div class="approval-chain-dot" style="background:#16a34a"></div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+              <div style="font-size:0.78rem;font-weight:600">Client Approval</div>
+              <button class="btn btn-secondary btn-sm" onclick="(function(url){if(!url)return;if(url.startsWith('data:')){try{const arr=url.split(','),mime=arr[0].match(/:(.*?);/)[1],bstr=atob(arr[1]);let n=bstr.length;const u8=new Uint8Array(n);while(n--)u8[n]=bstr.charCodeAt(n);const blob=new Blob([u8],{type:mime}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='client_approval.'+mime.split('/')[1];document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);}catch(e){window.open(url,'_blank');}}else{window.open(url,'_blank');}}('${prData.client_approval_screenshot}'))">⬇ Download</button>
+            </div>
+            ${prData.client_approval_notes?`<div style="font-size:0.72rem;color:var(--gray-3)">${prData.client_approval_notes}</div>`:''}
+            <div style="margin-top:6px"><img src="${prData.client_approval_screenshot}" style="max-width:240px;max-height:120px;object-fit:contain;border-radius:5px;border:1px solid var(--border)" onerror="this.style.display='none'"/></div>
+          </div>
+        </div>`:''}
+        ${prData?.pm_approval_screenshot?`<div class="approval-chain-item">
+          <div class="approval-chain-dot" style="background:#6366f1"></div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+              <div style="font-size:0.78rem;font-weight:600">PM Approval Screenshot</div>
+              <button class="btn btn-secondary btn-sm" onclick="(function(url){if(!url)return;if(url.startsWith('data:')){try{const arr=url.split(','),mime=arr[0].match(/:(.*?);/)[1],bstr=atob(arr[1]);let n=bstr.length;const u8=new Uint8Array(n);while(n--)u8[n]=bstr.charCodeAt(n);const blob=new Blob([u8],{type:mime}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pm_approval.'+mime.split('/')[1];document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);}catch(e){window.open(url,'_blank');}}else{window.open(url,'_blank');}}('${prData.pm_approval_screenshot}'))">⬇ Download</button>
+            </div>
+            <div style="margin-top:6px"><img src="${prData.pm_approval_screenshot}" style="max-width:240px;max-height:120px;object-fit:contain;border-radius:5px;border:1px solid var(--border)" onerror="this.style.display='none'"/></div>
+          </div>
+        </div>`:''}
+        ${prData?.qc_result?`<div class="approval-chain-item">
+          <div class="approval-chain-dot" style="background:${prData.qc_result==='accepted'||prData.qc_result==='qc_passed'?'#16a34a':'var(--red)'}"></div>
+          <div>
+            <div style="font-size:0.78rem;font-weight:600">QC Inspection — ${prData.qc_result==='accepted'||prData.qc_result==='qc_passed'?' Passed':'✗ Failed'}</div>
+            ${prData.qc_notes?`<div style="font-size:0.72rem;color:var(--gray-3)">${prData.qc_notes}</div>`:''}
+          </div>
+        </div>`:''}
+      </div>
+    </div>
+
+    <!-- ── ATTACHMENTS ── -->
+    ${_buildAttsSection(prAttachments, 'Documents & Attachments')}
+
+    <!-- ── BOM ── -->
+    ${prData?.parts?.length?`<div class="detail-section">
+      <div class="detail-section-title">📋 Bill of Materials</div>
+      ${renderPartsTable(prData.parts)}
+    </div>`:''}
+
+    <!-- ── TIMELINE / COMMENTS ── -->
+    ${prComments.length?`<div class="detail-section">
+      <div class="detail-section-title">💬 Activity Log (${prComments.length} entries)</div>
+      <div style="max-height:200px;overflow-y:auto">
+        ${renderComments(prComments)}
+      </div>
+    </div>`:''}
+
+    <!-- ── PAYMENT HISTORY ── -->
+    ${isPartial||isPaid?`<div class="detail-section">
+      <div style="padding:12px;background:rgba(22,163,74,0.05);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius)">
+        <div class="detail-key" style="color:#16a34a;margin-bottom:6px">${isPaid?' Fully Paid':'💛 Partial Payment Made'}</div>
+        <div style="font-family:var(--font-mono);font-weight:700">${pay.currency||'AED'} ${Number(pay.amount_paid||0).toLocaleString()} paid</div>
+        ${isPartial?`<div class="payment-status-bar" style="margin-top:6px"><div class="payment-status-fill" style="width:${paidPct}%"></div></div><div style="font-size:0.7rem;color:var(--gray-4);margin-top:3px">${paidPct}% of invoice paid</div>`:''}
+        ${pay.payment_notes?`<p style="font-size:0.78rem;color:var(--gray-3);margin-top:6px">${pay.payment_notes}</p>`:''}
+      </div>
+    </div>`:''}
+
+    <!-- ── RECORD PAYMENT SECTION ── -->
+    ${!isPaid?`<div class="detail-section">
+      <div class="detail-section-title">💳 Record Payment</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Amount Paid (${pay.currency||'AED'})</label>
+          <input class="form-control" id="paidAmt" type="number" placeholder="${pay.invoice_amount||'0.00'}" value="${pay.amount_paid||''}"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Payment Type</label>
+          <select class="form-control" id="paidType">
+            <option value="full">Full Payment</option>
+            <option value="partial" ${isPartial?'selected':''}>Partial Payment</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Transaction Notes</label>
+          <textarea class="form-control" id="paidNotes" placeholder="Transaction ID, bank reference, date, remarks...">${pay.payment_notes||''}</textarea>
+        </div>
+      </div>
+    </div>`:''}
+  `;
+
+  const footer = document.getElementById('payDetailFooter');
+  footer.innerHTML = `<button class="btn btn-secondary" onclick="closeModal('payDetailModal')">Close</button>`;
+  if (!isPaid) {
+    footer.innerHTML += `<button class="btn btn-primary" onclick="recordPayment('${id}')">Save Payment Record</button>`;
+  }
+}
+
+async function recordPayment(payId) {
+  const amtPaid=parseFloat(document.getElementById('paidAmt').value)||0;
+  const type=document.getElementById('paidType').value;
+  const notes=document.getElementById('paidNotes').value.trim()||null;
+  if(!amtPaid){showToast('Please enter paid amount','error');return;}
+  const status=type==='full'?'paid':'partial';
+  showLoader(true);
+  const{error}=await db.from('payment_requests').update({
+    status, amount_paid:amtPaid, payment_notes:notes,
+    paid_at:new Date().toISOString(), confirmed_by:currentUser.id
+  }).eq('id',payId);
+  if(error){showLoader(false);showToast('Error: '+error.message,'error');return;}
+  if(status==='paid'){
+    const pay=allPayments.find(p=>p.id===payId);
+    if(pay?.pr_id){
+      const { data: payPR } = await db.from('procurement_requests').select('phase_timestamps').eq('id',pay.pr_id).single();
+      await db.from('procurement_requests').update({
+        phase:'accepted', updated_at:new Date().toISOString(),
+        phase_timestamps: addPhaseTimestamp(payPR?.phase_timestamps, 'accepted')
+      }).eq('id',pay.pr_id);
+      notifyPhaseChange(pay.pr_id,'accepted',currentUser?.id);
+    }
+  }
+  showLoader(false);
+  showToast(status==='paid'?' Payment marked as fully paid!':'Partial payment recorded.','success');
+  closeModal('payDetailModal');
+  await loadPayments();
+}
+
+init();
+</script>
+</body>
+</html>

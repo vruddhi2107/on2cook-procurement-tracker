@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ProcureX — Projects</title>
+<link rel="icon" type="image/x-icon" href="../on2cook no bg.png">
+
+<link rel="stylesheet" href="../css/styles.css"/>
+<style>
+.project-card{background:white;border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:box-shadow 0.15s}
+.project-card:hover{box-shadow:0 2px 12px rgba(0,0,0,0.08)}
+.project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+.phase-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border:1px solid var(--border);border-radius:12px;font-size:0.72rem;background:var(--off-white);margin:2px}
+.phase-chip.selected{border-color:#6366f1;background:rgba(99,102,241,0.07);color:#6366f1}
+.phase-chip button{background:none;border:none;cursor:pointer;color:var(--red);padding:0 1px;font-size:0.75rem;line-height:1}
+.phase-library-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border:1.5px solid var(--border);border-radius:14px;font-size:0.76rem;background:white;margin:3px;cursor:default;transition:all 0.12s}
+.phase-library-chip:hover{border-color:#6366f1;background:rgba(99,102,241,0.04)}
+.phase-library-chip .del-btn{background:none;border:none;cursor:pointer;color:var(--gray-4);font-size:0.72rem;padding:0 2px;line-height:1;transition:color 0.12s}
+.phase-library-chip .del-btn:hover{color:var(--red)}
+.phase-select-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border:1.5px solid var(--border);border-radius:14px;font-size:0.76rem;background:white;margin:3px;cursor:pointer;transition:all 0.12s;user-select:none}
+.phase-select-chip:hover{border-color:#6366f1}
+.phase-select-chip.active{border-color:#6366f1;background:rgba(99,102,241,0.08);color:#6366f1;font-weight:600}
+.phase-select-chip .check{width:14px;height:14px;border:1.5px solid var(--border);border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:0.6rem;transition:all 0.12s}
+.phase-select-chip.active .check{border-color:#6366f1;background:#6366f1;color:white}
+.library-section{background:rgba(99,102,241,0.03);border:1px solid rgba(99,102,241,0.15);border-radius:var(--radius);padding:16px;margin-bottom:22px}
+</style>
+</head>
+<body>
+<div id="navbarMount"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<main class="page-container">
+  <div class="page-header">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div><h1 class="page-title">Project <span>Management</span></h1><p class="page-sub">Manage projects and their phases — available to all engineers in request forms</p></div>
+      <button class="btn btn-primary" onclick="openProjectModal()">+ Add Project</button>
+    </div>
+  </div>
+
+  <!-- ── GLOBAL PHASE LIBRARY ── -->
+  <div class="library-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+      <div>
+        <div style="font-weight:700;font-size:0.88rem;color:#6366f1">📚 Global Phase Library</div>
+        <div style="font-size:0.74rem;color:var(--gray-3);margin-top:2px">Add phases here once — then select them for any project below</div>
+      </div>
+    </div>
+    <div id="phaseLibraryChips" style="display:flex;flex-wrap:wrap;gap:2px;min-height:32px;margin-bottom:10px">
+      <span style="color:var(--gray-4);font-size:0.78rem;padding:6px 0">Loading...</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input class="form-control" id="newLibPhase" placeholder="Add new phase to library (e.g. Prototype, Design, Production)..." style="flex:1;min-width:200px;max-width:400px" onkeydown="if(event.key==='Enter'){event.preventDefault();addToLibrary();}"/>
+      <button class="btn btn-secondary btn-sm" onclick="addToLibrary()">+ Add to Library</button>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <input type="text" id="searchInput" placeholder="Search projects..." oninput="filterProjects()"/>
+    <select id="filterStatus" onchange="filterProjects()">
+      <option value="">All</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="project-grid" id="projectGrid">
+    <div style="color:var(--gray-4);padding:24px">Loading projects...</div>
+  </div>
+</main>
+
+<!-- ADD/EDIT PROJECT MODAL -->
+<div class="modal-overlay" id="projectModal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title" id="projectModalTitle">Add Project</div>
+      <button class="modal-close" onclick="closeModal('projectModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pId"/>
+      <div class="form-group">
+        <label class="form-label">Project Name *</label>
+        <input class="form-control" id="pName" placeholder="e.g. Smart Grid Prototype — Phase 2"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Default Project Manager</label>
+        <select class="form-control" id="pDefaultPM">
+          <option value="">Select PM (optional)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" id="pDesc" placeholder="Brief project description..."></textarea>
+      </div>
+
+      <!-- Select from Library -->
+      <div style="margin-top:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+          <label class="form-label" style="margin:0">Project Phases</label>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="selectAllPhases()" id="selectAllBtn">☑ Select All</button>
+            <button class="btn btn-ghost btn-sm" onclick="deselectAllPhases()" id="deselectAllBtn">☐ Deselect All</button>
+          </div>
+        </div>
+        <p style="font-size:0.74rem;color:var(--gray-3);margin-bottom:10px">Click phases to toggle, or use the buttons above:</p>
+
+        <div id="librarySelectChips" style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:12px;padding:10px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);min-height:44px">
+          <span style="font-size:0.74rem;color:var(--gray-4);padding:3px">Loading library...</span>
+        </div>
+
+        <!-- Custom phase add -->
+        <div style="display:flex;gap:6px">
+          <input class="form-control" id="newCustomPhase" placeholder="Add a custom phase not in library..." style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomPhaseToProject();}"/>
+          <button class="btn btn-secondary btn-sm" onclick="addCustomPhaseToProject()">+ Add</button>
+        </div>
+
+        <!-- Currently selected phases preview -->
+        <div id="selectedPhasesPreview" style="margin-top:10px;display:none">
+          <div style="font-size:0.72rem;font-weight:600;color:var(--gray-4);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px">Selected phases for this project:</div>
+          <div id="selectedPhasesList" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('projectModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProject()">Save Project</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="footerMount"></div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../js/supabase-config.js"></script>
+<script src="../js/shared.js"></script>
+<script>
+let currentUser, allProjects=[], allPMs=[];
+// phaseLibrary: array of {id, name} from Supabase
+let phaseLibrary = [];
+// selectedProjectPhases: array of {name, fromLibrary:bool, existingId?}
+let selectedProjectPhases = [];
+
+// ── PHASE LIBRARY (Supabase) ─────────────────────────────────
+
+async function loadPhaseLibrary() {
+  const { data, error } = await db
+    .from('phase_library')
+    .select('id, name')
+    .order('name');
+  if (error) { console.error('Phase library load error:', error); return; }
+  phaseLibrary = data || [];
+  renderPhaseLibraryChips();
+}
+
+function renderPhaseLibraryChips() {
+  const el = document.getElementById('phaseLibraryChips');
+  if (!el) return;
+  if (!phaseLibrary.length) {
+    el.innerHTML = `<span style="color:var(--gray-4);font-size:0.78rem;padding:6px 0">No phases yet — add your first phase above</span>`;
+    return;
+  }
+  el.innerHTML = phaseLibrary.map(ph => `
+    <span class="phase-library-chip">
+      📍 ${ph.name}
+      <button class="del-btn" onclick="removeFromLibrary('${ph.id}', '${ph.name.replace(/'/g,"\\'")}')" title="Remove from library">✕</button>
+    </span>`).join('');
+}
+
+async function addToLibrary() {
+  const input = document.getElementById('newLibPhase');
+  const name = input.value.trim();
+  if (!name) return;
+
+  if (phaseLibrary.find(p => p.name.toLowerCase() === name.toLowerCase())) {
+    showToast('Already in library', 'error');
+    return;
+  }
+
+  const { data, error } = await db
+    .from('phase_library')
+    .insert({ name, created_by: currentUser.id })
+    .select()
+    .single();
+
+  if (error) { showToast('Failed to add: ' + error.message, 'error'); return; }
+
+  phaseLibrary.push({ id: data.id, name: data.name });
+  // Keep alphabetically sorted
+  phaseLibrary.sort((a, b) => a.name.localeCompare(b.name));
+  input.value = '';
+  renderPhaseLibraryChips();
+  showToast(`"${name}" added to library`, 'success');
+  renderLibrarySelectChips();
+}
+
+async function removeFromLibrary(id, name) {
+  const { error } = await db.from('phase_library').delete().eq('id', id);
+  if (error) { showToast('Failed to remove: ' + error.message, 'error'); return; }
+
+  phaseLibrary = phaseLibrary.filter(p => p.id !== id);
+  renderPhaseLibraryChips();
+  renderLibrarySelectChips();
+  showToast(`"${name}" removed from library`, 'info');
+}
+
+// ── LIBRARY SELECT CHIPS (inside project modal) ──────────────
+function renderLibrarySelectChips() {
+  const el = document.getElementById('librarySelectChips');
+  if (!el) return;
+  if (!phaseLibrary.length) {
+    el.innerHTML = `<span style="font-size:0.74rem;color:var(--gray-4);padding:3px">No phases in library yet. Add some above first.</span>`;
+    return;
+  }
+  el.innerHTML = phaseLibrary.map(ph => {
+    const isActive = selectedProjectPhases.some(p => p.name === ph.name);
+    return `<span class="phase-select-chip ${isActive ? 'active' : ''}" onclick="toggleLibraryPhase('${ph.name.replace(/'/g,"\\'")}')">
+      <span class="check">${isActive ? '✓' : ''}</span>
+      ${ph.name}
+    </span>`;
+  }).join('');
+}
+
+function toggleLibraryPhase(name) {
+  const idx = selectedProjectPhases.findIndex(p => p.name === name);
+  if (idx >= 0) {
+    selectedProjectPhases.splice(idx, 1);
+  } else {
+    selectedProjectPhases.push({ name, fromLibrary: true });
+  }
+  renderLibrarySelectChips();
+  renderSelectedPhasesPreview();
+}
+
+// ── SELECT ALL / DESELECT ALL ────────────────────────────────
+function selectAllPhases() {
+  phaseLibrary.forEach(ph => {
+    if (!selectedProjectPhases.find(p => p.name === ph.name)) {
+      selectedProjectPhases.push({ name: ph.name, fromLibrary: true });
+    }
+  });
+  renderLibrarySelectChips();
+  renderSelectedPhasesPreview();
+}
+
+function deselectAllPhases() {
+  // Only remove library phases; keep any custom-typed ones
+  selectedProjectPhases = selectedProjectPhases.filter(p => !p.fromLibrary);
+  renderLibrarySelectChips();
+  renderSelectedPhasesPreview();
+}
+
+function addCustomPhaseToProject() {
+  const input = document.getElementById('newCustomPhase');
+  const name = input.value.trim();
+  if (!name) return;
+  if (selectedProjectPhases.find(p => p.name.toLowerCase() === name.toLowerCase())) {
+    showToast('Phase already added', 'error');
+    return;
+  }
+  selectedProjectPhases.push({ name, fromLibrary: false });
+  input.value = '';
+  renderLibrarySelectChips();
+  renderSelectedPhasesPreview();
+  // Also offer to add to library if not already there
+  if (!phaseLibrary.find(p => p.name.toLowerCase() === name.toLowerCase())) {
+    addCustomToLibrarySilent(name);
+  }
+}
+
+async function addCustomToLibrarySilent(name) {
+  const { data, error } = await db
+    .from('phase_library')
+    .insert({ name, created_by: currentUser.id })
+    .select()
+    .single();
+  if (!error && data) {
+    phaseLibrary.push({ id: data.id, name: data.name });
+    phaseLibrary.sort((a, b) => a.name.localeCompare(b.name));
+    renderPhaseLibraryChips();
+    renderLibrarySelectChips();
+  }
+}
+
+function removeSelectedPhase(idx) {
+  selectedProjectPhases.splice(idx, 1);
+  renderLibrarySelectChips();
+  renderSelectedPhasesPreview();
+}
+
+function renderSelectedPhasesPreview() {
+  const preview = document.getElementById('selectedPhasesPreview');
+  const list = document.getElementById('selectedPhasesList');
+  if (!preview || !list) return;
+  if (!selectedProjectPhases.length) { preview.style.display = 'none'; return; }
+  preview.style.display = 'block';
+  list.innerHTML = selectedProjectPhases.map((ph, i) => `
+    <span class="phase-chip selected">
+      📍 ${ph.name}
+      <button onclick="removeSelectedPhase(${i})" title="Remove">✕</button>
+    </span>`).join('');
+}
+
+// ── INIT ────────────────────────────────────────────────────
+async function init() {
+  currentUser = Session.require(['project_manager', 'master', 'procurement_manager']);
+  if (!currentUser) return;
+  document.getElementById('navbarMount').innerHTML = buildNavbar(currentUser);
+  document.getElementById('footerMount').innerHTML = buildFooter();
+  initNavbar(currentUser);
+  showLoader(true);
+  await Promise.all([loadProjects(), loadPMs(), loadPhaseLibrary()]);
+  showLoader(false);
+}
+
+async function loadProjects() {
+  const { data, error } = await db
+    .from('projects')
+    .select('*,project_phases(id,name),users:default_pm_id(id,name)')
+    .order('name');
+  if (error) { showToast('Failed to load projects', 'error'); return; }
+  allProjects = data || [];
+  filterProjects();
+}
+
+async function loadPMs() {
+  const { data } = await db.from('users').select('id,name').eq('role', 'project_manager').order('name');
+  allPMs = data || [];
+  const sel = document.getElementById('pDefaultPM');
+  sel.innerHTML = '<option value="">Select PM (optional)</option>' +
+    allPMs.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+}
+
+function filterProjects() {
+  const s = document.getElementById('searchInput').value.toLowerCase();
+  const st = document.getElementById('filterStatus').value;
+  let projs = allProjects;
+  if (s) projs = projs.filter(p => p.name.toLowerCase().includes(s));
+  if (st === 'active') projs = projs.filter(p => p.is_active !== false);
+  if (st === 'inactive') projs = projs.filter(p => p.is_active === false);
+  renderProjects(projs);
+}
+
+function renderProjects(projs) {
+  const grid = document.getElementById('projectGrid');
+  if (!projs.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--gray-4)"><div style="font-size:2rem;margin-bottom:10px">📋</div><h3>No projects yet</h3><p>Add your first project to get started.</p></div>`;
+    return;
+  }
+  grid.innerHTML = projs.map(p => {
+    const phases = p.project_phases || [];
+    const pm = p.users;
+    return `<div class="project-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div>
+          <div style="font-weight:700;font-size:0.92rem">${p.name}</div>
+          ${pm ? `<div style="font-size:0.74rem;color:var(--gray-3);margin-top:2px">👔 ${pm.name}</div>` : ''}
+        </div>
+        <span style="font-size:0.62rem;padding:2px 7px;border-radius:3px;font-family:var(--font-mono);flex-shrink:0;${p.is_active !== false ? 'background:rgba(5,150,105,0.08);color:#047857;border:1px solid rgba(5,150,105,0.2)' : 'background:var(--off-white);color:var(--gray-4);border:1px solid var(--border)'}">
+          ${p.is_active !== false ? 'Active' : 'Inactive'}
+        </span>
+      </div>
+      ${p.description ? `<p style="font-size:0.76rem;color:var(--gray-3);margin-bottom:8px">${p.description}</p>` : ''}
+      <div style="margin-bottom:10px">
+        <div style="font-size:0.68rem;font-weight:600;color:var(--gray-4);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Phases (${phases.length})</div>
+        <div style="display:flex;flex-wrap:wrap;gap:3px">
+          ${phases.map(ph => `<span class="phase-chip">📍 ${ph.name}</span>`).join('')}
+          ${!phases.length ? `<span style="font-size:0.72rem;color:var(--gray-4)">No phases added</span>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:5px">
+        <button class="btn btn-secondary btn-sm" onclick="openEditProject('${p.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="toggleProjectActive('${p.id}',${p.is_active !== false})">${p.is_active !== false ? 'Deactivate' : 'Activate'}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── PROJECT MODAL ─────────────────────────────────────────────
+function openProjectModal() {
+  document.getElementById('projectModalTitle').textContent = 'Add Project';
+  document.getElementById('pId').value = '';
+  document.getElementById('pName').value = '';
+  document.getElementById('pDesc').value = '';
+  document.getElementById('pDefaultPM').value = '';
+  selectedProjectPhases = [];
+  renderLibrarySelectChips();
+  renderSelectedPhasesPreview();
+  openModal('projectModal');
+}
+
+async function openEditProject(id) {
+  const proj = allProjects.find(p => p.id === id);
+  if (!proj) return;
+  document.getElementById('projectModalTitle').textContent = 'Edit Project';
+  document.getElementById('pId').value = proj.id;
+  document.getElementById('pName').value = proj.name || '';
+  document.getElementById('pDesc').value = proj.description || '';
+  document.getElementById('pDefaultPM').value = proj.default_pm_id || '';
+  // Pre-populate selectedProjectPhases from existing project_phases
+  // Mark as fromLibrary=true if name exists in library (for toggle highlighting)
+  selectedProjectPhases = (proj.project_phases || []).map(ph => ({
+    name: ph.name,
+    existingId: ph.id,
+    fromLibrary: !!phaseLibrary.find(l => l.name === ph.name)
+  }));
+  renderLibrarySelectChips();
+  renderSelectedPhasesPreview();
+  openModal('projectModal');
+}
+
+async function saveProject() {
+  const name = document.getElementById('pName').value.trim();
+  if (!name) { showToast('Project name required', 'error'); return; }
+  if (!selectedProjectPhases.length) { showToast('Please select at least one phase', 'error'); return; }
+
+  const id = document.getElementById('pId').value;
+  const vals = {
+    name,
+    description: document.getElementById('pDesc').value.trim() || null,
+    default_pm_id: document.getElementById('pDefaultPM').value || null,
+    created_by: currentUser.id
+  };
+
+  showLoader(true);
+  let projectId = id;
+
+  if (id) {
+    const { error } = await db.from('projects').update(vals).eq('id', id);
+    if (error) { showToast('Update failed: ' + error.message, 'error'); showLoader(false); return; }
+  } else {
+    const { data, error } = await db.from('projects').insert({ ...vals, is_active: true }).select().single();
+    if (error) { showToast('Create failed: ' + error.message, 'error'); showLoader(false); return; }
+    projectId = data?.id;
+  }
+
+  if (projectId) {
+    const existingInDB = (allProjects.find(p => p.id === id)?.project_phases || []);
+    const selectedNames = selectedProjectPhases.map(p => p.name);
+    const existingNames = existingInDB.map(p => p.name);
+
+    // Delete phases that were removed
+    const toDelete = existingInDB.filter(ph => !selectedNames.includes(ph.name));
+    for (const ph of toDelete) {
+      await db.from('project_phases').delete().eq('id', ph.id);
+    }
+
+    // Add new phases (those not already in DB for this project)
+    const toAdd = selectedProjectPhases.filter(p => !existingNames.includes(p.name));
+    if (toAdd.length) {
+      const { error } = await db.from('project_phases').insert(
+        toAdd.map(p => ({ project_id: projectId, name: p.name, created_by: currentUser.id }))
+      );
+      if (error) { showToast('Phase save error: ' + error.message, 'error'); }
+    }
+  }
+
+  showLoader(false);
+  showToast(id ? 'Project updated!' : 'Project added!', 'success');
+  closeModal('projectModal');
+  await loadProjects();
+}
+
+async function toggleProjectActive(id, current) {
+  const { error } = await db.from('projects').update({ is_active: !current }).eq('id', id);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast(`Project ${current ? 'deactivated' : 'activated'}.`, 'success');
+  await loadProjects();
+}
+
+init();
+</script>
+</body>
+</html>

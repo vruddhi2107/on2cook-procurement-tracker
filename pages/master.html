@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ProcureX — Master Dashboard</title>
+  <link rel="icon" type="image/x-icon" href="../on2cook no bg.png">
+  <link rel="stylesheet" href="../css/styles.css"/>
+</head>
+<body>
+<div id="navbarMount"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div><span style="font-family:var(--font-mono);font-size:0.8rem;color:var(--gray-4)">Loading...</span></div>
+
+<main class="page-container">
+  <div class="page-header">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px">
+      <div><h1 class="page-title">Master <span>Dashboard</span></h1>
+        <p class="page-sub">Full system oversight — all requests, users, vendors, and analytics</p></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="btn btn-primary" onclick="openAddUser()">+ Add User</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-card-value" id="sTotal">—</div><div class="stat-card-label">Total Requests</div><div class="stat-card-icon">📋</div></div>
+    <div class="stat-card" style="--accent:#f59e0b"><div class="stat-card-value" id="sActive">—</div><div class="stat-card-label">Active</div><div class="stat-card-icon">⚡</div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sClosed">—</div><div class="stat-card-label">Accepted & Closed</div><div class="stat-card-icon">✔</div></div>
+    <div class="stat-card" style="--accent:#3b82f6"><div class="stat-card-value" id="sUsers">—</div><div class="stat-card-label">Users</div><div class="stat-card-icon">👥</div></div>
+    <div class="stat-card" style="--accent:#8b5cf6"><div class="stat-card-value" id="sVendors">—</div><div class="stat-card-label">Vendors</div><div class="stat-card-icon">🏢</div></div>
+    <div class="stat-card" style="--accent:#ef4444"><div class="stat-card-value" id="sRejected">—</div><div class="stat-card-label">Rejected</div><div class="stat-card-icon">✖</div></div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('requests')">📋 All Requests</button>
+    <button class="tab-btn" onclick="switchTab('director')">👤 Director Approvals <span id="directorBadge" style="display:none;background:#7c3aed;color:#fff;border-radius:999px;padding:0 7px;font-size:0.72rem;margin-left:4px;vertical-align:middle"></span></button>
+    <button class="tab-btn" onclick="switchTab('users')">👥 Users</button>
+    <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendors</button>
+    <button class="tab-btn" onclick="switchTab('analytics')">📊 Analytics</button>
+    <button class="tab-btn" onclick="goToProjects()">📋 Projects</button>
+  </div>
+
+  <!-- REQUESTS TAB -->
+  <div id="tab-requests">
+    <div class="filter-bar">
+      <input type="text" id="searchInput" placeholder="Search by project, PR #, team member..." oninput="filterRequests()"/>
+      <select id="filterPhase" onchange="filterRequests()">
+        <option value="">All Phases</option>
+        <option value="submitted">📋 Submitted</option>
+        <option value="pending_initial_pm_approval">🔐 Awaiting PM Clearance</option>
+        <option value="procurement_active">⚙️ Procurement Active</option>
+        <option value="vendor_info_shared">🏢 Vendor Info Shared</option>
+        <option value="quotations_shared">📨 Quotations Shared</option>
+        <option value="pending_client_approval">👤 Pending Client Approval</option>
+        <option value="pending_pm_final_approval">✍️ Pending PM Final Approval</option>
+        <option value="approved">✅ Approved</option>
+        <option value="advance_requested">💳 Advance Requested</option>
+        <option value="advance_approved">💳 Advance Approved</option>
+        <option value="advance_rejected">💳 Advance Rejected</option>
+        <option value="order_placed">🛒 Order Placed</option>
+        <option value="grn_pending">📦 GRN / QC Pending</option>
+        <option value="qc_passed">✔️ QC Passed</option>
+        <option value="payment_requested">💰 Payment Requested</option>
+        <option value="accepted">✔️ Accepted &amp; Closed</option>
+        <option value="rejected">✖️ Rejected</option>
+      </select>
+      <select id="filterDept" onchange="filterRequests()">
+        <option value="">All Departments</option>
+        <option value="mech">Mechanical</option>
+        <option value="id">Industrial Design</option>
+        <option value="electronics">Electronics</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Clear</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>PR #</th><th>Project</th><th>Category</th><th>Dept</th><th>Vendor</th><th>Phase</th><th>Lead Time</th><th>Updated</th><th>Requester</th><th>Actions</th></tr></thead>
+          <tbody id="requestsBody"><tr><td colspan="10" style="text-align:center;padding:48px;color:var(--gray-4)">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIRECTOR APPROVALS TAB -->
+  <div id="tab-director" style="display:none">
+    <div class="card" style="margin-bottom:18px;border:1.5px solid rgba(124,58,237,0.25);background:rgba(124,58,237,0.03)">
+      <div class="card-header">
+        <span class="section-title" style="color:#7c3aed">👤 Director Approval Queue</span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Requests escalated by PMs — quote amount exceeds ₹5,000</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>PR #</th><th>Project</th><th>Phase</th><th>Selected Quote</th><th>Amount</th><th>PM Notes</th><th>Submitted</th><th></th></tr></thead>
+          <tbody id="directorBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- USERS TAB -->
+  <div id="tab-users" style="display:none">
+    <div class="card">
+      <div class="card-header"><span class="section-title">System Users</span>
+        <button class="btn btn-primary btn-sm" onclick="openAddUser()">+ Add User</button></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Joined</th><th>Actions</th></tr></thead>
+          <tbody id="usersBody"><tr><td colspan="6" style="text-align:center;padding:48px;color:var(--gray-4)">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- VENDORS TAB -->
+  <div id="tab-vendors" style="display:none">
+    <div class="filter-bar">
+      <input type="text" id="vendorSearch" placeholder="Search vendors..." oninput="filterVendors()"/>
+    </div>
+    <div class="vendor-grid" id="vendorGrid"><div style="color:var(--gray-4);grid-column:1/-1;padding:24px">Loading vendors...</div></div>
+  </div>
+
+  <!-- ANALYTICS TAB -->
+  <div id="tab-analytics" style="display:none">
+    <!-- KPI Row -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px" id="analyticsKPIs"></div>
+
+    <!-- Row 1: Phase donut + Dept bar -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+      <div class="card">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+          <span class="section-title">Requests by Phase</span>
+          <span id="phaseTotal" style="font-family:var(--font-mono);font-size:0.75rem;color:var(--gray-4)"></span>
+        </div>
+        <div class="card-body" style="padding:10px 16px 16px">
+          <canvas id="chartPhase" height="230"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="section-title">Requests by Department</span></div>
+        <div class="card-body" style="padding:10px 16px 16px">
+          <canvas id="chartDept" height="230"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Lead Time histogram + Top requesters -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px">
+      <div class="card">
+        <div class="card-header"><span class="section-title">Lead Time Distribution</span></div>
+        <div class="card-body" style="padding:10px 16px 16px">
+          <canvas id="chartLeadTime" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="section-title">Top Requesters</span></div>
+        <div class="card-body" style="padding:10px 16px 16px">
+          <canvas id="chartRequesters" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Monthly trend + Recent activity -->
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:18px">
+      <div class="card">
+        <div class="card-header"><span class="section-title">Monthly Requests (Last 6 Months)</span></div>
+        <div class="card-body" style="padding:10px 16px 16px">
+          <canvas id="chartMonthly" height="180"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="section-title">Recent Activity</span></div>
+        <div class="card-body" id="recentActivity" style="padding:10px 12px;max-height:280px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- PR DETAIL MODAL -->
+<div class="modal-overlay" id="prDetailModal">
+  <div class="modal" style="max-width:800px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="prDetailTitle">Request Details</div><div class="modal-title-sub" id="prDetailSub"></div></div>
+      <button class="modal-close" onclick="closeModal('prDetailModal')">✕</button>
+    </div>
+    <div class="modal-body" id="prDetailBody" style="max-height:74vh;overflow-y:auto"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="prDeleteBtn" onclick="deletePR()">Delete PR</button>
+      <button class="btn btn-secondary" onclick="closeModal('prDetailModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- USER MODAL -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div><div class="modal-title" id="userModalTitle">Add User</div><div class="modal-title-sub">Default password: 12345</div></div>
+      <button class="modal-close" onclick="closeModal('userModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">Full Name *</label><input class="form-control" id="uName" placeholder="Jane Doe"/></div>
+        <div class="form-group"><label class="form-label">Email *</label><input class="form-control" id="uEmail" type="email" placeholder="jane@company.com"/></div>
+        <div class="form-group"><label class="form-label">Password</label><input class="form-control" id="uPassword" value="12345"/></div>
+        <div class="form-group"><label class="form-label">Role *</label>
+          <select class="form-control" id="uRole">
+            <option value="">Select</option>
+            <option value="master">Master Admin</option>
+            <option value="procurement_manager">Procurement Manager</option>
+            <option value="engineer">Engineer</option>
+            <option value="project_manager">Project Manager</option>
+            <option value="workshop">Workshop</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Department</label>
+          <select class="form-control" id="uDept">
+            <option value="">—</option>
+            <option value="mech">Mechanical</option>
+            <option value="id">Industrial Design</option>
+            <option value="electronics">Electronics</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()">Save User</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="footerMount"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../js/supabase-config.js"></script>
+<script src="../js/shared.js"></script>
+<script>
+let currentUser, allRequests=[], allUsers=[], allVendors=[], activeTab='requests', editingUserId=null, viewingPRId=null;
+
+function handleAttachmentDownload(e, url, fileName) {
+  if (!url) return;
+  if (url.startsWith('data:')) {
+    e.preventDefault();
+    try {
+      const arr = url.split(','), mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]); let n = bstr.length; const u8 = new Uint8Array(n);
+      while(n--) u8[n] = bstr.charCodeAt(n);
+      const blob = new Blob([u8], {type: mime});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fileName;
+      document.body.appendChild(a); a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    } catch(err) { window.open(url, '_blank'); }
+  }
+}
+
+async function init() {
+  currentUser=Session.require(['master']);
+  if(!currentUser) return;
+  document.getElementById('navbarMount').innerHTML=buildNavbar(currentUser);
+  document.getElementById('footerMount').innerHTML=buildFooter();
+  initNavbar(currentUser);
+  showLoader(true);
+  await Promise.all([loadRequests(), loadUsers(), loadVendors()]);
+  showLoader(false);
+}
+
+async function loadRequests() {
+  const{data}=await db.from('procurement_requests')
+    .select('*, users!procurement_requests_created_by_fkey(name,email), vendors(name)')
+    .order('updated_at',{ascending:false});
+  allRequests=data||[];
+  updateStats();
+  filterRequests();
+  renderAnalytics();
+}
+
+async function loadUsers() {
+  const{data}=await db.from('users').select('*').order('created_at');
+  allUsers=data||[];
+  document.getElementById('sUsers').textContent=allUsers.length;
+  renderUsers();
+}
+
+async function loadVendors() {
+  const{data}=await db.from('vendors').select('*').order('name');
+  allVendors=data||[];
+  document.getElementById('sVendors').textContent=allVendors.length;
+  renderVendorGrid(allVendors);
+}
+
+function updateStats() {
+  document.getElementById('sTotal').textContent=allRequests.length;
+  document.getElementById('sActive').textContent=allRequests.filter(r=>!['accepted','rejected'].includes(r.phase)).length;
+  document.getElementById('sClosed').textContent=allRequests.filter(r=>r.phase==='accepted').length;
+  document.getElementById('sRejected').textContent=allRequests.filter(r=>r.phase==='rejected').length;
+  // Director badge
+  const directorPending=allRequests.filter(r=>r.phase==='pending_sandy_approval');
+  const badge=document.getElementById('directorBadge');
+  if(badge){badge.textContent=directorPending.length;badge.style.display=directorPending.length?'':'none';}
+}
+
+function switchTab(tab) {
+  activeTab=tab;
+  ['requests','director','users','vendors','analytics'].forEach((t,i)=>{
+    const el=document.getElementById(`tab-${t}`);
+    if(el) el.style.display=t===tab?'':'none';
+    document.querySelectorAll('.tab-btn')[i].classList.toggle('active',t===tab);
+  });
+  if(tab==='analytics') renderAnalytics();
+  if(tab==='director') renderDirectorApprovals();
+}
+
+function clearFilters() {
+  document.getElementById('searchInput').value='';
+  document.getElementById('filterPhase').value='';
+  document.getElementById('filterDept').value='';
+  filterRequests();
+}
+
+function filterRequests() {
+  const s=document.getElementById('searchInput').value.toLowerCase();
+  const ph=document.getElementById('filterPhase').value;
+  const dp=document.getElementById('filterDept').value;
+  let reqs=allRequests;
+  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s)||(r.team_member_name||'').toLowerCase().includes(s)||(r.users?.name||'').toLowerCase().includes(s));
+  if(ph) reqs=reqs.filter(r=>r.phase===ph);
+  if(dp) reqs=reqs.filter(r=>r.department===dp);
+  renderTable(reqs);
+}
+
+function renderTable(reqs) {
+  const tbody=document.getElementById('requestsBody');
+  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="10"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>No requests found</h3><p>No procurement requests match your current filters.</p></div></td></tr>`;return;}
+  tbody.innerHTML=reqs.map(r=>`<tr>
+    <td><span class="pr-number">PR-${String(r.request_number).padStart(4,'0')}</span></td>
+    <td><strong>${r.project_name}</strong><br/><span style="font-size:0.74rem;color:var(--gray-4)">${r.project_phase}</span></td>
+    <td class="mono">${r.request_category}</td>
+    <td style="font-size:0.82rem">${DEPARTMENTS[r.department]||r.department}</td>
+    <td style="font-size:0.8rem;max-width:110px;overflow:hidden;text-overflow:ellipsis">${r.vendors?.name||'—'}</td>
+    <td>${getPhaseBadge(r.phase)}</td>
+    <td>${leadTimeBadge(r.created_at)}</td>
+    <td class="mono" style="font-size:0.75rem">${formatDate(r.updated_at||r.created_at)}</td>
+    <td style="font-size:0.82rem">${r.users?.name||'—'}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-ghost btn-sm" onclick='viewPR("${r.id}")'>View</button>
+    </td>
+  </tr>`).join('');
+}
+
+async function viewPR(id) {
+  viewingPRId=id;
+  const pr=allRequests.find(r=>r.id===id);
+  if(!pr) return;
+  document.getElementById('prDetailTitle').textContent=`PR-${String(pr.request_number).padStart(4,'0')} — ${pr.project_name}`;
+  document.getElementById('prDetailSub').textContent=`${pr.request_category} · ${DEPARTMENTS[pr.department]} · ${formatDate(pr.created_at)}`;
+  showLoader(true);
+  const[comments,quotations,vd,attRes]=await Promise.all([
+    loadComments(id),
+    db.from('pr_quotations').select('*').eq('pr_id',id).order('created_at').then(r=>r.data||[]),
+    pr.assigned_vendor_id?db.from('vendors').select('name').eq('id',pr.assigned_vendor_id).single():Promise.resolve({data:null}),
+    db.from('pr_attachments').select('*').eq('pr_id',id).order('created_at')
+  ]);
+  const attachments = attRes.data || [];
+  showLoader(false);
+  const attachmentsHTML = attachments.length ? `
+    <div style="margin-top:16px;padding:14px;background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.15);border-radius:var(--radius)">
+      <div class="detail-key" style="color:#6366f1;margin-bottom:10px">📎 Attachments (${attachments.length})</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${attachments.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--off-white);border:1px solid var(--border);border-radius:6px">
+          <span style="font-size:1rem;flex-shrink:0">${(a.file_name||'').toLowerCase().includes('.pdf')?'📄':'🖼️'}</span>
+          <span style="font-size:0.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.file_name||'Attachment'}</span>
+          <span style="font-size:0.65rem;padding:2px 6px;background:white;border:1px solid var(--border);border-radius:3px;color:var(--gray-4);font-family:var(--font-mono);flex-shrink:0">${a.attachment_type||'doc'}</span>
+          <a href="${a.file_url}" target="_blank" download="${a.file_name||'attachment'}" class="btn btn-secondary btn-sm" style="flex-shrink:0" onclick="handleAttachmentDownload(event,'${a.file_url}','${(a.file_name||'attachment').replace(/'/g,'')}')">⬇ Download</a>
+        </div>`).join('')}
+      </div>
+    </div>` : '';
+  document.getElementById('prDetailBody').innerHTML=
+    buildPRDetailHTML(pr,quotations,vd?.data?.name||'')+
+    attachmentsHTML+
+    `<div style="margin-top:24px;border-top:1.5px solid var(--border);padding-top:18px">
+      <div class="section-title" style="margin-bottom:12px">💬 Comments</div>
+      ${renderComments(comments)}
+    </div>`;
+  openModal('prDetailModal');
+}
+
+async function deletePR() {
+  if(!viewingPRId||!confirm('Delete this request permanently? All associated quotations and comments will also be deleted.')) return;
+  showLoader(true);
+  await db.from('pr_comments').delete().eq('pr_id',viewingPRId);
+  await db.from('pr_quotations').delete().eq('pr_id',viewingPRId);
+  const{error}=await db.from('procurement_requests').delete().eq('id',viewingPRId);
+  showLoader(false);
+  if(error){showToast('Delete failed: '+error.message,'error');return;}
+  showToast('Request deleted','success');
+  closeModal('prDetailModal');
+  await loadRequests();
+}
+
+// ── DIRECTOR (SANDY) APPROVAL FUNCTIONS ────────────────────
+const DIRECTOR_EMAIL = 'sandy@on2cook.com';
+
+async function renderDirectorApprovals() {
+  const pending = allRequests.filter(r => r.phase === 'pending_sandy_approval');
+  const tbody = document.getElementById('directorBody');
+  if (!pending.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">✅</div><h3>All clear</h3><p>No requests awaiting Director approval.</p></div></td></tr>`;
+    return;
+  }
+  // Fetch selected quotations for these PRs
+  const prIds = pending.map(r => r.id);
+  const { data: quotations } = await db.from('pr_quotations').select('*').in('pr_id', prIds).eq('is_selected', true);
+  const qMap = {};
+  (quotations || []).forEach(q => { qMap[q.pr_id] = q; });
+
+  tbody.innerHTML = pending.map(r => {
+    const q = qMap[r.id];
+    const amt = q?.amount ? `₹${parseFloat(q.amount).toLocaleString('en-IN')}` : '—';
+    const vendor = q?.vendor_name || '—';
+    return `<tr>
+      <td><strong>PR-${String(r.request_number).padStart(4,'0')}</strong></td>
+      <td>${r.project_name}</td>
+      <td>${getPhaseBadge(r.phase)}</td>
+      <td style="font-size:0.82rem">${vendor}</td>
+      <td><strong style="color:#7c3aed">${amt}</strong></td>
+      <td style="font-size:0.78rem;color:var(--gray-3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.pm_final_approval_notes||'—'}</td>
+      <td style="font-size:0.78rem">${fmtDate(r.created_at)}</td>
+      <td><button class="btn btn-primary btn-sm" onclick='openDirectorModal("${r.id}")'>Review</button></td>
+    </tr>`;
+  }).join('');
+}
+
+let directorCurrentPR = null, directorQuotations = [];
+
+async function openDirectorModal(prId) {
+  directorCurrentPR = allRequests.find(r => r.id === prId);
+  if (!directorCurrentPR) return;
+  showLoader(true);
+  const { data: quotations } = await db.from('pr_quotations').select('*').eq('pr_id', prId).order('created_at');
+  directorQuotations = quotations || [];
+  const selectedQ = directorQuotations.find(q => q.is_selected) || directorQuotations.find(q => q.id === directorCurrentPR.selected_quotation_id);
+  showLoader(false);
+
+  const amt = selectedQ?.amount ? `₹${parseFloat(selectedQ.amount).toLocaleString('en-IN')}` : '—';
+  document.getElementById('modalTitle').textContent = `Director Review — PR-${String(directorCurrentPR.request_number).padStart(4,'0')}`;
+  document.getElementById('modalBody').innerHTML = `
+    <div style="margin-bottom:16px">
+      ${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {})}
+    </div>
+    <div class="action-section" style="border-color:#7c3aed33;background:rgba(124,58,237,0.04)">
+      <div class="action-section-title" style="color:#7c3aed">👤 Director Approval Required <span class="action-badge" style="background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35">ESCALATED</span></div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">PM approved this request but amount <strong>${amt}</strong> exceeds the PM limit of ₹5,000. Your approval is required to proceed.</p>
+      ${selectedQ ? `<div style="margin-bottom:14px;padding:12px;background:#fafafa;border:1px solid var(--border);border-radius:var(--radius)">
+        <div class="detail-key" style="margin-bottom:6px">Selected Quotation</div>
+        <div style="font-size:0.85rem"><strong>${selectedQ.vendor_name||'Unknown vendor'}</strong> — ${amt}${selectedQ.lead_time_days?` · ${selectedQ.lead_time_days} days lead time`:''}</div>
+        ${selectedQ.notes?`<div style="font-size:0.78rem;color:var(--gray-3);margin-top:4px">${selectedQ.notes}</div>`:''}
+      </div>` : ''}
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Decision Notes *</label>
+        <textarea class="form-control" id="directorNotes" placeholder="State your approval rationale or reason for rejection..."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-success" onclick="directorDecision('approved')" style="flex:1">✅ Approve — Allow Order</button>
+        <button class="btn btn-danger" onclick="directorDecision('rejected')" style="flex:1">✗ Reject</button>
+      </div>
+    </div>`;
+  openModal('mainModal');
+}
+
+async function directorDecision(decision) {
+  const notes = document.getElementById('directorNotes')?.value.trim();
+  if (!notes) { showToast('Please add decision notes', 'error'); return; }
+  showLoader(true);
+  const newPhase = decision === 'approved' ? 'approved' : 'rejected';
+  const { error } = await db.from('procurement_requests').update({
+    phase: newPhase,
+    pm_final_approval_status: decision,
+    pm_final_approval_notes: (directorCurrentPR.pm_final_approval_notes||'') + ` | Director: ${notes}`,
+    rejection_reason: decision === 'rejected' ? notes : null,
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(directorCurrentPR, newPhase)
+  }).eq('id', directorCurrentPR.id);
+  notifyPhaseChange(directorCurrentPR.id, newPhase, currentUser?.id);
+  if (!error) await postComment(directorCurrentPR.id, currentUser.id,
+    `${decision==='approved'?'✅':'❌'} Director ${decision==='approved'?'Approved':'Rejected'}: ${notes}`);
+  showLoader(false);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast(decision === 'approved' ? '✅ Director approved — procurement may place the order.' : '❌ Rejected by Director.', decision === 'approved' ? 'success' : 'error');
+  closeModal('mainModal');
+  await loadRequests();
+  renderDirectorApprovals();
+}
+// ── END DIRECTOR FUNCTIONS ────────────────────────────────
+
+function renderUsers() {
+  document.getElementById('usersBody').innerHTML=allUsers.map(u=>`<tr>
+    <td><strong>${u.name}</strong></td>
+    <td class="mono" style="font-size:0.8rem">${u.email}</td>
+    <td><span class="user-role-tag role-${u.role}">${roleLabel(u.role)}</span></td>
+    <td style="font-size:0.83rem">${u.department?DEPARTMENTS[u.department]:'—'}</td>
+    <td class="mono" style="font-size:0.75rem">${formatDate(u.created_at)}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-ghost btn-sm" onclick='editUser("${u.id}")'>Edit</button>
+      ${u.id!==currentUser.id?`<button class="btn btn-danger btn-sm" onclick='deleteUser("${u.id}")'>Del</button>`:''}
+    </td>
+  </tr>`).join('');
+}
+
+function filterVendors() {
+  const s=document.getElementById('vendorSearch').value.toLowerCase();
+  renderVendorGrid(allVendors.filter(v=>!s||v.name.toLowerCase().includes(s)||(v.specialization||'').toLowerCase().includes(s)));
+}
+
+function renderVendorGrid(vendors) {
+  const grid=document.getElementById('vendorGrid');
+  if(!vendors.length){grid.innerHTML=`<div style="color:var(--gray-4);font-size:0.85rem;padding:24px;grid-column:1/-1">No vendors found.</div>`;return;}
+  grid.innerHTML=vendors.map(v=>`
+    <div class="vendor-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div><div class="vendor-name">${v.name}</div>
+          <div class="vendor-spec">${v.specialization||'—'}</div></div>
+        <span style="font-size:0.7rem;font-family:var(--font-mono);padding:2px 8px;border-radius:4px;white-space:nowrap;${v.is_active?'background:rgba(34,197,94,0.1);color:#16a34a;border:1px solid rgba(34,197,94,0.3)':'background:var(--off-white);color:var(--gray-4);border:1px solid var(--border)'}">
+          ${v.is_active?'Active':'Inactive'}
+        </span>
+      </div>
+      <div style="margin-bottom:8px">${starRating(v.avg_rating,v.rating_count)}</div>
+      ${v.contact_person?`<div style="font-size:0.8rem;color:var(--gray-3)">${v.contact_person}${v.email?` · <a href="mailto:${v.email}" style="color:var(--red)">${v.email}</a>`:''}</div>`:''}
+    </div>`).join('');
+}
+
+function renderAnalytics() {
+  const reqs = allRequests;
+
+  // ── KPI cards ─────────────────────────────────────────────
+  const open   = reqs.filter(r=>!['accepted','rejected'].includes(r.phase)).length;
+  const closed = reqs.filter(r=>['accepted','rejected'].includes(r.phase)).length;
+  const avgLT  = reqs.length ? Math.round(reqs.reduce((s,r)=>s+calcLeadTimeDays(r.created_at),0)/reqs.length) : 0;
+  const pendPay= reqs.filter(r=>r.phase==='payment_requested').length;
+  document.getElementById('analyticsKPIs').innerHTML = [
+    {icon:'📋',label:'Total Requests',val:reqs.length,color:'#6366f1'},
+    {icon:'⚙️',label:'Active',val:open,color:'#3b82f6'},
+    {icon:'✔️',label:'Closed',val:closed,color:'#22c55e'},
+    {icon:'⏱',label:'Avg Lead Time',val:avgLT+'d',color:'#f59e0b'},
+  ].map(k=>`<div class="card" style="padding:16px 18px;border-top:3px solid ${k.color}">
+    <div style="font-size:1.8rem;font-weight:800;font-family:var(--font-mono);color:${k.color}">${k.val}</div>
+    <div style="font-size:0.75rem;color:var(--gray-3);margin-top:2px">${k.icon} ${k.label}</div>
+  </div>`).join('');
+
+  // ── Destroy old charts ────────────────────────────────────
+  ['chartPhase','chartDept','chartLeadTime','chartRequesters','chartMonthly'].forEach(id=>{
+    const c=document.getElementById(id);
+    if(c && c._chart) { c._chart.destroy(); delete c._chart; }
+  });
+
+  const fontColor = getComputedStyle(document.documentElement).getPropertyValue('--gray-2').trim()||'#374151';
+  const gridColor = 'rgba(0,0,0,0.06)';
+  const baseFont  = { family: 'Inter, sans-serif', size: 11 };
+
+  // ── Chart 1: Phase breakdown (horizontal bar) ─────────────
+  const phaseCounts={};
+  reqs.forEach(r=>{ phaseCounts[r.phase]=(phaseCounts[r.phase]||0)+1; });
+  const phaseEntries = Object.entries(phaseCounts).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('phaseTotal').textContent = reqs.length + ' total';
+  const phaseCanvas = document.getElementById('chartPhase');
+  phaseCanvas._chart = new Chart(phaseCanvas, {
+    type: 'bar',
+    data: {
+      labels: phaseEntries.map(([k])=>PHASES[k]?.label||k),
+      datasets:[{ data: phaseEntries.map(([,v])=>v),
+        backgroundColor: phaseEntries.map(([k])=>(PHASES[k]?.color||'#6b7280')+'CC'),
+        borderColor:     phaseEntries.map(([k])=>PHASES[k]?.color||'#6b7280'),
+        borderWidth:1, borderRadius:4 }]
+    },
+    options:{
+      indexAxis:'y', responsive:true, plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>' '+ctx.raw+' requests'}}},
+      scales:{
+        x:{grid:{color:gridColor},ticks:{font:baseFont,color:fontColor,stepSize:1}},
+        y:{grid:{display:false},ticks:{font:{...baseFont,size:10},color:fontColor}}
+      }
+    }
+  });
+
+  // ── Chart 2: Department (donut) ───────────────────────────
+  const deptMap = {mech:0,id:0,electronics:0};
+  reqs.forEach(r=>{ if(deptMap[r.department]!==undefined) deptMap[r.department]++; });
+  const deptCanvas = document.getElementById('chartDept');
+  deptCanvas._chart = new Chart(deptCanvas, {
+    type:'doughnut',
+    data:{
+      labels:['Mechanical','Industrial Design','Electronics'],
+      datasets:[{data:[deptMap.mech,deptMap.id,deptMap.electronics],
+        backgroundColor:['#E02020CC','#3b82f6CC','#10b981CC'],
+        borderColor:['#E02020','#3b82f6','#10b981'],
+        borderWidth:2, hoverOffset:6}]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{position:'bottom',labels:{font:baseFont,color:fontColor,padding:14}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} (${reqs.length?Math.round(ctx.raw/reqs.length*100):0}%)`}}
+      },
+      cutout:'62%'
+    }
+  });
+
+  // ── Chart 3: Lead time histogram ──────────────────────────
+  const bins = [{label:'1–7d',min:0,max:7},{label:'8–14d',min:7,max:14},{label:'15–30d',min:14,max:30},{label:'31–60d',min:30,max:60},{label:'>60d',min:60,max:Infinity}];
+  const binCounts = bins.map(b=>reqs.filter(r=>{ const d=calcLeadTimeDays(r.created_at); return d>b.min&&d<=b.max; }).length);
+  const binColors = ['#22c55eCC','#84cc16CC','#f59e0bCC','#ef4444CC','#991b1bCC'];
+  const ltCanvas = document.getElementById('chartLeadTime');
+  ltCanvas._chart = new Chart(ltCanvas, {
+    type:'bar',
+    data:{
+      labels:bins.map(b=>b.label),
+      datasets:[{label:'Requests',data:binCounts,
+        backgroundColor:binColors,borderColor:binColors.map(c=>c.slice(0,-2)),
+        borderWidth:1,borderRadius:5}]
+    },
+    options:{responsive:true,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>' '+ctx.raw+' requests'}}},
+      scales:{x:{grid:{display:false},ticks:{font:baseFont,color:fontColor}},
+              y:{grid:{color:gridColor},ticks:{font:baseFont,color:fontColor,stepSize:1}}}}
+  });
+
+  // ── Chart 4: Top requesters ───────────────────────────────
+  const reqByUser={};
+  reqs.forEach(r=>{ const n=r.users?.name||'Unknown'; reqByUser[n]=(reqByUser[n]||0)+1; });
+  const topUsers = Object.entries(reqByUser).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const reqCanvas = document.getElementById('chartRequesters');
+  const palette=['#6366f1','#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#14b8a6','#f97316'];
+  reqCanvas._chart = new Chart(reqCanvas, {
+    type:'bar',
+    data:{
+      labels:topUsers.map(([n])=>n.split(' ')[0]),  // first name only
+      datasets:[{data:topUsers.map(([,v])=>v),
+        backgroundColor:topUsers.map((_,i)=>palette[i%palette.length]+'CC'),
+        borderColor:topUsers.map((_,i)=>palette[i%palette.length]),
+        borderWidth:1,borderRadius:5}]
+    },
+    options:{responsive:true,plugins:{legend:{display:false},
+      tooltip:{callbacks:{title:ctx=>topUsers[ctx[0].dataIndex][0],label:ctx=>' '+ctx.raw+' requests'}}},
+      scales:{x:{grid:{display:false},ticks:{font:baseFont,color:fontColor}},
+              y:{grid:{color:gridColor},ticks:{font:baseFont,color:fontColor,stepSize:1}}}}
+  });
+
+  // ── Chart 5: Monthly trend ────────────────────────────────
+  const months=[]; const mCounts=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(); d.setMonth(d.getMonth()-i);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    months.push(d.toLocaleDateString('en-GB',{month:'short',year:'2-digit'}));
+    mCounts.push(reqs.filter(r=>r.created_at&&r.created_at.slice(0,7)===key).length);
+  }
+  const moCanvas = document.getElementById('chartMonthly');
+  moCanvas._chart = new Chart(moCanvas, {
+    type:'line',
+    data:{labels:months,datasets:[{label:'Requests',data:mCounts,
+      borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,0.1)',
+      fill:true,tension:0.4,pointBackgroundColor:'#6366f1',pointRadius:4,pointHoverRadius:6,borderWidth:2}]},
+    options:{responsive:true,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>' '+ctx.raw+' requests'}}},
+      scales:{x:{grid:{display:false},ticks:{font:baseFont,color:fontColor}},
+              y:{grid:{color:gridColor},ticks:{font:baseFont,color:fontColor,stepSize:1}}}}
+  });
+
+  // ── Recent activity list ──────────────────────────────────
+  document.getElementById('recentActivity').innerHTML = reqs.slice(0,10).map(r=>`
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span class="pr-number" style="flex-shrink:0;font-size:0.7rem">PR-${String(r.request_number).padStart(4,'0')}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.project_name}</div>
+        <div style="font-size:0.7rem;color:var(--gray-4)">${r.users?.name||'—'} · ${formatDate(r.updated_at||r.created_at)}</div>
+      </div>
+      ${getPhaseBadge(r.phase)}
+    </div>`).join('')||'<p style="color:var(--gray-4);font-size:0.82rem">No activity yet.</p>';
+}
+
+
+function openAddUser() {
+  editingUserId=null;
+  document.getElementById('userModalTitle').textContent='Add New User';
+  ['uName','uEmail','uRole','uDept'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('uPassword').value='12345';
+  openModal('userModal');
+}
+
+function editUser(id) {
+  const u=allUsers.find(u=>u.id===id);
+  if(!u) return;
+  editingUserId=id;
+  document.getElementById('userModalTitle').textContent='Edit User';
+  document.getElementById('uName').value=u.name;
+  document.getElementById('uEmail').value=u.email;
+  document.getElementById('uPassword').value=u.password;
+  document.getElementById('uRole').value=u.role;
+  document.getElementById('uDept').value=u.department||'';
+  openModal('userModal');
+}
+
+async function saveUser() {
+  const name=document.getElementById('uName').value.trim();
+  const email=document.getElementById('uEmail').value.trim();
+  const password=document.getElementById('uPassword').value.trim()||'12345';
+  const role=document.getElementById('uRole').value;
+  const department=document.getElementById('uDept').value||null;
+  if(!name||!email||!role){showToast('Please fill all required fields','error');return;}
+  showLoader(true);
+  let error;
+  if(editingUserId){({error}=await db.from('users').update({name,email,password,role,department}).eq('id',editingUserId));}
+  else{({error}=await db.from('users').insert({name,email,password,role,department}));}
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast(editingUserId?'User updated!':'User created!','success');
+  closeModal('userModal');
+  await loadUsers();
+}
+
+async function deleteUser(id) {
+  if(!confirm('Delete this user? Their requests will remain in the system.')) return;
+  showLoader(true);
+  const{error}=await db.from('users').delete().eq('id',id);
+  showLoader(false);
+  if(error){showToast('Delete failed: '+error.message,'error');return;}
+  showToast('User deleted','success');
+  await loadUsers();
+}
+
+function exportCSV() {
+  const headers=['PR#','Project','Phase','Category','Department','Vendor','Status','Updated','Requester'];
+  const rows=allRequests.map(r=>[
+    `PR-${String(r.request_number).padStart(4,'0')}`,r.project_name,r.project_phase,r.request_category,
+    DEPARTMENTS[r.department]||r.department,r.vendors?.name||'—',
+    PHASES[r.phase]?.label||r.phase,formatDate(r.updated_at||r.created_at),r.users?.name||'—'
+  ]);
+  const csv=[headers,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv,'+encodeURIComponent(csv);
+  a.download=`procurement_export_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+function goToProjects() {
+  window.location.href = 'projects.html';
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+BEGIN;
+
+-- 1. Break circular link between PR and its selected quotation
+UPDATE public.procurement_requests 
+SET selected_quotation_id = NULL 
+WHERE id = '73c17919-8a11-4ae2-b4f5-39ef14c63970';
+
+-- 2. Unlink any modifications/child PRs that point to this as a parent
+UPDATE public.procurement_requests 
+SET parent_request_id = NULL 
+WHERE parent_request_id = '73c17919-8a11-4ae2-b4f5-39ef14c63970';
+
+-- 3. Clear all related data entries
+DELETE FROM public.purchase_orders WHERE pr_id = '73c17919-8a11-4ae2-b4f5-39ef14c63970';
+DELETE FROM public.advance_payment_requests WHERE pr_id = '73c17919-8a11-4ae2-b4f5-39ef14c63970';
+DELETE FROM public.payment_requests WHERE pr_id = '73c17919-8a11-4ae2-b4f5-39ef14c63970';
+DELETE FROM public.pr_comments WHERE pr_id = '73c17919-8a11-4ae2-b4f5-39ef14c63970';
+DELETE FROM public.vendor_ratings WHERE pr_id = '73c17919-8a11-4ae2-b4f5-39ef14c63970';
+DELETE FROM public.pr_attachments WHERE pr_id = '73c17919-8a11-4ae2-b4f5-39ef14c63970';
+DELETE FROM public.pr_quotations WHERE pr_id = '73c17919-8a11-4ae2-b4f5-39ef14c63970';
+
+-- 4. Delete the primary PR record
+DELETE FROM public.procurement_requests WHERE id = '73c17919-8a11-4ae2-b4f5-39ef14c63970';
+
+COMMIT;
+
+
+
+Changes to be made:
+I would like to make sure that i have selected pm for each project but they only have the right to approve the need of procurement, and for final quote approval they can only approve till 5000 rupees. Anything above that goes straight to sandy@on2cook.com and we need his approval for that.
+
+I would also like you to replicate this supabase to my another account making sure rls is enabled.
+
+
