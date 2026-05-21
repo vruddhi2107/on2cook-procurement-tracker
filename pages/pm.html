@@ -84,7 +84,7 @@ function addPhaseTimestamp(pr, phaseName) {
   ts[phaseName] = new Date().toISOString();
   return ts;
 }
-let pmSelectedQuotationId=null, prQuotations=[];
+let prQuotations=[];
 
 function handleAttachmentDownload(e, url, fileName) {
   if (!url) return;
@@ -184,7 +184,7 @@ function renderTable(reqs) {
 
 async function openPR(id) {
   currentPR=allRequests.find(r=>r.id===id); if(!currentPR) return;
-  pmSelectedQuotationId=null; prQuotations=[];
+  prQuotations=[];
   document.getElementById('prModalTitle').textContent=`PR-${String(currentPR.request_number).padStart(4,'0')} — ${currentPR.project_name}`;
   document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${currentPR.users?.name||''}`;
   showLoader(true);
@@ -221,54 +221,23 @@ async function openPR(id) {
 
   // ── FINAL APPROVAL ──
   if(currentPR.phase==='pending_pm_final_approval') {
-    const isPMPath=currentPR.approval_path==='project_manager';
     const selectedQ=quotations.find(q=>q.id===currentPR.selected_quotation_id)||quotations.find(q=>q.is_selected);
 
-    if(isPMPath) {
-      // PM selects final quote + approves/rejects
-      actionSection=`<div class="action-section">
-        <div class="action-section-title">✍️ Select Quote & Approve <span class="action-badge">ACTION REQUIRED</span></div>
-        <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:4px">Engineer forwarded directly to you. <strong>Select a final quotation</strong>, then make your decision.</p>
-        <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius-sm);padding:9px 12px;margin-bottom:14px;font-size:0.78rem;color:#6d28d9">No client approval required — your decision is final.</div>
-        <div class="form-label" style="margin-bottom:8px">Select Final Quotation *</div>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-          ${quotations.map(q=>renderQuotationCard(q,true,pmSelectedQuotationId)).join('')}
-        </div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label">Decision Notes *</label>
-          <textarea class="form-control" id="approvalNotes" placeholder="Approval rationale or reason for rejection..."></textarea>
-        </div>
-        ${rejectOptionsHTML()}
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-success" onclick="finalDecision('approved')" style="flex:1"> Approve — Allow Order</button>
-          <button class="btn btn-danger" onclick="showRejectionOptions()" style="flex:1">✗ Reject</button>
-        </div>
-      </div>`;
-    } else {
-      // Client path: engineer + client already approved, PM just reviews
-      actionSection=`<div class="action-section">
-        <div class="action-section-title">✍️ Final Approval <span class="action-badge">ACTION REQUIRED</span></div>
-        <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Engineer selected a quote and client has approved. Review below and make your final decision.</p>
-        ${selectedQ?`<div style="margin-bottom:14px"><div class="detail-key" style="margin-bottom:8px">Engineer's Selected Quote</div>${renderQuotationCard(selectedQ,false)}</div>`:''}
-        ${currentPR.client_approval_screenshot?`<div style="margin-bottom:14px;padding:12px;background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <div class="detail-key" style="color:#16a34a">✓ Client Approval Screenshot</div>
-            <button class="btn btn-secondary btn-sm" onclick="(function(url){if(!url)return;if(url.startsWith('data:')){try{const arr=url.split(','),mime=arr[0].match(/:(.*?);/)[1],bstr=atob(arr[1]);let n=bstr.length;const u8=new Uint8Array(n);while(n--)u8[n]=bstr.charCodeAt(n);const blob=new Blob([u8],{type:mime}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='client_approval.'+mime.split('/')[1];document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);}catch(e){window.open(url,'_blank');}}else{window.open(url,'_blank');}}('${currentPR.client_approval_screenshot}'))">⬇ Download</button>
-          </div>
-          <img src="${currentPR.client_approval_screenshot}" style="max-width:100%;max-height:260px;object-fit:contain;border-radius:6px;border:1px solid var(--border)" onerror="this.style.display='none'"/>
-          ${currentPR.client_approval_notes?`<p style="margin-top:6px;font-size:0.8rem;color:var(--gray-3)">${currentPR.client_approval_notes}</p>`:''}
-        </div>`:''}
-        <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label">Decision Notes *</label>
-          <textarea class="form-control" id="approvalNotes" placeholder="Approval rationale or reason for rejection..."></textarea>
-        </div>
-        ${rejectOptionsHTML()}
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-success" onclick="finalDecision('approved')" style="flex:1"> Approve — Allow Order</button>
-          <button class="btn btn-danger" onclick="showRejectionOptions()" style="flex:1">✗ Reject</button>
-        </div>
-      </div>`;
-    }
+    // Engineer has already verified & selected the quote; PM reviews and approves/rejects.
+    actionSection=`<div class="action-section">
+      <div class="action-section-title">✍️ Final Approval <span class="action-badge">ACTION REQUIRED</span></div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">The engineer has verified and selected this quotation. Review and make your final decision. Amounts of <strong>₹5,000 or above</strong> will be automatically escalated to the Director.</p>
+      ${selectedQ?`<div style="margin-bottom:14px"><div class="detail-key" style="margin-bottom:8px">Engineer's Verified Quotation</div>${renderQuotationCard(selectedQ,false)}</div>`:`<div style="margin-bottom:14px;padding:10px;background:#fff8f0;border:1px solid #f59e0b33;border-radius:var(--radius-sm);font-size:0.82rem;color:#92400e">⚠ No quotation pre-selected — contact engineer.</div>`}
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Decision Notes *</label>
+        <textarea class="form-control" id="approvalNotes" placeholder="Approval rationale or reason for rejection..."></textarea>
+      </div>
+      ${rejectOptionsHTML()}
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-success" onclick="finalDecision('approved')" style="flex:1"> Approve — Allow Order</button>
+        <button class="btn btn-danger" onclick="showRejectionOptions()" style="flex:1">✗ Reject</button>
+      </div>
+    </div>`;
   }
 
   // ── PENDING DIRECTOR (SANDY) APPROVAL ──
@@ -314,26 +283,6 @@ function rejectOptionsHTML() {
 
 function showRejectionOptions(){const e=document.getElementById('rejectionExtra');if(e)e.style.display='block';}
 
-// PM selects a quotation (PM path only)
-function selectQuotation(qId) {
-  pmSelectedQuotationId=qId;
-  prQuotations.forEach(q=>{
-    const card=document.getElementById(`qcard-${q.id}`); if(!card) return;
-    const isNow=q.id===qId;
-    card.classList.toggle('selected',isNow);
-    const ob=card.querySelector('.sel-badge'); if(ob) ob.remove();
-    if(isNow) card.querySelector('.quotation-card-header').insertAdjacentHTML('beforeend',
-      `<span class="sel-badge" style="background:#22c55e14;color:#16a34a;border:1px solid #22c55e30;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-size:0.62rem;font-weight:600;white-space:nowrap">✓ SELECTED</span>`);
-    card.querySelectorAll('button').forEach(btn=>{
-      if(btn.textContent.includes('Select as Final')||btn.textContent.includes('Deselect')){
-        btn.textContent=isNow?'Deselect':'✓ Select as Final';
-        btn.className=`btn btn-sm ${isNow?'btn-danger':'btn-primary'}`;
-        btn.onclick=()=>selectQuotation(isNow?null:q.id);
-      }
-    });
-  });
-}
-
 async function grantClearance(decision) {
   const notes=document.getElementById('clearanceNotes')?.value.trim();
   if(!notes){showToast('Please add decision notes','error');return;}
@@ -354,15 +303,13 @@ async function grantClearance(decision) {
 }
 
 // ── APPROVAL THRESHOLD ─────────────────────────────────────
-// PM can approve final quote only up to ₹5,000.
-// Anything above is escalated to the Director (sandy@on2cook.com).
+// PM can approve quotes strictly below ₹5,000.
+// ₹5,000 and above is escalated to the Director (sandy@on2cook.com).
 const PM_APPROVAL_LIMIT = 5000;
 
 async function finalDecision(decision) {
   const notes=document.getElementById('approvalNotes')?.value.trim();
   if(!notes){showToast('Please add decision notes','error');return;}
-  const isPMPath=currentPR.approval_path==='project_manager';
-  if(isPMPath&&decision==='approved'&&!pmSelectedQuotationId){showToast('Please select the final quotation','error');return;}
   let needsMoreVendors=false;
   if(decision==='rejected'){
     const ra=[...document.querySelectorAll('input[name="rejectAction"]')].find(r=>r.checked)?.value;
@@ -371,23 +318,15 @@ async function finalDecision(decision) {
   }
   showLoader(true);
 
-  // ── Determine selected quotation amount ─────────────────
+  // ── Engineer already selected the quote; just read it ────
   let selectedAmount = 0;
   if(decision==='approved') {
-    const qId = isPMPath ? pmSelectedQuotationId : currentPR.selected_quotation_id;
-    if(qId) {
-      const selectedQ = prQuotations.find(q=>q.id===qId);
-      selectedAmount = parseFloat(selectedQ?.amount || 0);
-    }
+    const selectedQ = prQuotations.find(q=>q.id===currentPR.selected_quotation_id) || prQuotations.find(q=>q.is_selected);
+    selectedAmount = parseFloat(selectedQ?.amount || 0);
   }
 
-  // ── Escalate to Director if amount > ₹5,000 ─────────────
-  const needsDirectorApproval = decision==='approved' && selectedAmount > PM_APPROVAL_LIMIT;
-
-  if(isPMPath&&decision==='approved'&&pmSelectedQuotationId){
-    await db.from('pr_quotations').update({is_selected:false}).eq('pr_id',currentPR.id);
-    await db.from('pr_quotations').update({is_selected:true}).eq('id',pmSelectedQuotationId);
-  }
+  // ── Escalate to Director if amount >= ₹5,000 ─────────────
+  const needsDirectorApproval = decision==='approved' && selectedAmount >= PM_APPROVAL_LIMIT;
 
   let newPhase;
   if(decision==='rejected') newPhase='rejected';
@@ -398,7 +337,7 @@ async function finalDecision(decision) {
     phase:newPhase,
     pm_final_approval_status:needsDirectorApproval?'pending':decision,
     pm_final_approval_notes:notes,
-    selected_quotation_id:isPMPath&&decision==='approved'?pmSelectedQuotationId:currentPR.selected_quotation_id,
+    selected_quotation_id:currentPR.selected_quotation_id,
     rejection_reason:decision==='rejected'?notes:null,
     needs_more_vendors:needsMoreVendors,
     updated_at:new Date().toISOString(),
@@ -409,7 +348,7 @@ async function finalDecision(decision) {
 
   let commentText;
   if(needsDirectorApproval)
-    commentText=`⬆️ Escalated to Director for approval — amount ₹${selectedAmount.toLocaleString('en-IN')} exceeds PM limit of ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}. PM notes: ${notes}`;
+    commentText=`⬆️ Escalated to Director for approval — amount ₹${selectedAmount.toLocaleString('en-IN')} meets/exceeds PM limit of ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}. PM notes: ${notes}`;
   else if(decision==='approved')
     commentText=`✅ PM Final Approved: ${notes}`;
   else
@@ -420,7 +359,7 @@ async function finalDecision(decision) {
   if(error){showToast('Error: '+error.message,'error');return;}
 
   if(needsDirectorApproval)
-    showToast(`⬆️ Amount ₹${selectedAmount.toLocaleString('en-IN')} exceeds ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')} — escalated to Director for approval.`,'info');
+    showToast(`⬆️ Amount ₹${selectedAmount.toLocaleString('en-IN')} meets/exceeds ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')} — escalated to Director.`,'info');
   else
     showToast(decision==='approved'?'✅ Approved! Procurement may now place the order.':needsMoreVendors?'Rejected — Procurement will find more vendors.':'Rejected — request closed.',decision==='approved'?'success':'error');
   closeModal('prModal'); await loadRequests();

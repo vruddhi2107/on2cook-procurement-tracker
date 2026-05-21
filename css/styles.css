@@ -266,6 +266,21 @@ table.data-table {
   white-space: nowrap;
 }
 
+/* ── BADGE UTILITIES (used by getPhaseBadge) ── */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 100px;
+  font-family: var(--font-mono); font-size: 0.67rem; font-weight: 600;
+  white-space: nowrap; letter-spacing: 0.01em;
+}
+.badge-gray   { background: rgba(107,114,128,0.12); color: #4b5563; border: 1px solid rgba(107,114,128,0.2); }
+.badge-orange { background: rgba(249,115,22,0.1);   color: #c2410c; border: 1px solid rgba(249,115,22,0.25); }
+.badge-yellow { background: rgba(234,179,8,0.12);   color: #a16207; border: 1px solid rgba(234,179,8,0.3); }
+.badge-green  { background: rgba(22,163,74,0.1);    color: #15803d; border: 1px solid rgba(22,163,74,0.22); }
+.badge-red    { background: rgba(220,38,38,0.1);    color: #b91c1c; border: 1px solid rgba(220,38,38,0.22); }
+.badge-blue   { background: rgba(37,99,235,0.1);    color: #1d4ed8; border: 1px solid rgba(37,99,235,0.22); }
+.badge-purple { background: rgba(109,40,217,0.09);  color: #6d28d9; border: 1px solid rgba(109,40,217,0.2); }
+
 /* ── MODAL ── */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 500;
@@ -935,6 +950,14 @@ textarea.form-control { resize: vertical; min-height: 74px; line-height: 1.5; }
 
 /* ── PHASE BADGE ── */
 .phase-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 3px; font-size: 0.67rem; font-weight: 500; white-space: nowrap; letter-spacing: -0.01em; }
+.badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 100px; font-family: var(--font-mono); font-size: 0.67rem; font-weight: 600; white-space: nowrap; letter-spacing: 0.01em; }
+.badge-gray   { background: rgba(107,114,128,0.12); color: #4b5563; border: 1px solid rgba(107,114,128,0.2); }
+.badge-orange { background: rgba(249,115,22,0.1);   color: #c2410c; border: 1px solid rgba(249,115,22,0.25); }
+.badge-yellow { background: rgba(234,179,8,0.12);   color: #a16207; border: 1px solid rgba(234,179,8,0.3); }
+.badge-green  { background: rgba(22,163,74,0.1);    color: #15803d; border: 1px solid rgba(22,163,74,0.22); }
+.badge-red    { background: rgba(220,38,38,0.1);    color: #b91c1c; border: 1px solid rgba(220,38,38,0.22); }
+.badge-blue   { background: rgba(37,99,235,0.1);    color: #1d4ed8; border: 1px solid rgba(37,99,235,0.22); }
+.badge-purple { background: rgba(109,40,217,0.09);  color: #6d28d9; border: 1px solid rgba(109,40,217,0.2); }
 
 /* ── MODAL ── */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.38); backdrop-filter: blur(3px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 18px; }
@@ -1313,6 +1336,14 @@ textarea.form-control { resize: vertical; min-height: 74px; line-height: 1.5; }
 
 /* ── PHASE BADGE ── */
 .phase-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 3px; font-size: 0.67rem; font-weight: 500; white-space: nowrap; letter-spacing: -0.01em; }
+.badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 100px; font-family: var(--font-mono); font-size: 0.67rem; font-weight: 600; white-space: nowrap; letter-spacing: 0.01em; }
+.badge-gray   { background: rgba(107,114,128,0.12); color: #4b5563; border: 1px solid rgba(107,114,128,0.2); }
+.badge-orange { background: rgba(249,115,22,0.1);   color: #c2410c; border: 1px solid rgba(249,115,22,0.25); }
+.badge-yellow { background: rgba(234,179,8,0.12);   color: #a16207; border: 1px solid rgba(234,179,8,0.3); }
+.badge-green  { background: rgba(22,163,74,0.1);    color: #15803d; border: 1px solid rgba(22,163,74,0.22); }
+.badge-red    { background: rgba(220,38,38,0.1);    color: #b91c1c; border: 1px solid rgba(220,38,38,0.22); }
+.badge-blue   { background: rgba(37,99,235,0.1);    color: #1d4ed8; border: 1px solid rgba(37,99,235,0.22); }
+.badge-purple { background: rgba(109,40,217,0.09);  color: #6d28d9; border: 1px solid rgba(109,40,217,0.2); }
 
 /* ── MODAL ── */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.38); backdrop-filter: blur(3px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 18px; }

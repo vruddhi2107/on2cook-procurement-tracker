@@ -59,7 +59,21 @@ const ORDER_TYPES = {
   inventory:    'Inventory Item (Available in Inventory)'
 };
 
-const DEPARTMENTS = { mech: 'Mechanical', id: 'Industrial Design', electronics: 'Electronics' };
+const DEPARTMENTS = {
+  // Legacy keys (backward-compat for existing records)
+  mech:        'Mechanical Design Engineering',
+  id:          'Industrial Design',
+  electronics: 'Production & Operations - Electronics',
+  // New department keys
+  npd:          'Production & Operations - NPD',
+  assembly:     'Production & Operations - Assembly',
+  scm_stores:   'SCM - Stores & Logistics',
+  service:      'Production & Operations - Service',
+  machine_shop: 'Production & Operations - Machine Shop',
+  quality:      'Production & Operations - Quality',
+  mech_design:  'Mechanical Design Engineering',
+  other:        'Other'
+};
 
 // Ordered for workflow timeline
 const PHASE_ORDER = [

@@ -566,11 +566,14 @@
 
     function redirectByRole(role) {
         const r = {
+            director: 'pages/master.html',
             master: 'pages/master.html',
             procurement_manager: 'pages/procurement.html',
             engineer: 'pages/engineer.html',
             project_manager: 'pages/pm.html',
-            accounts: 'pages/accounts.html'
+            accounts: 'pages/accounts.html',
+            store_manager: 'pages/store.html',
+            qc_inspector: 'pages/qc.html'
         };
         window.location.href = r[role] || 'pages/engineer.html';
     }

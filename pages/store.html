@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ProcureX — Store Manager</title>
+<link rel="icon" type="image/x-icon" href="../on2cook no bg.png">
+<link rel="stylesheet" href="../css/styles.css"/>
+<style>
+.grn-table{width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:10px}
+.grn-table th{background:var(--off-white);padding:7px 8px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;border:1px solid var(--border);text-align:center}
+.grn-table td{border:1px solid var(--border);padding:5px 7px;vertical-align:middle}
+.grn-header-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.rework-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:0.72rem;font-weight:700;background:rgba(239,68,68,0.1);color:#dc2626;border:1px solid rgba(239,68,68,0.2)}
+</style>
+</head>
+<body>
+<div id="navbarMount"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<main class="page-container">
+  <div class="page-header">
+    <h1 class="page-title">Store <span>Dashboard</span></h1>
+    <p class="page-sub">Receive goods, complete GRN &amp; manage rework</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card" style="--accent:#f59e0b"><div class="stat-card-value" id="sGrnPending">—</div><div class="stat-card-label">GRN Pending</div><div class="stat-card-icon">📦</div></div>
+    <div class="stat-card" style="--accent:#ef4444"><div class="stat-card-value" id="sRework">—</div><div class="stat-card-label">Rework Out</div><div class="stat-card-icon">🔄</div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sDone">—</div><div class="stat-card-label">Completed</div><div class="stat-card-icon">✅</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="action" onclick="switchTab('action')">🔔 Action Required</button>
+    <button class="tab-btn" data-tab="all" onclick="switchTab('all')">All Requests</button>
+    <button class="tab-btn" data-tab="myrequests" onclick="switchTab('myrequests')">📋 My PR Submissions</button>
+  </div>
+
+  <div id="tabMain">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>PR #</th><th>Project</th><th>Phase</th><th>Vendor</th><th>Parts</th><th>Date</th><th></th></tr></thead>
+        <tbody id="mainTbody"><tr><td colspan="7" style="text-align:center;padding:32px;color:var(--gray-4)">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tabMyRequests" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <p style="font-size:0.82rem;color:var(--gray-3);margin:0">PRs you submitted — tracked separately from your store duties.</p>
+      <a href="engineer.html" class="btn btn-primary btn-sm">+ New Request</a>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>PR #</th><th>Project</th><th>Phase</th><th>Updated</th><th></th></tr></thead>
+        <tbody id="myReqTbody"><tr><td colspan="5" style="text-align:center;padding:32px;color:var(--gray-4)">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div id="footerMount"></div>
+
+<!-- PR Detail Modal -->
+<div class="modal-overlay" id="prModal">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Request Detail</div>
+      <button class="modal-close" onclick="closeModal('prModal')">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>if(!window.supabase){document.write('<scr'+'ipt src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"><\/scr'+'ipt>');}</script>
+<script src="../js/supabase-config.js"></script>
+<script src="../js/shared.js"></script>
+<script>
+let currentUser=null, allRequests=[], myRequests=[], currentPR=null, activeTab='action';
+
+function addPhaseTimestamp(pr, phaseName) {
+  var existing = (pr && pr.phase_timestamps) ? pr.phase_timestamps : {};
+  var ts = Object.assign({}, existing);
+  ts[phaseName] = new Date().toISOString();
+  return ts;
+}
+
+
+function renderMyRequestsTable() {
+  const tbody = document.getElementById('myReqTbody');
+  if (!myRequests.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state" style="padding:32px;text-align:center;color:var(--gray-4)">No requests submitted yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = myRequests.map(r => `<tr>
+    <td><span class="pr-number">PR-${String(r.request_number).padStart(4,'0')}</span></td>
+    <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase||''}</div></td>
+    <td>${getPhaseBadge(r.phase)}</td>
+    <td style="font-size:0.78rem;color:var(--gray-4)">${fmtDate(r.updated_at||r.created_at)}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="openPR('${r.id}')">View</button></td>
+  </tr>`).join('');
+}
+
+function switchTab(t) {
+  activeTab = t;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => { if (b.dataset.tab === t) b.classList.add('active'); });
+  document.getElementById('tabMain').style.display = t === 'myrequests' ? 'none' : 'block';
+  document.getElementById('tabMyRequests').style.display = t === 'myrequests' ? 'block' : 'none';
+  if (t === 'myrequests') renderMyRequestsTable();
+  else renderTable();
+}
+
+async function init() {
+  currentUser = Session.require(['store_manager']);
+  if (!currentUser) return;
+  document.getElementById('navbarMount').innerHTML = buildNavbar(currentUser);
+  document.getElementById('footerMount').innerHTML = buildFooter();
+  initNavbar(currentUser);
+  await loadRequests();
+}
+
+async function loadRequests() {
+  showLoader(true);
+  const [{data,error}, myPRsRes] = await Promise.all([
+    db.from('procurement_requests').select('*').order('created_at',{ascending:false}),
+    db.from('procurement_requests').select('*').eq('created_by',currentUser.id).order('updated_at',{ascending:false})
+  ]);
+  myRequests = myPRsRes.data || [];
+  showLoader(false);
+  if (error) { showToast('Error loading requests','error'); return; }
+  allRequests = data || [];
+  updateStats();
+  renderTable();
+  renderMyRequestsTable();
+}
+
+function updateStats() {
+  document.getElementById('sGrnPending').textContent = allRequests.filter(r=>r.phase==='grn_initiated').length;
+  document.getElementById('sRework').textContent = allRequests.filter(r=>r.phase==='rework_pending').length;
+  document.getElementById('sDone').textContent = allRequests.filter(r=>['qc_passed','accepted'].includes(r.phase)).length;
+}
+
+
+
+function renderTable() {
+  const actionPhases = ['grn_initiated','rework_pending'];
+  const rows = activeTab==='action'
+    ? allRequests.filter(r=>actionPhases.includes(r.phase))
+    : allRequests.filter(r=>['grn_initiated','qc_pending','rework_pending','rework_returned','qc_passed','accepted'].includes(r.phase));
+
+  const tbody = document.getElementById('mainTbody');
+  if (!rows.length) { tbody.innerHTML=`<tr><td colspan="7" class="empty-state">No requests</td></tr>`; return; }
+
+  tbody.innerHTML = rows.map(r=>{
+    const parts = r.parts||[];
+    const isAction = actionPhases.includes(r.phase);
+    const lbl = {grn_initiated:'Complete GRN',rework_pending:'Mark Rework Returned'}[r.phase]||'View';
+    return `<tr${isAction?' class="row-action"':''}>
+      <td><span class="pr-num">PR-${String(r.request_number).padStart(4,'0')}</span></td>
+      <td><span class="fw-600">${r.project_name}</span>${r.project_phase?`<br><span class="text-muted" style="font-size:0.75rem">${r.project_phase}</span>`:''}</td>
+      <td>${getPhaseBadge(r.phase)}</td>
+      <td style="font-size:0.82rem">${r.vendor_suggestion||'—'}</td>
+      <td style="font-size:0.8rem;color:var(--gray-3)">${parts.length} item${parts.length!==1?'s':''}</td>
+      <td style="font-size:0.78rem;color:var(--gray-4)">${new Date(r.created_at).toLocaleDateString('en-IN')}</td>
+      <td><button class="btn btn-sm ${isAction?'btn-primary':'btn-secondary'}" onclick="openPR('${r.id}')">${lbl}</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function openPR(id) {
+  showLoader(true);
+  const {data,error} = await db.from('procurement_requests').select('*').eq('id',id).single();
+  showLoader(false);
+  if (error) { showToast('Error loading PR','error'); return; }
+  currentPR = data;
+  renderModal();
+  openModal('prModal');
+}
+
+function renderModal() {
+  const pr = currentPR;
+  const parts = pr.parts||[];
+  const today = new Date().toISOString().split('T')[0];
+  const prNum = `PR-${String(pr.request_number).padStart(4,'0')}`;
+
+  let actionSection = '';
+
+  // ── GRN INITIATED: store manager does GRN ──
+  if (pr.phase==='grn_initiated') {
+    const grnRows = parts.map((p,i)=>`<tr>
+      <td style="text-align:center;color:var(--gray-4)">${i+1}</td>
+      <td><input class="form-control" style="font-size:0.78rem" placeholder="Item code" id="grnCode_${i}"/></td>
+      <td style="font-size:0.82rem;font-weight:500">${p.name||'—'}</td>
+      <td style="text-align:center">${p.qty||1}</td>
+      <td><input class="form-control" type="number" min="0" style="font-size:0.82rem" placeholder="0" id="grnRcvd_${i}" oninput="calcGRNRow(${i})"/></td>
+      <td><input class="form-control" type="number" min="0" style="font-size:0.82rem" placeholder="0" id="grnAccpt_${i}" oninput="calcGRNRow(${i})"/></td>
+      <td><input class="form-control" type="number" min="0" style="background:rgba(239,68,68,0.05);font-size:0.82rem" placeholder="0" id="grnRejct_${i}" readonly/></td>
+      <td><input class="form-control" style="font-size:0.78rem" placeholder="Notes" id="grnNote_${i}"/></td>
+    </tr>`).join('');
+
+    actionSection = `<div class="action-section">
+      <div class="action-section-title">📦 Goods Receipt Note (GRN) <span class="action-badge">ACTION REQUIRED</span></div>
+
+      <div class="grn-header-grid">
+        <div><label class="form-label" style="font-size:0.7rem">GRN NUMBER *</label>
+          <input class="form-control" id="grnNumber" placeholder="e.g. GRN/25-26/0001" style="font-family:var(--font-mono);font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">GRN DATE</label>
+          <input class="form-control" id="grnDate" value="${today}" style="font-family:var(--font-mono);font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">INVOICE / PO NO</label>
+          <input class="form-control" id="grnInvoice" placeholder="Invoice or PO number" style="font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">TRANSPORTER</label>
+          <input class="form-control" id="grnTransport" placeholder="Transporter name" style="font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">GATE INWARD NO</label>
+          <input class="form-control" id="grnGateNo" placeholder="Gate inward number" style="font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">GATE INWARD DATE</label>
+          <input class="form-control" id="grnGateDate" placeholder="${today}" style="font-family:var(--font-mono);font-size:0.82rem"/></div>
+      </div>
+
+      <div class="table-wrap" style="overflow-x:auto">
+        <table class="grn-table">
+          <thead><tr>
+            <th>Sr.</th><th>Item Code</th><th>Description</th><th>PO Qty</th>
+            <th>Received</th><th>Accepted</th><th>Rejected</th><th>Remarks</th>
+          </tr></thead>
+          <tbody>${parts.length?grnRows:`<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--gray-4)">No parts on this PR</td></tr>`}</tbody>
+        </table>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+        <div><label class="form-label" style="font-size:0.7rem">RECEIVED BY</label>
+          <input class="form-control" id="grnReceivedBy" placeholder="Name" style="font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">GRN NOTES</label>
+          <textarea class="form-control" id="grnRemarks" rows="2" placeholder="Condition, packaging, any notes..." style="font-size:0.82rem"></textarea></div>
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:14px" onclick="submitGRN()">✅ Submit GRN — Send to QC →</button>
+    </div>`;
+  }
+
+  // ── REWORK PENDING: store manager marks goods returned ──
+  if (pr.phase==='rework_pending') {
+    const jwcData = pr.qc_criteria?.jwc || {};
+    actionSection = `<div class="action-section" style="background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius);padding:14px">
+      <div class="action-section-title" style="color:#dc2626">🔄 Rework Out — Awaiting Return <span class="rework-badge">JWC RAISED</span></div>
+      ${jwcData.jwc_number?`<div style="margin:10px 0;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.82rem">
+        <div style="font-weight:600;margin-bottom:4px">JWC Details</div>
+        <div>JWC No: <strong>${jwcData.jwc_number}</strong></div>
+        <div>Vendor: <strong>${jwcData.rework_vendor||'—'}</strong></div>
+        <div>Expected Duration: <strong>${jwcData.expected_days||'—'} days</strong></div>
+        ${jwcData.notes?`<div>Notes: ${jwcData.notes}</div>`:''}
+      </div>`:''}
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Once reworked goods are returned from vendor, mark them received to send back for QC re-inspection.</p>
+      <textarea class="form-control" id="reworkReturnNotes" rows="2" placeholder="Rework return notes / condition..." style="font-size:0.82rem;margin-bottom:10px"></textarea>
+      <button class="btn btn-primary" onclick="markReworkReturned()">📦 Reworked Goods Returned — Send for Re-QC →</button>
+    </div>`;
+  }
+
+  // ── QC PENDING / PASSED / REWORK RETURNED: read-only ──
+  if (['qc_pending','qc_passed','accepted','rework_returned'].includes(pr.phase)) {
+    const msgs = {
+      qc_passed:       '✅ QC Passed',
+      accepted:        '✅ QC Passed & Accepted',
+      qc_pending:      '🔍 QC Inspection in Progress',
+      rework_returned: '🔄 Reworked Goods Returned — Awaiting QC Re-inspection'
+    };
+    const colors = {
+      qc_passed:       '#16a34a',
+      accepted:        '#16a34a',
+      rework_returned: '#d97706'
+    };
+    const bgColors = {
+      qc_passed:       'rgba(22,163,74,0.04)',
+      accepted:        'rgba(22,163,74,0.04)',
+      rework_returned: 'rgba(251,191,36,0.06)'
+    };
+    const borderColors = {
+      qc_passed:       'rgba(22,163,74,0.2)',
+      accepted:        'rgba(22,163,74,0.2)',
+      rework_returned: 'rgba(251,191,36,0.3)'
+    };
+    const titleColor = colors[pr.phase] ? `color:${colors[pr.phase]}` : '';
+    const bg = bgColors[pr.phase] || 'transparent';
+    const border = borderColors[pr.phase] ? `border:1px solid ${borderColors[pr.phase]}` : '';
+    actionSection = `<div class="action-section" style="background:${bg};${border};border-radius:var(--radius);padding:14px">
+      <div class="action-section-title" style="${titleColor}">${msgs[pr.phase] || '🔍 QC In Progress'}</div>
+      ${pr.phase === 'rework_returned'
+        ? '<p style="font-size:0.82rem;color:var(--gray-3)">Goods have been returned from rework. The QC Inspector will now perform re-inspection and confirm pass.</p>'
+        : '<p style="font-size:0.82rem;color:var(--gray-3)">GRN submitted. QC Inspector is performing quality check.</p>'
+      }
+    </div>`;
+  }
+
+  document.getElementById('modalTitle').innerHTML = `${prNum} — ${pr.project_name} ${getPhaseBadge(pr.phase)}`;
+  document.getElementById('modalBody').innerHTML = `
+    ${buildPRDetailHTML(pr)}
+    ${actionSection}
+    <div style="margin-top:18px">
+      <div style="font-size:0.8rem;font-weight:600;color:var(--gray-3);margin-bottom:8px">Comments</div>
+      <div id="commentsList" style="margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px">
+        <input class="form-control" id="commentInput" placeholder="Add a comment…" style="flex:1;font-size:0.82rem"/>
+        <button class="btn btn-secondary btn-sm" onclick="addComment()">Send</button>
+      </div>
+    </div>`;
+  loadComments(pr.id).then(c=>{ document.getElementById('commentsList').innerHTML=renderComments(c); });
+}
+
+function calcGRNRow(i) {
+  const rcvd = parseInt(document.getElementById('grnRcvd_'+i)?.value||'0')||0;
+  const acpt = parseInt(document.getElementById('grnAccpt_'+i)?.value||'0')||0;
+  const rjEl = document.getElementById('grnRejct_'+i);
+  if (rjEl) rjEl.value = Math.max(0, rcvd - acpt);
+}
+
+async function submitGRN() {
+  const grnNumber = document.getElementById('grnNumber')?.value.trim()||'';
+  const grnDate   = document.getElementById('grnDate')?.value.trim()||'';
+  const grnInvoice= document.getElementById('grnInvoice')?.value.trim()||'';
+  const grnTransport=document.getElementById('grnTransport')?.value.trim()||'';
+  const grnGateNo = document.getElementById('grnGateNo')?.value.trim()||'';
+  const grnGateDate=document.getElementById('grnGateDate')?.value.trim()||'';
+  const grnRecvBy = document.getElementById('grnReceivedBy')?.value.trim()||'';
+  const grnRemarks= document.getElementById('grnRemarks')?.value.trim()||'';
+
+  if (!grnNumber) { showToast('Please enter a GRN Number','error'); return; }
+
+  const parts = currentPR.parts||[];
+  const grnLines = parts.map((p,i)=>({
+    sr: i+1,
+    item_code: document.getElementById('grnCode_'+i)?.value.trim()||'—',
+    item_name: p.name,
+    po_qty: p.qty||1,
+    received: parseInt(document.getElementById('grnRcvd_'+i)?.value||'0')||0,
+    accepted: parseInt(document.getElementById('grnAccpt_'+i)?.value||'0')||0,
+    rejected: parseInt(document.getElementById('grnRejct_'+i)?.value||'0')||0,
+    notes: document.getElementById('grnNote_'+i)?.value.trim()||''
+  }));
+
+  const grnData = {
+    grn_number:grnNumber, grn_date:grnDate,
+    invoice_no:grnInvoice, transporter:grnTransport,
+    gate_inward_no:grnGateNo, gate_inward_date:grnGateDate,
+    received_by:grnRecvBy, remarks:grnRemarks,
+    lines:grnLines
+  };
+
+  showLoader(true);
+  const {error} = await db.from('procurement_requests').update({
+    phase:'qc_pending',
+    qc_notes:`GRN# ${grnNumber} | Received by: ${grnRecvBy} | ${grnRemarks}`,
+    qc_criteria: Object.assign({}, currentPR.qc_criteria||{}, {grn:grnData}),
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR,'qc_pending')
+  }).eq('id',currentPR.id);
+  showLoader(false);
+  if (error) { showToast('Error: '+error.message,'error'); return; }
+  notifyPhaseChange(currentPR.id,'qc_pending',currentUser?.id);
+  await window.postComment(currentPR.id, currentUser?.id, `📦 GRN completed (${grnNumber}) — sent to QC Inspector.`);
+  showToast('GRN submitted — QC Inspector notified!','success');
+  closeModal('prModal'); await loadRequests();
+}
+
+async function markReworkReturned() {
+  const notes = document.getElementById('reworkReturnNotes')?.value.trim()||'';
+  showLoader(true);
+  const {error} = await db.from('procurement_requests').update({
+    phase:'rework_returned',
+    qc_notes: `Reworked goods returned. ${notes}`,
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR,'rework_returned')
+  }).eq('id',currentPR.id);
+  showLoader(false);
+  if (error) { showToast('Error: '+error.message,'error'); return; }
+  notifyPhaseChange(currentPR.id,'rework_returned',currentUser?.id);
+  await window.postComment(currentPR.id, currentUser?.id, `🔄 Reworked goods returned to store — QC Inspector notified for re-inspection. ${notes}`);
+  showToast('Rework returned — QC Inspector notified for re-inspection!','success');
+  closeModal('prModal'); await loadRequests();
+}
+
+async function addComment() {
+  const input=document.getElementById('commentInput'),text=input?.value.trim();
+  if(!text||!currentPR)return;
+  try{await postComment(currentPR.id,currentUser.id,text);input.value='';const c=await loadComments(currentPR.id);document.getElementById('commentsList').innerHTML=renderComments(c);}catch(e){showToast('Comment failed','error');}
+}
+
+function logout() { Session.clear(); window.location.href='../index.html'; }
+
+init();
+</script>
+</body>
+</html>

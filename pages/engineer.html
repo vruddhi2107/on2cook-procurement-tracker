@@ -156,9 +156,16 @@
           <label class="form-label">Department *</label>
           <select class="form-control" id="fDept">
             <option value="">Select</option>
-            <option value="mech">Mechanical</option>
+            <option value="npd">Production &amp; Operations - NPD</option>
+            <option value="electronics">Production &amp; Operations - Electronics</option>
             <option value="id">Industrial Design</option>
-            <option value="electronics">Electronics</option>
+            <option value="assembly">Production &amp; Operations - Assembly</option>
+            <option value="scm_stores">SCM - Stores &amp; Logistics</option>
+            <option value="service">Production &amp; Operations - Service</option>
+            <option value="machine_shop">Production &amp; Operations - Machine Shop</option>
+            <option value="quality">Production &amp; Operations - Quality</option>
+            <option value="mech_design">Mechanical Design Engineering</option>
+            <option value="other">Other</option>
           </select>
         </div>
 
@@ -330,7 +337,7 @@ function addPhaseTimestamp(pr, phaseName) {
   return ts;
 }
 let activeTab='all', selectedPMApproval=null, currentPR=null;
-let selectedQuotationId=null, screenshotBase64=null, selectedApprovalPath=null;
+let selectedQuotationId=null;
 let isEditMode=false, editingParentId=null;
 let pmScreenshotBase64=null, selectedSourcing=[], attachedFiles=[];
 
@@ -352,7 +359,7 @@ function handleAttachmentDownload(e, url, fileName) {
 
 // ── INIT ─────────────────────────────────────────────────────
 async function init() {
-  currentUser=Session.require(['engineer']); if(!currentUser) return;
+  currentUser=Session.require(['engineer','store_manager','qc_inspector']); if(!currentUser) return;
   document.getElementById('navbarMount').innerHTML=buildNavbar(currentUser);
   document.getElementById('footerMount').innerHTML=buildFooter();
   initNavbar(currentUser);
@@ -700,7 +707,6 @@ async function submitPR() {
 async function openPR(id) {
   currentPR=myRequests.find(r=>r.id===id); if(!currentPR) return;
   selectedQuotationId=currentPR.selected_quotation_id;
-  screenshotBase64=null; selectedApprovalPath=null;
   document.getElementById('prModalTitle').textContent=`PR-${String(currentPR.request_number).padStart(4,'0')} — ${currentPR.project_name}`;
   document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${fmtDate(currentPR.created_at)}`;
   showLoader(true);
@@ -733,8 +739,7 @@ async function openPR(id) {
 
   if(currentPR.phase==='quotations_shared') {
     actionSection=buildQuoteReview(quotations);
-    footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('prModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitApprovalPath()">Submit →</button>`;
+    footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('prModal')">Cancel</button>`;
   }
 
   if(currentPR.phase==='grn_pending') {
@@ -763,8 +768,8 @@ async function openPR(id) {
           <input class="form-control" id="grnNumber" placeholder="e.g. GRN/25-26/0001" style="font-family:var(--font-mono);font-size:0.82rem"/></div>
         <div><label class="form-label" style="font-size:0.7rem">GRN DATE</label>
           <input class="form-control" id="grnDate" value="${today}" style="font-family:var(--font-mono);font-size:0.82rem"/></div>
-        <div><label class="form-label" style="font-size:0.7rem">INVOICE NO</label>
-          <input class="form-control" id="grnInvoice" placeholder="Invoice number" style="font-size:0.82rem"/></div>
+        <div><label class="form-label" style="font-size:0.7rem">PO NO</label>
+          <input class="form-control" id="grnInvoice" placeholder="PO number" style="font-size:0.82rem"/></div>
         <div><label class="form-label" style="font-size:0.7rem">TRANSPORTER</label>
           <input class="form-control" id="grnTransport" placeholder="Transporter name" style="font-size:0.82rem"/></div>
         <div><label class="form-label" style="font-size:0.7rem">GATE INWARD NO</label>
@@ -858,56 +863,55 @@ async function resolveVendorInfo(action) {
 function buildQuoteReview(quotations) {
   if(!quotations.length) return `<div class="action-section"><div class="action-section-title">📨 Review Quotations <span class="action-badge">ACTION REQUIRED</span></div><p style="color:var(--gray-4);font-size:0.82rem">No quotations yet.</p></div>`;
   return `<div class="action-section">
-    <div class="action-section-title">📨 Review Quotations <span class="action-badge">ACTION REQUIRED</span></div>
-    <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Review ${quotations.length} quotation${quotations.length>1?'s':''} then choose an approval path.</p>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">${quotations.map(q=>renderQuotationCard(q,false)).join('')}</div>
-    <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:16px">
-      <div class="form-label" style="margin-bottom:10px">Who should approve this? *</div>
-      <div class="approval-options">
-        <div class="approval-option" id="pathClient" onclick="selectApprovalPath('client')">
-          <div class="approval-option-icon">👤</div>
-          <div class="approval-option-label">Client Approval</div>
-          <div class="approval-option-sub">Select quote + attach client screenshot, then goes to PM</div>
-        </div>
-        <div class="approval-option" id="pathPM" onclick="selectApprovalPath('project_manager')">
-          <div class="approval-option-icon">👔</div>
-          <div class="approval-option-label">Project Manager</div>
-          <div class="approval-option-sub">Forward directly — PM selects quote and approves</div>
-        </div>
-      </div>
+    <div class="action-section-title">📨 Verify Quotation <span class="action-badge">ACTION REQUIRED</span></div>
+    <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Review the ${quotations.length} quotation${quotations.length>1?'s':''} below. Select the one that best meets the requirement and click <strong>Verify & Forward</strong> to route it for approval.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">${quotations.map(q=>renderQuotationCard(q,true,selectedQuotationId)).join('')}</div>
+    <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:14px;font-size:0.8rem;color:#4338ca">
+      <strong>ℹ Routing rule:</strong> Quotes below ₹5,000 go to the <strong>Project Manager</strong>. Quotes of ₹5,000 or above go to the <strong>Director</strong> for approval.
     </div>
-    <div id="clientPathFields" style="display:none">
-      <div class="form-label" style="margin-bottom:8px">Select Final Quotation *</div>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${quotations.map(q=>renderQuotationCard(q,true,selectedQuotationId)).join('')}</div>
-      <div class="form-label" style="margin-bottom:6px">Client Approval Screenshot *</div>
-      <div class="screenshot-zone" id="screenshotZone"><input type="file" id="screenshotFile" accept="image/png,image/jpeg" onchange="handleScreenshot(event)"/>
-        <div style="font-size:1.3rem;margin-bottom:4px">📷</div><div style="font-size:0.8rem;font-weight:600">Upload screenshot</div><div style="font-size:0.72rem;color:var(--gray-4)">PNG or JPG, max 5MB</div></div>
-      <div id="screenshotPreview" style="display:none;margin-top:8px">
-        <img id="screenshotImg" style="max-width:100%;max-height:200px;object-fit:contain;border-radius:6px;border:1px solid var(--border)"/>
-        <button class="btn btn-ghost btn-sm" style="margin-top:4px" onclick="clearScreenshot()">✕ Remove</button>
-      </div>
-      <div class="form-group" style="margin-top:10px">
-        <label class="form-label">Client Approval Notes</label>
-        <textarea class="form-control" id="clientNotes" placeholder="Client name, reference, date..."></textarea>
-      </div>
-    </div>
-    <div id="pmPathFields" style="display:none">
-      <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius-sm);padding:12px;display:flex;gap:10px">
-        <span style="font-size:1.2rem">👔</span>
-        <div><div style="font-size:0.85rem;font-weight:600;margin-bottom:3px">Forwarding to PM</div>
-        <p style="font-size:0.78rem;color:var(--gray-3)">PM will receive all quotations, select the final one, and give approval.</p></div>
-      </div>
-    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="submitEngineerVerification()">✓ Verify & Forward for Approval</button>
   </div>`;
 }
 
-function selectApprovalPath(path) {
-  selectedApprovalPath=path;
-  document.getElementById('pathClient').classList.toggle('selected',path==='client');
-  document.getElementById('pathPM').classList.toggle('selected',path==='project_manager');
-  document.getElementById('clientPathFields').style.display=path==='client'?'block':'none';
-  document.getElementById('pmPathFields').style.display=path==='project_manager'?'block':'none';
-  if(path!=='client') selectedQuotationId=null;
+// ── ENGINEER QUOTE VERIFICATION ─────────────────────────────
+const ENGINEER_APPROVAL_LIMIT = 5000; // INR threshold
+
+async function submitEngineerVerification() {
+  if(!selectedQuotationId){showToast('Please select a quotation first','error');return;}
+  const selectedQ = prQuotations.find(q=>q.id===selectedQuotationId);
+  if(!selectedQ){showToast('Selected quotation not found','error');return;}
+
+  const amount = parseFloat(selectedQ.amount || 0);
+  const needsDirector = amount >= ENGINEER_APPROVAL_LIMIT;
+  const newPhase = needsDirector ? 'pending_sandy_approval' : 'pending_pm_final_approval';
+
+  showLoader(true);
+  // Mark selected quotation
+  await db.from('pr_quotations').update({is_selected:false}).eq('pr_id',currentPR.id);
+  await db.from('pr_quotations').update({is_selected:true}).eq('id',selectedQuotationId);
+
+  const{error}=await db.from('procurement_requests').update({
+    phase: newPhase,
+    approval_path: 'engineer_verified',
+    selected_quotation_id: selectedQuotationId,
+    client_approval_screenshot: null,
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR, newPhase)
+  }).eq('id',currentPR.id);
+
+  if(!error){
+    const routedTo = needsDirector ? 'Director (amount ≥ ₹5,000)' : 'Project Manager';
+    await postComment(currentPR.id, currentUser.id,
+      `✅ Engineer verified quotation from ${selectedQ.vendor_name||'vendor'} (₹${amount.toLocaleString('en-IN')}). Forwarded to ${routedTo}.`);
+    notifyPhaseChange(currentPR.id, newPhase, currentUser?.id);
+  }
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast(needsDirector
+    ? `⬆️ Amount ₹${amount.toLocaleString('en-IN')} ≥ ₹5,000 — forwarded to Director for approval.`
+    : `✅ Verified — forwarded to Project Manager.`,'success');
+  selectedQuotationId=null;
+  closeModal('prModal');await loadRequests();
 }
 
 function selectQuotation(qId) {
@@ -926,43 +930,6 @@ function selectQuotation(qId) {
       }
     });
   });
-}
-
-function handleScreenshot(e) {
-  const file=e.target.files[0];if(!file)return;
-  fileToBase64(file).then(b64=>{screenshotBase64=b64;document.getElementById('screenshotImg').src=b64;document.getElementById('screenshotPreview').style.display='block';document.getElementById('screenshotZone').style.display='none';});
-}
-function clearScreenshot(){screenshotBase64=null;document.getElementById('screenshotPreview').style.display='none';document.getElementById('screenshotZone').style.display='block';document.getElementById('screenshotFile').value='';}
-
-async function submitApprovalPath() {
-  if(!selectedApprovalPath){showToast('Please select an approval path','error');return;}
-  if(selectedApprovalPath==='client'){
-    if(!selectedQuotationId){showToast('Please select a final quotation','error');return;}
-    if(!screenshotBase64){showToast('Please attach client approval screenshot','error');return;}
-    showLoader(true);
-    await db.from('pr_quotations').update({is_selected:false}).eq('pr_id',currentPR.id);
-    await db.from('pr_quotations').update({is_selected:true}).eq('id',selectedQuotationId);
-    const{error}=await db.from('procurement_requests').update({
-      phase:'pending_pm_final_approval',approval_path:'client',selected_quotation_id:selectedQuotationId,
-      client_approval_screenshot:screenshotBase64,client_approval_notes:document.getElementById('clientNotes')?.value.trim()||null,
-      updated_at:new Date().toISOString()
-    }).eq('id',currentPR.id);
-    showLoader(false);
-    if(error){showToast('Error: '+error.message,'error');return;}
-    showToast('Client approval submitted — forwarded to PM.','success');
-  } else {
-    showLoader(true);
-    const{error}=await db.from('procurement_requests').update({
-      phase:'pending_pm_final_approval',approval_path:'project_manager',client_approval_screenshot:null,selected_quotation_id:null,
-      updated_at:new Date().toISOString()
-    }).eq('id',currentPR.id);
-    await db.from('pr_quotations').update({is_selected:false}).eq('pr_id',currentPR.id);
-    showLoader(false);
-    if(error){showToast('Error: '+error.message,'error');return;}
-    showToast('Forwarded directly to Project Manager.','success');
-  }
-  screenshotBase64=null;selectedQuotationId=null;selectedApprovalPath=null;
-  closeModal('prModal');await loadRequests();
 }
 
 // Calculate rejected = received - accepted for a GRN row

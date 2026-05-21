@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ProcureX — QC Inspector</title>
+<link rel="icon" type="image/x-icon" href="../on2cook no bg.png">
+<link rel="stylesheet" href="../css/styles.css"/>
+<style>
+/* ── QC option cards ─────────────────────────────────────────────────── */
+.qc-result-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.qc-option{border:2px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all 0.15s;text-align:center}
+.qc-option:hover{border-color:var(--red)}
+.qc-option.pass.selected{border-color:#16a34a;background:rgba(22,163,74,0.06)}
+.qc-option.fail.selected{border-color:#dc2626;background:rgba(220,38,38,0.06)}
+.qc-option .qc-icon{font-size:1.8rem;margin-bottom:6px}
+.qc-option .qc-label{font-weight:700;font-size:0.88rem}
+.qc-option .qc-desc{font-size:0.75rem;color:var(--gray-3);margin-top:2px}
+
+/* ── JWC form ────────────────────────────────────────────────────────── */
+.jwc-form{background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-top:12px}
+.jwc-form-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.jwc-table{width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:8px}
+.jwc-table th{background:#e8e8e8;padding:7px 8px;font-size:0.72rem;font-weight:700;text-transform:uppercase;border:1px solid #ccc}
+.jwc-table td{border:1px solid #ccc;padding:5px 7px;vertical-align:middle}
+
+/* ── GRN summary ─────────────────────────────────────────────────────── */
+.grn-summary{background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:14px}
+.grn-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.grn-stat{text-align:center;padding:8px;background:white;border-radius:var(--radius-sm);border:1px solid var(--border)}
+.grn-stat-val{font-size:1.2rem;font-weight:700}
+.grn-stat-lbl{font-size:0.7rem;color:var(--gray-3);text-transform:uppercase;letter-spacing:0.04em}
+.grn-table{width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:10px}
+.grn-table th{background:var(--off-white);padding:7px 8px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;border:1px solid var(--border);text-align:center}
+.grn-table td{border:1px solid var(--border);padding:5px 7px;vertical-align:middle}
+
+/* ── JWC print preview ───────────────────────────────────────────────── */
+.jwc-preview{background:white;border:1px solid #999;padding:20px;font-size:0.78rem;font-family:Arial,sans-serif;line-height:1.5;position:relative}
+.jwc-preview-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px}
+.jwc-preview-title{text-align:center;font-weight:800;font-size:1.05rem;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.jwc-preview-table{width:100%;border-collapse:collapse;margin:8px 0}
+.jwc-preview-table th,.jwc-preview-table td{border:1px solid #888;padding:5px 7px;font-size:0.75rem}
+.jwc-preview-table th{background:#eee;font-weight:700;text-align:center}
+.jwc-sig-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px;border-top:1px solid #aaa;padding-top:12px}
+.jwc-sig-box{text-align:center}
+.jwc-sig-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#555;margin-bottom:30px}
+.jwc-stamp{width:80px;height:80px;border:3px solid #0038a8;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:4px auto;position:relative;font-size:7px;color:#0038a8;font-weight:700;text-align:center;padding:4px}
+.jwc-stamp::before{content:'ON2COOK INDIA PVT. LTD.';position:absolute;top:8px;font-size:6.5px;letter-spacing:0.5px;font-weight:800}
+.jwc-stamp::after{content:'STORE DEPT.';position:absolute;bottom:8px;font-size:6.5px;letter-spacing:0.5px}
+.jwc-stamp-inner{font-size:8px;font-weight:800;letter-spacing:0.5px;margin-top:10px}
+
+/* ── My Requests table ───────────────────────────────────────────────── */
+.pr-number{font-family:var(--font-mono);font-size:0.82rem;font-weight:700;color:var(--primary)}
+</style>
+</head>
+<body>
+<div id="navbarMount"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<main class="page-container">
+  <div class="page-header">
+    <h1 class="page-title">QC <span>Dashboard</span></h1>
+    <p class="page-sub">Inspect received goods — pass or raise rework JWC</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sQcPending">—</div><div class="stat-card-label">QC Pending</div><div class="stat-card-icon">🔍</div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sQcPassed">—</div><div class="stat-card-label">QC Passed</div><div class="stat-card-icon">✅</div></div>
+    <div class="stat-card" style="--accent:#ef4444"><div class="stat-card-value" id="sRework">—</div><div class="stat-card-label">Rework Raised</div><div class="stat-card-icon">🔄</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="action" onclick="switchTab('action')">🔔 Pending QC</button>
+    <button class="tab-btn" data-tab="all" onclick="switchTab('all')">All Inspected</button>
+    <button class="tab-btn" data-tab="myrequests" onclick="switchTab('myrequests')">📋 My Requests</button>
+  </div>
+
+  <div id="tabMain">
+    <div class="table-wrap">
+      <table class="data-table" id="mainTable">
+        <thead>
+          <tr>
+            <th>PR #</th><th>Project</th><th>Phase</th><th>GRN Info</th><th>Parts</th><th>Date</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="mainTbody">
+          <tr><td colspan="7" style="text-align:center;padding:32px;color:var(--gray-4)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tabMyRequests" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <p style="font-size:0.82rem;color:var(--gray-3);margin:0">PRs you submitted — tracked separately from your QC duties.</p>
+      <a href="engineer.html" class="btn btn-primary btn-sm">+ New Request</a>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>PR #</th><th>Project</th><th>Phase</th><th>Last Updated</th><th></th></tr>
+        </thead>
+        <tbody id="myReqTbody">
+          <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--gray-4)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div id="footerMount"></div>
+
+<!-- PR Detail Modal -->
+<div class="modal-overlay" id="prModal">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Request Detail</div>
+      <button class="modal-close" onclick="closeModal('prModal')">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- JWC Preview Modal -->
+<div class="modal-overlay" id="jwcModal">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-header">
+      <div class="modal-title">📄 Job Work Challan — Preview</div>
+      <button class="modal-close" onclick="closeModal('jwcModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="jwcPreviewBody"></div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-primary" onclick="printJWC()">🖨️ Print JWC</button>
+        <button class="btn btn-secondary" onclick="closeModal('jwcModal')">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>if(!window.supabase){document.write('<scr'+'ipt src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"><\/scr'+'ipt>');}</script>
+<script src="../js/supabase-config.js"></script>
+<script src="../js/shared.js"></script>
+<script src="../js/qc.js"></script>
+</body>
+</html>

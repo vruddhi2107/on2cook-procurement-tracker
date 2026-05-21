@@ -1,0 +1,659 @@
+// ─── Page state ───────────────────────────────────────────────────────────────
+var currentUser = null;
+var allRequests  = [];
+var myRequests   = [];
+var currentPR    = null;
+var activeTab    = 'action';
+var qcSelection  = null;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function addPhaseTimestamp(pr, phaseName) {
+  var existing = (pr && pr.phase_timestamps) ? pr.phase_timestamps : {};
+  var ts = Object.assign({}, existing);
+  ts[phaseName] = new Date().toISOString();
+  return ts;
+}
+
+// function fmtDate(iso) {
+//   if (!iso) return '—';
+//   return new Date(iso).toLocaleDateString('en-IN');
+// }
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+window.switchTab = function switchTab(t) {
+  activeTab = t;
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.tab === t);
+  });
+  document.getElementById('tabMain').style.display        = t === 'myrequests' ? 'none' : 'block';
+  document.getElementById('tabMyRequests').style.display  = t === 'myrequests' ? 'block' : 'none';
+  if (t === 'myrequests') renderMyRequestsTable();
+  else renderTable();
+};
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  currentUser = Session.require(['qc_inspector']);
+  if (!currentUser) return;
+  document.getElementById('navbarMount').innerHTML = buildNavbar(currentUser);
+  document.getElementById('footerMount').innerHTML = buildFooter();
+  initNavbar(currentUser);
+  await loadRequests();
+}
+
+// ─── Data loading ─────────────────────────────────────────────────────────────
+async function loadRequests() {
+  showLoader(true);
+  var results = await Promise.all([
+    db.from('procurement_requests').select('*').order('created_at', {ascending: false}),
+    db.from('procurement_requests').select('*').eq('created_by', currentUser.id).order('updated_at', {ascending: false})
+  ]);
+  showLoader(false);
+
+  var allRes = results[0];
+  var myRes  = results[1];
+
+  if (allRes.error) { showToast('Error loading requests', 'error'); return; }
+
+  allRequests = allRes.data  || [];
+  myRequests  = myRes.data   || [];
+
+  updateStats();
+  renderTable();
+  renderMyRequestsTable();
+}
+
+function updateStats() {
+  document.getElementById('sQcPending').textContent = allRequests.filter(function(r){ return r.phase === 'qc_pending' || r.phase === 'rework_returned'; }).length;
+  document.getElementById('sQcPassed').textContent  = allRequests.filter(function(r){ return r.phase === 'qc_passed' || r.phase === 'accepted'; }).length;
+  document.getElementById('sRework').textContent    = allRequests.filter(function(r){ return r.phase === 'rework_pending'; }).length;
+}
+
+// ─── Tables ───────────────────────────────────────────────────────────────────
+function renderTable() {
+  var actionPhases = ['qc_pending', 'rework_returned'];
+  var rows = activeTab === 'action'
+    ? allRequests.filter(function(r){ return actionPhases.indexOf(r.phase) !== -1; })
+    : allRequests.filter(function(r){ return ['qc_pending','qc_passed','rework_pending','rework_returned','accepted'].indexOf(r.phase) !== -1; });
+
+  var tbody = document.getElementById('mainTbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No requests</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(function(r) {
+    var grn      = (r.qc_criteria && r.qc_criteria.grn) ? r.qc_criteria.grn : {};
+    var parts    = r.parts || [];
+    var isAction = actionPhases.indexOf(r.phase) !== -1;
+    var btnLabel = r.phase === 'rework_returned' ? '\uD83D\uDD04 Post-Rework QC \u2192' : (isAction ? 'Inspect \u2192' : 'View');
+    return '<tr' + (isAction ? ' class="row-action"' : '') + '>'
+      + '<td><span class="pr-num">PR-' + String(r.request_number).padStart(4,'0') + '</span></td>'
+      + '<td><span class="fw-600">' + r.project_name + '</span>'
+        + (r.project_phase ? '<br><span class="text-muted" style="font-size:0.75rem">' + r.project_phase + '</span>' : '')
+        + '</td>'
+      + '<td>' + getPhaseBadge(r.phase) + '</td>'
+      + '<td style="font-size:0.78rem">'
+        + (grn.grn_number
+            ? '<span class="fw-600">' + grn.grn_number + '</span><br>' + (grn.grn_date || '')
+            : (r.qc_notes || '—'))
+        + '</td>'
+      + '<td style="font-size:0.8rem;color:var(--gray-3)">' + parts.length + ' item' + (parts.length !== 1 ? 's' : '') + '</td>'
+      + '<td style="font-size:0.78rem;color:var(--gray-4)">' + new Date(r.created_at).toLocaleDateString('en-IN') + '</td>'
+      + '<td><button class="btn btn-sm ' + (isAction ? 'btn-primary' : 'btn-secondary') + '" onclick="openPR(\'' + r.id + '\')">'
+        + btnLabel + '</button></td>'
+      + '</tr>';
+  }).join('');
+}
+
+function renderMyRequestsTable() {
+  var tbody = document.getElementById('myReqTbody');
+  if (!myRequests.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state" style="padding:32px;text-align:center;color:var(--gray-4)">No requests submitted yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = myRequests.map(function(r) {
+    return '<tr>'
+      + '<td><span class="pr-number">PR-' + String(r.request_number).padStart(4,'0') + '</span></td>'
+      + '<td><div style="font-weight:600;font-size:0.82rem">' + r.project_name + '</div>'
+        + '<div style="font-size:0.72rem;color:var(--gray-4)">' + (r.project_phase || '') + '</div></td>'
+      + '<td>' + getPhaseBadge(r.phase) + '</td>'
+      + '<td style="font-size:0.78rem;color:var(--gray-4)">' + fmtDate(r.updated_at || r.created_at) + '</td>'
+      + '<td><button class="btn btn-ghost btn-sm" onclick="openPR(\'' + r.id + '\')">View</button></td>'
+      + '</tr>';
+  }).join('');
+}
+
+// ─── Open PR modal ────────────────────────────────────────────────────────────
+window.openPR = async function openPR(id) {
+  showLoader(true);
+  var result = await db.from('procurement_requests').select('*').eq('id', id).single();
+  showLoader(false);
+  if (result.error) { showToast('Error loading request', 'error'); return; }
+  currentPR   = result.data;
+  qcSelection = null;
+  renderModal();
+  openModal('prModal');
+};
+
+// ─── Modal rendering ──────────────────────────────────────────────────────────
+function renderModal() {
+  var pr     = currentPR;
+  var parts  = pr.parts || [];
+  var grn    = (pr.qc_criteria && pr.qc_criteria.grn) ? pr.qc_criteria.grn : {};
+  var prNum  = 'PR-' + String(pr.request_number).padStart(4,'0');
+
+  // ── GRN summary block ────────────────────────────────────────────────────
+  var grnSummary = '';
+  if (grn.grn_number) {
+    var lines    = grn.lines || [];
+    var totRcvd  = lines.reduce(function(s,l){ return s + (l.received || 0); }, 0);
+    var totAccpt = lines.reduce(function(s,l){ return s + (l.accepted || 0); }, 0);
+    var totRejct = lines.reduce(function(s,l){ return s + (l.rejected || 0); }, 0);
+
+    var lineRows = lines.length
+      ? '<details style="margin-top:8px"><summary style="font-size:0.78rem;cursor:pointer;color:var(--gray-3)">View item-by-item GRN →</summary>'
+        + '<div style="overflow-x:auto;margin-top:8px"><table class="grn-table" style="font-size:0.75rem">'
+        + '<thead><tr><th>Sr.</th><th>Code</th><th>Item</th><th>PO Qty</th><th>Received</th><th>Accepted</th><th>Rejected</th><th>Remarks</th></tr></thead>'
+        + '<tbody>' + lines.map(function(l) {
+            return '<tr>'
+              + '<td style="text-align:center">' + l.sr + '</td>'
+              + '<td>' + (l.item_code || '—') + '</td>'
+              + '<td>' + (l.item_name  || '—') + '</td>'
+              + '<td style="text-align:center">' + (l.po_qty   || 0) + '</td>'
+              + '<td style="text-align:center">' + (l.received || 0) + '</td>'
+              + '<td style="text-align:center;color:#16a34a;font-weight:600">' + (l.accepted || 0) + '</td>'
+              + '<td style="text-align:center;color:#dc2626;font-weight:600">' + (l.rejected || 0) + '</td>'
+              + '<td>' + (l.notes || '—') + '</td>'
+              + '</tr>';
+          }).join('') + '</tbody></table></div></details>'
+      : '';
+
+    grnSummary = '<div class="grn-summary">'
+      + '<div style="font-size:0.8rem;font-weight:700;color:var(--gray-3);margin-bottom:2px">📋 GRN Details — ' + grn.grn_number + '</div>'
+      + '<div style="font-size:0.75rem;color:var(--gray-4)">' + (grn.grn_date || '') + ' | Received by: ' + (grn.received_by || '—') + ' | Transporter: ' + (grn.transporter || '—') + '</div>'
+      + '<div class="grn-summary-grid">'
+        + '<div class="grn-stat"><div class="grn-stat-val">' + totRcvd  + '</div><div class="grn-stat-lbl">Received</div></div>'
+        + '<div class="grn-stat" style="border-color:rgba(22,163,74,0.3)"><div class="grn-stat-val" style="color:#16a34a">' + totAccpt + '</div><div class="grn-stat-lbl">Accepted</div></div>'
+        + '<div class="grn-stat" style="border-color:rgba(220,38,38,0.3)"><div class="grn-stat-val" style="color:#dc2626">' + totRejct + '</div><div class="grn-stat-lbl">Rejected</div></div>'
+      + '</div>'
+      + lineRows
+      + (grn.remarks ? '<div style="margin-top:6px;font-size:0.78rem;color:var(--gray-3)">Remarks: ' + grn.remarks + '</div>' : '')
+      + '</div>';
+  }
+
+  // ── Action section ───────────────────────────────────────────────────────
+  var actionSection = '';
+
+  if (pr.phase === 'qc_pending') {
+    var qcCriteriaHTML = '';
+    if (pr.qc_criteria && (pr.qc_criteria.preferred_color || pr.qc_criteria.preferred_material || pr.qc_criteria.custom)) {
+      qcCriteriaHTML = '<div style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius);padding:10px;margin-bottom:12px">'
+        + '<div style="font-size:0.75rem;font-weight:700;color:#6366f1;margin-bottom:4px">🔍 Expected QC Criteria</div>'
+        + (pr.qc_criteria.preferred_color    ? '<div style="font-size:0.78rem">Color/Finish: <strong>' + pr.qc_criteria.preferred_color    + '</strong></div>' : '')
+        + (pr.qc_criteria.preferred_material ? '<div style="font-size:0.78rem">Material: <strong>'     + pr.qc_criteria.preferred_material + '</strong></div>' : '')
+        + (pr.qc_criteria.custom             ? '<div style="font-size:0.78rem">Other: '                + pr.qc_criteria.custom             + '</div>'          : '')
+        + '</div>';
+    }
+
+    actionSection = '<div class="action-section">'
+      + '<div class="action-section-title">🔍 Quality Check <span class="action-badge">ACTION REQUIRED</span></div>'
+      + grnSummary
+      + qcCriteriaHTML
+      + '<div class="qc-result-row">'
+        + '<div class="qc-option pass" id="optPass" onclick="selectQC(\'pass\')">'
+          + '<div class="qc-icon">✅</div><div class="qc-label">QC Passed</div>'
+          + '<div class="qc-desc">Goods meet all quality specs</div></div>'
+        + '<div class="qc-option fail" id="optFail" onclick="selectQC(\'fail\')">'
+          + '<div class="qc-icon">❌</div><div class="qc-label">QC Failed — Rework</div>'
+          + '<div class="qc-desc">Raise Job Work Challan for rework</div></div>'
+      + '</div>'
+      + '<div><label class="form-label">Inspection Notes *</label>'
+        + '<textarea class="form-control" id="qcNotes" rows="3" placeholder="Describe findings, defects, measurements checked…"></textarea></div>'
+      + '<div id="jwcFormSection" style="display:none" class="jwc-form">'
+        + '<div style="font-size:0.84rem;font-weight:700;color:#dc2626;margin-bottom:10px">📄 Job Work Challan Details</div>'
+        + '<div class="jwc-form-grid">'
+          + '<div><label class="form-label" style="font-size:0.7rem">JWC NUMBER *</label>'
+            + '<input class="form-control" id="jwcNumber" placeholder="O2C/JW/00012" style="font-family:var(--font-mono);font-size:0.82rem"/></div>'
+          + '<div><label class="form-label" style="font-size:0.7rem">ISSUE DATE</label>'
+            + '<input class="form-control" id="jwcDate" value="' + new Date().toISOString().split('T')[0] + '" style="font-family:var(--font-mono);font-size:0.82rem"/></div>'
+          + '<div><label class="form-label" style="font-size:0.7rem">EXPECTED DAYS</label>'
+            + '<input class="form-control" type="number" id="jwcDays" placeholder="15" style="font-size:0.82rem"/></div>'
+          + '<div><label class="form-label" style="font-size:0.7rem">REWORK VENDOR</label>'
+            + '<input class="form-control" id="jwcVendor" placeholder="Vendor name &amp; address" style="font-size:0.82rem"/></div>'
+          + '<div><label class="form-label" style="font-size:0.7rem">VEHICLE NO</label>'
+            + '<input class="form-control" id="jwcVehicle" placeholder="Vehicle number" style="font-size:0.82rem"/></div>'
+          + '<div><label class="form-label" style="font-size:0.7rem">NATURE OF PROCESS</label>'
+            + '<input class="form-control" id="jwcProcess" placeholder="e.g. For Re-work / Re-coating" style="font-size:0.82rem"/></div>'
+        + '</div>'
+        + '<div style="margin-bottom:10px">'
+          + '<label class="form-label" style="font-size:0.7rem">REWORK ITEMS (from GRN rejected qty)</label>'
+          + '<div id="jwcItemsGrid" style="overflow-x:auto">'
+            + '<table class="jwc-table">'
+              + '<thead><tr><th>Sr.</th><th>Description of Goods (Out)</th><th>Issued Qty</th><th>Unit Rate</th><th>Est. Value</th></tr></thead>'
+              + '<tbody id="jwcItemsBody"></tbody>'
+            + '</table>'
+          + '</div>'
+        + '</div>'
+        + '<div><label class="form-label" style="font-size:0.7rem">ADDITIONAL NOTES</label>'
+          + '<textarea class="form-control" id="jwcNotes" rows="2" placeholder="Packing, weight, special instructions…" style="font-size:0.82rem"></textarea></div>'
+      + '</div>'
+      + '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'
+        + '<button class="btn btn-primary" id="btnSubmitQC" onclick="submitQC()">Submit QC Result →</button>'
+      + '</div>'
+      + '</div>';
+
+  } else if (pr.phase === 'qc_passed' || pr.phase === 'accepted') {
+    actionSection = '<div class="action-section" style="background:rgba(22,163,74,0.04);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:14px">'
+      + '<div class="action-section-title" style="color:#16a34a">✅ QC Passed</div>'
+      + (pr.qc_notes ? '<p style="font-size:0.82rem;color:var(--gray-3)">' + pr.qc_notes + '</p>' : '')
+      + '</div>';
+
+  } else if (pr.phase === 'rework_pending') {
+    var jwcData = (pr.qc_criteria && pr.qc_criteria.jwc) ? pr.qc_criteria.jwc : {};
+    actionSection = '<div class="action-section" style="background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius);padding:14px">'
+      + '<div class="action-section-title" style="color:#dc2626">\uD83D\uDD04 Rework Out — JWC Raised — Awaiting Return</div>'
+      + (jwcData.jwc_number
+          ? '<div style="margin:10px 0;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.82rem">'
+            + '<div style="font-weight:600;margin-bottom:4px">JWC Details</div>'
+            + '<div>JWC No: <strong>' + jwcData.jwc_number + '</strong></div>'
+            + '<div>Vendor: <strong>' + (jwcData.rework_vendor || '—') + '</strong></div>'
+            + '<div>Expected Duration: <strong>' + (jwcData.expected_days || '—') + ' days</strong></div>'
+            + (jwcData.notes ? '<div>Notes: ' + jwcData.notes + '</div>' : '')
+            + '</div>'
+          : '')
+      + '<p style="font-size:0.82rem;color:var(--gray-3);margin:8px 0">Goods are out for rework. Once the Store Manager confirms goods are returned, this will appear in your Post-Rework QC queue.</p>'
+      + '<button class="btn btn-secondary btn-sm" onclick="previewJWC()">\uD83D\uDCC4 View JWC</button>'
+      + '</div>';
+
+  } else if (pr.phase === 'rework_returned') {
+    var jwcReworkData = (pr.qc_criteria && pr.qc_criteria.jwc) ? pr.qc_criteria.jwc : {};
+    actionSection = '<div class="action-section">'
+      + '<div class="action-section-title">\uD83D\uDD04 Post-Rework QC Inspection <span class="action-badge">ACTION REQUIRED</span></div>'
+      + grnSummary
+      + (jwcReworkData.jwc_number
+          ? '<div style="margin-bottom:14px;padding:10px 12px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);font-size:0.82rem">'
+            + '<div style="font-weight:700;color:#dc2626;margin-bottom:4px">\uD83D\uDCC4 Rework History — JWC ' + jwcReworkData.jwc_number + '</div>'
+            + '<div>Rework Vendor: <strong>' + (jwcReworkData.rework_vendor || '—') + '</strong></div>'
+            + '<div>Process: <strong>' + (jwcReworkData.process || '—') + '</strong></div>'
+            + (jwcReworkData.notes ? '<div>Rework Notes: ' + jwcReworkData.notes + '</div>' : '')
+            + '<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="previewJWC()">\uD83D\uDCC4 View JWC</button>'
+            + '</div>'
+          : '')
+      + '<div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;font-size:0.82rem">'
+        + '<strong>\u26A0\uFE0F Goods returned from rework.</strong> Please inspect the reworked items and confirm they now meet quality specifications before approving.'
+      + '</div>'
+      + '<div><label class="form-label">Post-Rework Inspection Notes *</label>'
+        + '<textarea class="form-control" id="qcNotesRework" rows="3" placeholder="Describe rework quality findings — measurements checked, defects resolved, overall condition…"></textarea></div>'
+      + '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'
+        + '<button class="btn btn-primary" onclick="submitPostReworkPass()" style="background:#16a34a;border-color:#16a34a">\u2705 Confirm QC Passed after Rework \u2192</button>'
+      + '</div>'
+      + '</div>';
+  }
+
+  document.getElementById('modalTitle').innerHTML = prNum + ' — ' + pr.project_name + ' ' + getPhaseBadge(pr.phase);
+  document.getElementById('modalBody').innerHTML  =
+    buildPRDetailHTML(pr)
+    + actionSection
+    + '<div style="margin-top:18px">'
+      + '<div style="font-size:0.8rem;font-weight:600;color:var(--gray-3);margin-bottom:8px">Comments</div>'
+      + '<div id="commentsList" style="margin-bottom:10px"></div>'
+      + '<div style="display:flex;gap:8px">'
+        + '<input class="form-control" id="commentInput" placeholder="Add a comment…" style="flex:1;font-size:0.82rem"/>'
+        + '<button class="btn btn-secondary btn-sm" onclick="addComment()">Send</button>'
+      + '</div>'
+    + '</div>';
+
+  loadComments(pr.id).then(function(c) {
+    var el = document.getElementById('commentsList');
+    if (el) el.innerHTML = renderComments(c);
+  });
+
+  if (pr.phase === 'qc_pending') populateJWCItems();
+}
+
+// ─── QC option selection ──────────────────────────────────────────────────────
+window.selectQC = function selectQC(choice) {
+  qcSelection = choice;
+  var passEl = document.getElementById('optPass');
+  var failEl = document.getElementById('optFail');
+  var jwcSec = document.getElementById('jwcFormSection');
+  if (passEl) passEl.classList.toggle('selected', choice === 'pass');
+  if (failEl) failEl.classList.toggle('selected', choice === 'fail');
+  if (jwcSec) jwcSec.style.display = choice === 'fail' ? 'block' : 'none';
+};
+
+// ─── Populate JWC items from GRN rejected lines ───────────────────────────────
+function populateJWCItems() {
+  var grn           = (currentPR && currentPR.qc_criteria && currentPR.qc_criteria.grn) ? currentPR.qc_criteria.grn : {};
+  var lines         = grn.lines || [];
+  var rejectedLines = lines.filter(function(l){ return l.rejected > 0; });
+  var tbody         = document.getElementById('jwcItemsBody');
+  if (!tbody) return;
+
+  var sourceLines = rejectedLines.length ? rejectedLines : (currentPR.parts || []);
+
+  tbody.innerHTML = sourceLines.map(function(l, i) {
+    var name = l.item_name || l.name || '—';
+    var qty  = rejectedLines.length ? (l.rejected || 1) : (l.qty || 1);
+    return '<tr>'
+      + '<td style="text-align:center">' + (i + 1) + '</td>'
+      + '<td>' + name + '</td>'
+      + '<td><input class="form-control" type="number" id="jwcQty_' + i + '" value="' + qty + '" style="font-size:0.8rem;width:70px"/></td>'
+      + '<td><input class="form-control" type="number" id="jwcRate_' + i + '" placeholder="0" style="font-size:0.8rem;width:80px" oninput="calcJWCRow(' + i + ')"/></td>'
+      + '<td id="jwcVal_' + i + '" style="text-align:center;font-family:var(--font-mono)">—</td>'
+      + '</tr>';
+  }).join('');
+}
+
+window.calcJWCRow = function calcJWCRow(i) {
+  var qtyEl  = document.getElementById('jwcQty_'  + i);
+  var rateEl = document.getElementById('jwcRate_' + i);
+  var valEl  = document.getElementById('jwcVal_'  + i);
+  if (!qtyEl || !rateEl || !valEl) return;
+  var qty  = parseFloat(qtyEl.value  || '0') || 0;
+  var rate = parseFloat(rateEl.value || '0') || 0;
+  valEl.textContent = (qty && rate) ? (qty * rate).toLocaleString('en-IN') : '—';
+};
+
+// ─── Submit QC ────────────────────────────────────────────────────────────────
+window.submitQC = async function submitQC() {
+  if (!qcSelection) { showToast('Please select Pass or Fail', 'error'); return; }
+
+  var notesEl = document.getElementById('qcNotes');
+  var notes   = notesEl ? notesEl.value.trim() : '';
+  if (!notes) { showToast('Please add inspection notes', 'error'); return; }
+
+  var isPassed = qcSelection === 'pass';
+  var jwcData  = null;
+
+  if (!isPassed) {
+    var jwcNumberEl = document.getElementById('jwcNumber');
+    var jwcNumber   = jwcNumberEl ? jwcNumberEl.value.trim() : '';
+    if (!jwcNumber) { showToast('Please enter JWC Number', 'error'); return; }
+
+    var grn           = (currentPR.qc_criteria && currentPR.qc_criteria.grn) ? currentPR.qc_criteria.grn : {};
+    var lines         = grn.lines || [];
+    var rejectedLines = lines.filter(function(l){ return l.rejected > 0; });
+    var sourceLines   = rejectedLines.length ? rejectedLines : (currentPR.parts || []);
+
+    var jwcItems = sourceLines.map(function(l, i) {
+      var qtyEl  = document.getElementById('jwcQty_'  + i);
+      var rateEl = document.getElementById('jwcRate_' + i);
+      var qty    = parseInt((qtyEl  ? qtyEl.value  : '0'), 10) || 0;
+      var rate   = parseFloat(rateEl ? rateEl.value : '0')      || 0;
+      return {
+        sr:          i + 1,
+        description: l.item_name || l.name || '—',
+        qty:         qty,
+        rate:        rate,
+        value:       qty * rate
+      };
+    });
+
+    var jwcDateEl    = document.getElementById('jwcDate');
+    var jwcDaysEl    = document.getElementById('jwcDays');
+    var jwcVendorEl  = document.getElementById('jwcVendor');
+    var jwcVehicleEl = document.getElementById('jwcVehicle');
+    var jwcProcessEl = document.getElementById('jwcProcess');
+    var jwcNotesEl   = document.getElementById('jwcNotes');
+
+    jwcData = {
+      jwc_number:     jwcNumber,
+      jwc_date:       jwcDateEl    ? jwcDateEl.value    : new Date().toISOString().split('T')[0],
+      expected_days:  jwcDaysEl    ? jwcDaysEl.value    : '15',
+      rework_vendor:  jwcVendorEl  ? jwcVendorEl.value.trim()  : '',
+      vehicle_no:     jwcVehicleEl ? jwcVehicleEl.value.trim() : '',
+      process:        jwcProcessEl ? jwcProcessEl.value.trim() : 'For Re-work',
+      notes:          jwcNotesEl   ? jwcNotesEl.value.trim()   : '',
+      items:          jwcItems
+    };
+  }
+
+  showLoader(true);
+  var newPhase  = isPassed ? 'qc_passed'  : 'rework_pending';
+  var qcResult  = isPassed ? 'accepted'   : 'rejected';
+
+  var updatedCriteria = Object.assign({}, currentPR.qc_criteria || {}, {
+    qc_inspector: currentUser.name,
+    qc_date:      new Date().toISOString()
+  });
+  if (jwcData) updatedCriteria.jwc = jwcData;
+
+  var updateResult = await db.from('procurement_requests').update({
+    phase:            newPhase,
+    qc_result:        qcResult,
+    qc_notes:         notes,
+    qc_criteria:      updatedCriteria,
+    updated_at:       new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR, newPhase)
+  }).eq('id', currentPR.id);
+
+  showLoader(false);
+  if (updateResult.error) { showToast('Error: ' + updateResult.error.message, 'error'); return; }
+
+  notifyPhaseChange(currentPR.id, newPhase, currentUser.id);
+
+  var commentText = isPassed
+    ? '✅ QC Passed — ' + notes
+    : '❌ QC Failed — Rework JWC raised (' + (jwcData ? jwcData.jwc_number : '—') + '). ' + notes;
+  await window.postComment(currentPR.id, currentUser.id, commentText);
+
+  showToast(
+    isPassed
+      ? '✅ QC Passed — Procurement & Requestor notified!'
+      : '❌ QC Failed — JWC raised, Store Manager notified!',
+    'success'
+  );
+
+  if (!isPassed && jwcData) {
+    currentPR = Object.assign({}, currentPR, { qc_criteria: updatedCriteria, phase: 'rework_pending' });
+    setTimeout(function(){ previewJWC(); }, 400);
+  }
+
+  closeModal('prModal');
+  await loadRequests();
+};
+
+// ─── Post-Rework QC Pass ─────────────────────────────────────────────────────
+window.submitPostReworkPass = async function submitPostReworkPass() {
+  var notesEl = document.getElementById('qcNotesRework');
+  var notes   = notesEl ? notesEl.value.trim() : '';
+  if (!notes) { showToast('Please add post-rework inspection notes', 'error'); return; }
+
+  showLoader(true);
+  var updatedCriteria = Object.assign({}, currentPR.qc_criteria || {}, {
+    post_rework_qc_inspector: currentUser.name,
+    post_rework_qc_date:      new Date().toISOString(),
+    post_rework_notes:        notes
+  });
+
+  var updateResult = await db.from('procurement_requests').update({
+    phase:            'qc_passed',
+    qc_result:        'qc_passed',
+    qc_notes:         notes,
+    qc_criteria:      updatedCriteria,
+    updated_at:       new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR, 'qc_passed')
+  }).eq('id', currentPR.id);
+
+  showLoader(false);
+  if (updateResult.error) { showToast('Error: ' + updateResult.error.message, 'error'); return; }
+
+  notifyPhaseChange(currentPR.id, 'qc_passed', currentUser.id);
+  await window.postComment(currentPR.id, currentUser.id, '\u2705 Post-Rework QC Passed \u2014 ' + notes);
+  showToast('\u2705 Post-Rework QC Passed \u2014 Procurement notified!', 'success');
+  closeModal('prModal');
+  await loadRequests();
+};
+
+// ─── JWC Preview ──────────────────────────────────────────────────────────────
+window.previewJWC = function previewJWC() {
+  var jwc = currentPR && currentPR.qc_criteria ? currentPR.qc_criteria.jwc : null;
+  if (!jwc) { showToast('No JWC data found', 'error'); return; }
+
+  var pr       = currentPR;
+  var prNum    = 'PR-' + String(pr.request_number).padStart(4,'0');
+  var items    = jwc.items || [];
+  var totalQty = items.reduce(function(s,i){ return s + (i.qty   || 0); }, 0);
+  var totalVal = items.reduce(function(s,i){ return s + (i.value || 0); }, 0);
+
+  var itemRows = items.map(function(it, i) {
+    return '<tr>'
+      + '<td style="text-align:center">'  + (i + 1) + '</td>'
+      + '<td>'                            + (it.description || '—') + '</td>'
+      + '<td style="text-align:center">'  + (it.qty   || 0) + '</td>'
+      + '<td style="text-align:right">'   + (it.rate  ? it.rate.toLocaleString('en-IN')  : '—') + '</td>'
+      + '<td style="text-align:right">'   + (it.value ? it.value.toLocaleString('en-IN') : '—') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  var inRows = items.map(function(it) {
+    return '<tr>'
+      + '<td>' + (it.description || '—') + ' (reworked)</td>'
+      + '<td style="text-align:center">' + (it.qty   || 0) + '</td>'
+      + '<td style="text-align:right">'  + (it.value ? it.value.toLocaleString('en-IN') : '—') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  document.getElementById('jwcPreviewBody').innerHTML =
+    '<div class="jwc-preview" id="jwcPrintArea">'
+      + '<div style="text-align:right;font-size:0.72rem;color:#555;margin-bottom:4px">Original / Duplicate / Triplicate</div>'
+      + '<div class="jwc-preview-header">'
+        + '<div>'
+          + '<div style="font-size:1rem;font-weight:800">On2cook India Pvt. Ltd.</div>'
+          + '<div style="font-size:0.72rem;color:#555">Crest house 3, Adani inspire business park, Adani shanti gram,</div>'
+          + '<div style="font-size:0.72rem;color:#555">Vaishnodevi circle, Gandhinagar, Gujarat, India - 382421</div>'
+        + '</div>'
+        + '<div style="text-align:right;font-size:0.72rem">'
+          + '<div><strong>GST NO:</strong> 24AADCO8527A1ZR</div>'
+          + '<div><strong>STATE CODE/NAME:</strong> 24 - GUJARAT</div>'
+        + '</div>'
+      + '</div>'
+      + '<div class="jwc-preview-title">RETURNABLE JOB WORK CHALLAN</div>'
+      + '<table class="jwc-preview-table" style="margin-bottom:10px">'
+        + '<tr>'
+          + '<td style="width:50%"><strong>Issued To:</strong><br>' + (jwc.rework_vendor || '—') + '</td>'
+          + '<td>'
+            + '<strong>Issue Date:</strong> '   + (jwc.jwc_date      || '—') + '<br>'
+            + '<strong>Challan No.:</strong> '  + (jwc.jwc_number    || '—') + '<br>'
+            + '<strong>From Department:</strong> Store<br>'
+            + '<strong>P.O #:</strong> '        + prNum + ' — ' + pr.project_name
+          + '</td>'
+        + '</tr>'
+        + '<tr>'
+          + '<td><strong>Nature of Process:</strong> ' + (jwc.process || 'For Re-work') + '</td>'
+          + '<td>'
+            + '<strong>For Process:</strong> '           + (jwc.process        || 'For Re-work') + '<br>'
+            + '<strong>Expected Duration:</strong> '     + (jwc.expected_days  || '—') + ' Days<br>'
+            + '<strong>Vehicle No.:</strong> '           + (jwc.vehicle_no     || '—')
+          + '</td>'
+        + '</tr>'
+      + '</table>'
+      + '<div class="jwc-preview-title">(continued)</div>'
+      + '<table class="jwc-preview-table">'
+        + '<thead><tr>'
+          + '<th style="width:5%">Sr.</th><th>Description of Goods</th>'
+          + '<th style="width:12%">Issued Qty.</th><th style="width:15%">Unit Rate</th><th style="width:15%">Est. Value</th>'
+        + '</tr></thead>'
+        + '<tbody>'
+          + itemRows
+          + '<tr style="font-weight:700;background:#f5f5f5">'
+            + '<td colspan="2" style="text-align:right">Total Qty. Issued</td>'
+            + '<td style="text-align:center">' + totalQty + '</td>'
+            + '<td></td>'
+            + '<td style="text-align:right">' + totalVal.toLocaleString('en-IN') + '</td>'
+          + '</tr>'
+        + '</tbody>'
+      + '</table>'
+      + '<div style="font-weight:700;margin:10px 0 4px;font-size:0.8rem;background:#eee;padding:5px 7px;border:1px solid #aaa">Goods In Details</div>'
+      + '<table class="jwc-preview-table">'
+        + '<thead><tr><th>Description of Goods (to receive)</th><th style="width:15%">Qty to Receive</th><th style="width:15%">Amount</th></tr></thead>'
+        + '<tbody>' + inRows + '</tbody>'
+      + '</table>'
+      + (jwc.notes ? '<div style="margin-top:10px;font-size:0.78rem"><strong>Remarks:</strong> ' + jwc.notes + '</div>' : '')
+      + '<div class="jwc-sig-row">'
+        + '<div class="jwc-sig-box">'
+          + '<div class="jwc-sig-label">Approved / Checked By</div>'
+          + '<div style="border-top:1px solid #aaa;padding-top:4px;font-size:0.7rem;color:#555">' + (currentUser ? currentUser.name : 'QC Inspector') + '</div>'
+        + '</div>'
+        + '<div class="jwc-sig-box">'
+          + '<div class="jwc-sig-label">Issued By</div>'
+          + '<div style="border-top:1px solid #aaa;padding-top:4px;font-size:0.7rem;color:#555">Store Manager</div>'
+        + '</div>'
+        + '<div class="jwc-sig-box">'
+          + '<div class="jwc-sig-label">Received By</div>'
+          + '<div style="border-top:1px solid #aaa;padding-top:4px;font-size:0.7rem;color:#555">&nbsp;</div>'
+        + '</div>'
+        + '<div class="jwc-sig-box">'
+          + '<div class="jwc-sig-label">Authorised Signatory</div>'
+          + '<div class="jwc-stamp"><div class="jwc-stamp-inner">AUTHORISED</div></div>'
+          + '<div style="border-top:1px solid #aaa;padding-top:4px;font-size:0.7rem;color:#555;margin-top:4px">&nbsp;</div>'
+        + '</div>'
+      + '</div>'
+      + '<div style="text-align:center;font-size:0.7rem;color:#888;margin-top:14px;border-top:1px solid #ddd;padding-top:8px">This is a computer generated copy — ProcureX | On2Cook India Pvt. Ltd.</div>'
+    + '</div>';
+
+  closeModal('prModal');
+  openModal('jwcModal');
+};
+
+// ─── Print JWC ────────────────────────────────────────────────────────────────
+window.printJWC = function printJWC() {
+  var printArea = document.getElementById('jwcPrintArea');
+  if (!printArea) return;
+  var content = printArea.innerHTML;
+
+  var w = window.open('', '_blank');
+  if (!w) { showToast('Unable to open print window', 'error'); return; }
+
+  var html = '<!DOCTYPE html><html><head><title>JWC</title>'
+    + '<style>'
+      + 'body{font-family:Arial,sans-serif;font-size:11px;margin:20px;color:#000}'
+      + 'table{width:100%;border-collapse:collapse}'
+      + 'th,td{border:1px solid #888;padding:5px 7px;font-size:11px}'
+      + 'th{background:#eee;font-weight:700;text-align:center}'
+      + '.jwc-preview-title{text-align:center;font-weight:800;font-size:14px;letter-spacing:1px;text-transform:uppercase;margin:8px 0}'
+      + '.jwc-preview-header{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:8px}'
+      + '.jwc-sig-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px;border-top:1px solid #aaa;padding-top:12px}'
+      + '.jwc-sig-box{text-align:center}'
+      + '.jwc-sig-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#555;margin-bottom:30px}'
+      + '.jwc-stamp{width:70px;height:70px;border:2.5px solid #0038a8;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:4px auto;position:relative;font-size:6px;color:#0038a8;font-weight:700;text-align:center;padding:4px}'
+      + '.jwc-stamp::before{content:"ON2COOK INDIA PVT. LTD.";position:absolute;top:6px;font-size:5.5px;letter-spacing:0.5px;font-weight:800}'
+      + '.jwc-stamp::after{content:"STORE DEPT.";position:absolute;bottom:6px;font-size:5.5px;letter-spacing:0.5px}'
+      + '.jwc-stamp-inner{font-size:7px;font-weight:800;letter-spacing:0.5px;margin-top:10px}'
+      + '@media print{body{margin:10px}}'
+    + '</style></head><body>'
+    + content
+    + '</body></html>';
+
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function(){ w.print(); }, 500);
+};
+
+// ─── Comments ─────────────────────────────────────────────────────────────────
+window.addComment = async function addComment() {
+  var input = document.getElementById('commentInput');
+  var text  = input ? input.value.trim() : '';
+  if (!text || !currentPR) return;
+  try {
+    await postComment(currentPR.id, currentUser.id, text);
+    input.value = '';
+    var c  = await loadComments(currentPR.id);
+    var el = document.getElementById('commentsList');
+    if (el) el.innerHTML = renderComments(c);
+  } catch(e) {
+    showToast('Comment failed', 'error');
+  }
+};
+
+// ─── Logout (page-level override, shared.js also defines this) ────────────────
+window.logout = function logout() {
+  Session.clear();
+  window.location.href = '../index.html';
+};
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+init();

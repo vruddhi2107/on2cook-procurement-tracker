@@ -105,7 +105,7 @@ function getPhaseBadge(phase){
     pending_initial_pm_approval:['PM Clearance','badge-orange'],
     procurement_active:['Procurement','badge-blue'],
     vendor_info_shared:['Vendor Info Shared','badge-purple'],
-    quotations_shared:['Quotes Shared','badge-purple'],
+    quotations_shared:['Engineer Verification','badge-purple'],
     pending_pm_final_approval:['PM Approval','badge-orange'],
     pending_sandy_approval:['Director Approval','badge-purple'],
     approved:['Approved','badge-green'],
@@ -141,7 +141,7 @@ function initNavbar(user) {
     }
   });
 }
-function roleLabel(r){return{master:'Master Admin',procurement_manager:'Procurement',engineer:'Engineer',project_manager:'Project Manager',accounts:'Accounts'}[r]||r;}
+function roleLabel(r){return{master:'Master Admin',procurement_manager:'Procurement',engineer:'Engineer',project_manager:'Project Manager',accounts:'Accounts',director:'Director'}[r]||r;}
 function logout(){Session.clear();window.location.href='../index.html';}
 
 window.toggleUserMenu = function toggleUserMenu(e) {
@@ -856,11 +856,16 @@ function initPartsEditor(containerId, initialParts=[]) {
 }
 const DEPT_OPTIONS = [
   {val:'',label:'— Dept —'},
-  {val:'Electronics',label:'Electronics'},
-  {val:'ID',label:'Industrial Design'},
-  {val:'Mechanical',label:'Mechanical'},
-  {val:'General Hardware',label:'General Hardware'},
-  {val:'Others',label:'Others'},
+  {val:'npd',label:'Production & Operations - NPD'},
+  {val:'electronics',label:'Production & Operations - Electronics'},
+  {val:'id',label:'Industrial Design'},
+  {val:'assembly',label:'Production & Operations - Assembly'},
+  {val:'scm_stores',label:'SCM - Stores & Logistics'},
+  {val:'service',label:'Production & Operations - Service'},
+  {val:'machine_shop',label:'Production & Operations - Machine Shop'},
+  {val:'quality',label:'Production & Operations - Quality'},
+  {val:'mech_design',label:'Mechanical Design Engineering'},
+  {val:'other',label:'Other'},
 ];
 function renderPartsEditor(containerId) {
   const c=document.getElementById(containerId); if(!c) return;

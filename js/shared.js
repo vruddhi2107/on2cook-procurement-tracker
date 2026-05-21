@@ -81,7 +81,7 @@ function openModal(id){ const m=document.getElementById(id); if(m){m.classList.a
 function closeModal(id){ const m=document.getElementById(id); if(m){m.classList.remove('active');document.body.style.overflow='';} }
 
 // ── CONSTANTS ────────────────────────────────────────────────
-var CURRENCIES = typeof CURRENCIES !== 'undefined' ? CURRENCIES : ['AED','USD','EUR','GBP','INR','SAR','OMR','KWD','QAR','BHD'];
+var CURRENCIES = typeof CURRENCIES !== 'undefined' ? CURRENCIES : ['USD','EUR','INR','RMB'];
 var SOURCING_OPTIONS = typeof SOURCING_OPTIONS !== 'undefined' ? SOURCING_OPTIONS : [{value:'domestic',label:'🏠 Domestic'},{value:'international',label:'🌍 International'}];
 var PAYMENT_TERMS_OPTIONS = typeof PAYMENT_TERMS_OPTIONS !== 'undefined' ? PAYMENT_TERMS_OPTIONS : [
   {value:'50_50',label:'50% Advance — 50% Post Delivery'},
@@ -105,12 +105,16 @@ function getPhaseBadge(phase){
     pending_initial_pm_approval:['PM Clearance','badge-orange'],
     procurement_active:['Procurement','badge-blue'],
     vendor_info_shared:['Vendor Info Shared','badge-purple'],
-    quotations_shared:['Quotes Shared','badge-purple'],
+    quotations_shared:['Engineer Verification','badge-purple'],
     pending_pm_final_approval:['PM Approval','badge-orange'],
     pending_sandy_approval:['Director Approval','badge-purple'],
     approved:['Approved','badge-green'],
     order_placed:['Order Placed','badge-blue'],
     grn_pending:['GRN / QC','badge-orange'],
+    grn_initiated:['GRN — Store','badge-orange'],
+    qc_pending:['QC Inspection','badge-orange'],
+    rework_pending:['Rework / JWC','badge-orange'],
+    rework_returned:['Rework Returned — Re-QC','badge-yellow'],
     qc_passed:['QC Passed','badge-green'],
     accepted:['Accepted & Closed','badge-green'],
     rejected:['Rejected','badge-red'],
@@ -142,7 +146,7 @@ function initNavbar(user) {
     }
   });
 }
-function roleLabel(r){return{master:'Master Admin',procurement_manager:'Procurement',engineer:'Engineer',project_manager:'Project Manager',accounts:'Accounts'}[r]||r;}
+function roleLabel(r){return{master:'Master Admin',procurement_manager:'Procurement',engineer:'Engineer',project_manager:'Project Manager',accounts:'Accounts',director:'Director'}[r]||r;}
 function logout(){Session.clear();window.location.href='../index.html';}
 
 window.toggleUserMenu = function toggleUserMenu(e) {
@@ -325,7 +329,9 @@ const WF_STEPS = [
   {key:'advance_raised_to_accounts',label:'Adv. Raised',optional:true},
   {key:'advance_payment_received',label:'Adv. Received',optional:true},
   {key:'order_placed',label:'Ordered'},
-  {key:'grn_pending',label:'GRN/QC'},
+  {key:'grn_initiated',label:'GRN→Store'},
+  {key:'qc_pending',label:'QC Check'},
+  {key:'rework_pending',label:'Rework',optional:true},
   {key:'qc_passed',label:'QC Passed'},
   {key:'payment_raised_to_accounts',label:'Pay. Raised'},
   {key:'payment_received',label:'Pay. Received'},
@@ -831,7 +837,7 @@ function openVendorEnquiry(vendor) {
   ov.classList.add('active');
 }
 
-// ── COMMENTS ────────────────────────────────────────────────
+// ── COMMENTS  
 window.loadComments = async function (prId) {
   const { data, error } = await db.from('pr_comments').select('*,users(name)').eq('pr_id', prId).order('created_at');
   if (error) { console.error("Load comments error:", error); return []; }
@@ -1020,11 +1026,16 @@ function initPartsEditor(containerId, initialParts=[]) {
 }
 const DEPT_OPTIONS = [
   {val:'',label:'— Dept —'},
-  {val:'Electronics',label:'Electronics'},
-  {val:'ID',label:'Industrial Design'},
-  {val:'Mechanical',label:'Mechanical'},
-  {val:'General Hardware',label:'General Hardware'},
-  {val:'Others',label:'Others'},
+  {val:'npd',label:'Production & Operations - NPD'},
+  {val:'electronics',label:'Production & Operations - Electronics'},
+  {val:'id',label:'Industrial Design'},
+  {val:'assembly',label:'Production & Operations - Assembly'},
+  {val:'scm_stores',label:'SCM - Stores & Logistics'},
+  {val:'service',label:'Production & Operations - Service'},
+  {val:'machine_shop',label:'Production & Operations - Machine Shop'},
+  {val:'quality',label:'Production & Operations - Quality'},
+  {val:'mech_design',label:'Mechanical Design Engineering'},
+  {val:'other',label:'Other'},
 ];
 function renderPartsEditor(containerId) {
   const c=document.getElementById(containerId); if(!c) return;

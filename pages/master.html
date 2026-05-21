@@ -53,9 +53,9 @@
         <option value="pending_initial_pm_approval">🔐 Awaiting PM Clearance</option>
         <option value="procurement_active">⚙️ Procurement Active</option>
         <option value="vendor_info_shared">🏢 Vendor Info Shared</option>
-        <option value="quotations_shared">📨 Quotations Shared</option>
-        <option value="pending_client_approval">👤 Pending Client Approval</option>
+        <option value="quotations_shared">📨 Awaiting Engineer Verification</option>
         <option value="pending_pm_final_approval">✍️ Pending PM Final Approval</option>
+        <option value="pending_sandy_approval">👤 Pending Director Approval</option>
         <option value="approved">✅ Approved</option>
         <option value="advance_requested">💳 Advance Requested</option>
         <option value="advance_approved">💳 Advance Approved</option>
@@ -69,9 +69,16 @@
       </select>
       <select id="filterDept" onchange="filterRequests()">
         <option value="">All Departments</option>
-        <option value="mech">Mechanical</option>
+        <option value="npd">Production &amp; Operations - NPD</option>
+        <option value="electronics">Production &amp; Operations - Electronics</option>
         <option value="id">Industrial Design</option>
-        <option value="electronics">Electronics</option>
+        <option value="assembly">Production &amp; Operations - Assembly</option>
+        <option value="scm_stores">SCM - Stores &amp; Logistics</option>
+        <option value="service">Production &amp; Operations - Service</option>
+        <option value="machine_shop">Production &amp; Operations - Machine Shop</option>
+        <option value="quality">Production &amp; Operations - Quality</option>
+        <option value="mech_design">Mechanical Design Engineering</option>
+        <option value="other">Other</option>
       </select>
       <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Clear</button>
     </div>
@@ -194,6 +201,20 @@
   </div>
 </div>
 
+<!-- DIRECTOR REVIEW MODAL -->
+<div class="modal-overlay" id="mainModal">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="modalTitle">Director Review</div></div>
+      <button class="modal-close" onclick="closeModal('mainModal')">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody" style="max-height:76vh;overflow-y:auto;padding:18px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('mainModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- USER MODAL -->
 <div class="modal-overlay" id="userModal">
   <div class="modal">
@@ -209,19 +230,27 @@
         <div class="form-group"><label class="form-label">Role *</label>
           <select class="form-control" id="uRole">
             <option value="">Select</option>
+            <option value="director">Director</option>
             <option value="master">Master Admin</option>
             <option value="procurement_manager">Procurement Manager</option>
             <option value="engineer">Engineer</option>
             <option value="project_manager">Project Manager</option>
-            <option value="workshop">Workshop</option>
+            <option value="accounts">Accounts</option>
           </select>
         </div>
         <div class="form-group"><label class="form-label">Department</label>
           <select class="form-control" id="uDept">
             <option value="">—</option>
-            <option value="mech">Mechanical</option>
+            <option value="npd">Production &amp; Operations - NPD</option>
+            <option value="electronics">Production &amp; Operations - Electronics</option>
             <option value="id">Industrial Design</option>
-            <option value="electronics">Electronics</option>
+            <option value="assembly">Production &amp; Operations - Assembly</option>
+            <option value="scm_stores">SCM - Stores &amp; Logistics</option>
+            <option value="service">Production &amp; Operations - Service</option>
+            <option value="machine_shop">Production &amp; Operations - Machine Shop</option>
+            <option value="quality">Production &amp; Operations - Quality</option>
+            <option value="mech_design">Mechanical Design Engineering</option>
+            <option value="other">Other</option>
           </select>
         </div>
       </div>
@@ -242,6 +271,8 @@
 <script src="../js/shared.js"></script>
 <script>
 let currentUser, allRequests=[], allUsers=[], allVendors=[], activeTab='requests', editingUserId=null, viewingPRId=null;
+Chart.defaults.animation = false;
+Chart.defaults.maintainAspectRatio = false;
 
 function handleAttachmentDownload(e, url, fileName) {
   if (!url) return;
@@ -259,8 +290,13 @@ function handleAttachmentDownload(e, url, fileName) {
   }
 }
 
+function addPhaseTimestamp(pr, newPhase) {
+  const existing = pr.phase_timestamps || {};
+  return { ...existing, [newPhase]: new Date().toISOString() };
+}
+
 async function init() {
-  currentUser=Session.require(['master']);
+  currentUser=Session.require(['master','director']);
   if(!currentUser) return;
   document.getElementById('navbarMount').innerHTML=buildNavbar(currentUser);
   document.getElementById('footerMount').innerHTML=buildFooter();
@@ -277,7 +313,7 @@ async function loadRequests() {
   allRequests=data||[];
   updateStats();
   filterRequests();
-  renderAnalytics();
+  if (activeTab === 'analytics') renderAnalytics();
 }
 
 async function loadUsers() {
@@ -312,7 +348,9 @@ function switchTab(tab) {
     if(el) el.style.display=t===tab?'':'none';
     document.querySelectorAll('.tab-btn')[i].classList.toggle('active',t===tab);
   });
-  if(tab==='analytics') renderAnalytics();
+  if(tab==='analytics') {
+    requestAnimationFrame(() => requestAnimationFrame(renderAnalytics));
+  }
   if(tab==='director') renderDirectorApprovals();
 }
 
@@ -406,20 +444,28 @@ async function deletePR() {
 // ── DIRECTOR (SANDY) APPROVAL FUNCTIONS ────────────────────
 const DIRECTOR_EMAIL = 'sandy@on2cook.com';
 
+// Phases the Director can override from any state
+const DIRECTOR_OVERRIDABLE_PHASES = [
+  'submitted','pending_initial_pm_approval','procurement_active',
+  'quotations_shared','pending_pm_final_approval','pending_sandy_approval'
+];
+
 async function renderDirectorApprovals() {
   const pending = allRequests.filter(r => r.phase === 'pending_sandy_approval');
+  const overridable = allRequests.filter(r => DIRECTOR_OVERRIDABLE_PHASES.includes(r.phase) && r.phase !== 'pending_sandy_approval');
   const tbody = document.getElementById('directorBody');
-  if (!pending.length) {
+
+  if (!pending.length && !overridable.length) {
     tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">✅</div><h3>All clear</h3><p>No requests awaiting Director approval.</p></div></td></tr>`;
     return;
   }
-  // Fetch selected quotations for these PRs
-  const prIds = pending.map(r => r.id);
+
+  const prIds = [...pending, ...overridable].map(r => r.id);
   const { data: quotations } = await db.from('pr_quotations').select('*').in('pr_id', prIds).eq('is_selected', true);
   const qMap = {};
   (quotations || []).forEach(q => { qMap[q.pr_id] = q; });
 
-  tbody.innerHTML = pending.map(r => {
+  const renderRow = (r, isEscalated) => {
     const q = qMap[r.id];
     const amt = q?.amount ? `₹${parseFloat(q.amount).toLocaleString('en-IN')}` : '—';
     const vendor = q?.vendor_name || '—';
@@ -431,15 +477,26 @@ async function renderDirectorApprovals() {
       <td><strong style="color:#7c3aed">${amt}</strong></td>
       <td style="font-size:0.78rem;color:var(--gray-3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.pm_final_approval_notes||'—'}</td>
       <td style="font-size:0.78rem">${fmtDate(r.created_at)}</td>
-      <td><button class="btn btn-primary btn-sm" onclick='openDirectorModal("${r.id}")'>Review</button></td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick='openDirectorModal("${r.id}")'>Review</button>
+        ${!isEscalated ? `<button class="btn btn-ghost btn-sm" style="font-size:0.7rem;padding:2px 7px;color:#7c3aed;border-color:#7c3aed44" onclick='openDirectorModal("${r.id}",true)'>⚡ Override</button>` : ''}
+      </td>
     </tr>`;
-  }).join('');
+  };
+
+  let rows = pending.map(r => renderRow(r, true));
+  if (overridable.length) {
+    rows.push(`<tr><td colspan="8" style="padding:8px 12px;background:#f8f7ff;font-size:0.75rem;font-weight:600;color:#7c3aed;letter-spacing:0.04em">⚡ DIRECTOR OVERRIDE — All Active Requests</td></tr>`);
+    rows = rows.concat(overridable.map(r => renderRow(r, false)));
+  }
+  tbody.innerHTML = rows.join('');
 }
 
-let directorCurrentPR = null, directorQuotations = [];
+let directorCurrentPR = null, directorQuotations = [], directorIsOverride = false;
 
-async function openDirectorModal(prId) {
+async function openDirectorModal(prId, isOverride = false) {
   directorCurrentPR = allRequests.find(r => r.id === prId);
+  directorIsOverride = !!isOverride;
   if (!directorCurrentPR) return;
   showLoader(true);
   const { data: quotations } = await db.from('pr_quotations').select('*').eq('pr_id', prId).order('created_at');
@@ -448,14 +505,21 @@ async function openDirectorModal(prId) {
   showLoader(false);
 
   const amt = selectedQ?.amount ? `₹${parseFloat(selectedQ.amount).toLocaleString('en-IN')}` : '—';
-  document.getElementById('modalTitle').textContent = `Director Review — PR-${String(directorCurrentPR.request_number).padStart(4,'0')}`;
+  const prLabel = `PR-${String(directorCurrentPR.request_number).padStart(4,'0')}`;
+
+  const headerLabel = directorIsOverride
+    ? `<div class="action-section-title" style="color:#7c3aed">⚡ Director Override — ${prLabel} <span class="action-badge" style="background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35">OVERRIDE MODE</span></div>
+       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">As Director, you can approve or reject this request at any stage, bypassing the standard workflow.</p>`
+    : `<div class="action-section-title" style="color:#7c3aed">👤 Director Approval Required <span class="action-badge" style="background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35">ESCALATED</span></div>
+       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Engineer verified this quotation and the amount <strong>${amt}</strong> meets or exceeds the PM limit of ₹5,000. Your approval is required to proceed.</p>`;
+
+  document.getElementById('modalTitle').textContent = `Director Review — ${prLabel}`;
   document.getElementById('modalBody').innerHTML = `
     <div style="margin-bottom:16px">
       ${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {})}
     </div>
     <div class="action-section" style="border-color:#7c3aed33;background:rgba(124,58,237,0.04)">
-      <div class="action-section-title" style="color:#7c3aed">👤 Director Approval Required <span class="action-badge" style="background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35">ESCALATED</span></div>
-      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">PM approved this request but amount <strong>${amt}</strong> exceeds the PM limit of ₹5,000. Your approval is required to proceed.</p>
+      ${headerLabel}
       ${selectedQ ? `<div style="margin-bottom:14px;padding:12px;background:#fafafa;border:1px solid var(--border);border-radius:var(--radius)">
         <div class="detail-key" style="margin-bottom:6px">Selected Quotation</div>
         <div style="font-size:0.85rem"><strong>${selectedQ.vendor_name||'Unknown vendor'}</strong> — ${amt}${selectedQ.lead_time_days?` · ${selectedQ.lead_time_days} days lead time`:''}</div>
@@ -478,17 +542,18 @@ async function directorDecision(decision) {
   if (!notes) { showToast('Please add decision notes', 'error'); return; }
   showLoader(true);
   const newPhase = decision === 'approved' ? 'approved' : 'rejected';
+  const overrideTag = directorIsOverride ? ' [Director Override]' : '';
   const { error } = await db.from('procurement_requests').update({
     phase: newPhase,
     pm_final_approval_status: decision,
-    pm_final_approval_notes: (directorCurrentPR.pm_final_approval_notes||'') + ` | Director: ${notes}`,
+    pm_final_approval_notes: ((directorCurrentPR.pm_final_approval_notes||'') + ` | Director${overrideTag}: ${notes}`).trim(),
     rejection_reason: decision === 'rejected' ? notes : null,
     updated_at: new Date().toISOString(),
     phase_timestamps: addPhaseTimestamp(directorCurrentPR, newPhase)
   }).eq('id', directorCurrentPR.id);
   notifyPhaseChange(directorCurrentPR.id, newPhase, currentUser?.id);
   if (!error) await postComment(directorCurrentPR.id, currentUser.id,
-    `${decision==='approved'?'✅':'❌'} Director ${decision==='approved'?'Approved':'Rejected'}: ${notes}`);
+    `${decision==='approved'?'✅':'❌'} Director${overrideTag} ${decision==='approved'?'Approved':'Rejected'}: ${notes}`);
   showLoader(false);
   if (error) { showToast('Error: ' + error.message, 'error'); return; }
   showToast(decision === 'approved' ? '✅ Director approved — procurement may place the order.' : '❌ Rejected by Director.', decision === 'approved' ? 'success' : 'error');
@@ -588,16 +653,16 @@ function renderAnalytics() {
   });
 
   // ── Chart 2: Department (donut) ───────────────────────────
-  const deptMap = {mech:0,id:0,electronics:0};
+  const deptMap = {npd:0,electronics:0,id:0,assembly:0,scm_stores:0,service:0,machine_shop:0,quality:0,mech_design:0,mech:0,other:0};
   reqs.forEach(r=>{ if(deptMap[r.department]!==undefined) deptMap[r.department]++; });
   const deptCanvas = document.getElementById('chartDept');
   deptCanvas._chart = new Chart(deptCanvas, {
     type:'doughnut',
     data:{
-      labels:['Mechanical','Industrial Design','Electronics'],
-      datasets:[{data:[deptMap.mech,deptMap.id,deptMap.electronics],
-        backgroundColor:['#E02020CC','#3b82f6CC','#10b981CC'],
-        borderColor:['#E02020','#3b82f6','#10b981'],
+      labels:['P&O - NPD','P&O - Electronics','Industrial Design','P&O - Assembly','SCM - Stores','P&O - Service','Machine Shop','Quality','Mech Design','Other','Legacy-Mech'],
+      datasets:[{data:[deptMap.npd,deptMap.electronics,deptMap.id,deptMap.assembly,deptMap.scm_stores,deptMap.service,deptMap.machine_shop,deptMap.quality,deptMap.mech_design,deptMap.other,deptMap.mech],
+        backgroundColor:['#6366f1CC','#10b981CC','#f59e0bCC','#3b82f6CC','#8b5cf6CC','#ec4899CC','#14b8a6CC','#f97316CC','#22c55eCC','#6b7280CC','#E02020CC'],
+        borderColor:['#6366f1','#10b981','#f59e0b','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#22c55e','#6b7280','#E02020'],
         borderWidth:2, hoverOffset:6}]
     },
     options:{

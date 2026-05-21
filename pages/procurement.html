@@ -244,7 +244,9 @@
         <option value="procurement_active">Procurement Active</option>
         <option value="approved">Approved — to Order</option>
         <option value="order_placed">Order Placed</option>
-        <option value="grn_pending">GRN Pending</option>
+        <option value="grn_initiated">GRN Initiated (Store)</option>
+        <option value="qc_pending">QC Pending</option>
+        <option value="rework_pending">Rework / JWC</option>
         <option value="qc_passed">QC Passed</option>
         <option value="accepted">Accepted</option>
         <option value="rejected">Rejected</option>
@@ -572,7 +574,7 @@ async function loadVendors() {
 function updateStats() {
   document.getElementById('sActive').textContent=allRequests.filter(r=>r.phase==='procurement_active').length;
   document.getElementById('sOrders').textContent=allRequests.filter(r=>r.phase==='approved').length;
-  document.getElementById('sGRN').textContent=allRequests.filter(r=>r.phase==='grn_pending').length;
+  document.getElementById('sGRN').textContent=allRequests.filter(r=>['grn_initiated','qc_pending','rework_pending'].includes(r.phase)).length;
 }
 
 function switchTab(t) {
@@ -589,7 +591,7 @@ function clearFilters(){document.getElementById('searchInput').value='';document
 function filterTable(){
   const s=document.getElementById('searchInput').value.toLowerCase();
   const ph=document.getElementById('filterPhase').value;
-  const actionPhases=['procurement_active','approved','advance_requested','grn_pending','qc_passed'];
+  const actionPhases=['procurement_active','approved','advance_requested','grn_initiated','qc_pending','rework_pending','qc_passed'];
   let reqs=allRequests;
   if(activeTab==='active') reqs=reqs.filter(r=>actionPhases.includes(r.phase));
   if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
@@ -601,8 +603,8 @@ function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
   if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>${activeTab==='active'?'All caught up!':'No requests'}</h3></div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
-    const needsAction=['procurement_active','approved','grn_pending','qc_passed'].includes(r.phase);
-    const lbl={procurement_active:'Work on it',approved:'Place Order',advance_requested:'View Advance',grn_pending:'Invoke GRN',qc_passed:'Payment Req'}[r.phase]||'View';
+    const needsAction=['procurement_active','approved','grn_initiated','qc_pending','rework_pending','qc_passed'].includes(r.phase);
+    const lbl={procurement_active:'Work on it',approved:'Place Order',advance_requested:'View Advance',grn_initiated:'GRN Sent to Store',qc_pending:'QC In Progress',rework_pending:'Rework Out',qc_passed:'Payment Req'}[r.phase]||'View';
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
       <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
       <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase||''}</div></td>
@@ -835,17 +837,32 @@ async function openPR(id) {
   if(currentPR.phase==='order_placed') {
     actionSection=`<div class="action-section">
       <div class="action-section-title">📦 Invoke GRN <span class="action-badge">ACTION REQUIRED</span></div>
-      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Once goods have arrived, invoke GRN to notify the engineer for QC.</p>
-      <button class="btn btn-primary" onclick="invokeGRN()">Goods Received — Notify Engineer for QC →</button>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Once goods have arrived at the warehouse, invoke GRN to notify the Store Manager (Hrithik) for goods receipt.</p>
+      <button class="btn btn-primary" onclick="invokeGRN()">Goods Arrived — Notify Store Manager →</button>
     </div>`;
   }
 
-  // ── GRN PENDING ──
-  if(currentPR.phase==='grn_pending'&&currentPR.assigned_vendor_id) {
+  // ── GRN INITIATED (waiting for store manager) ──
+  if(currentPR.phase==='grn_initiated') {
     actionSection=`<div class="action-section">
-      <div class="action-section-title">📦 GRN in Progress</div>
-      <p style="font-size:0.82rem;color:var(--gray-3)">Waiting for engineer to complete QC.</p>
-      <button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="openRateModal('${currentPR.id}','${currentPR.assigned_vendor_id}')">⭐ Rate Vendor</button>
+      <div class="action-section-title">📦 GRN — Awaiting Store Manager</div>
+      <p style="font-size:0.82rem;color:var(--gray-3)">Store Manager (Hrithik) has been notified to receive goods and complete the GRN.</p>
+    </div>`;
+  }
+
+  // ── QC PENDING (store done, waiting for QC) ──
+  if(currentPR.phase==='qc_pending') {
+    actionSection=`<div class="action-section">
+      <div class="action-section-title">🔍 QC Inspection in Progress</div>
+      <p style="font-size:0.82rem;color:var(--gray-3)">Store GRN is complete. QC Inspector (Aditya) is performing quality check.</p>
+    </div>`;
+  }
+
+  // ── REWORK PENDING ──
+  if(currentPR.phase==='rework_pending') {
+    actionSection=`<div class="action-section" style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius);padding:14px">
+      <div class="action-section-title" style="color:#b45309">🔄 Rework / JWC Out</div>
+      <p style="font-size:0.82rem;color:var(--gray-3)">QC failed — Job Work Challan has been raised. Goods sent for rework. Awaiting return for re-inspection.</p>
     </div>`;
   }
 
@@ -1007,7 +1024,7 @@ async function declinePR() {
 // ── QUOTATION UPLOAD ──────────────────────────────────────────
 function buildQuoteFieldsHTML() {
   if(!uploadedFiles.length) return '<div id="quoteFieldsContainer"></div>';
-  const allV=allVendors;
+  const allV = allVendors;
   return `<div id="quoteFieldsContainer" style="margin-top:14px">
     <div class="form-label" style="margin-bottom:8px">Quotation Details — select a vendor per file</div>
     ${uploadedFiles.map((f,i)=>`
@@ -1027,17 +1044,58 @@ function buildQuoteFieldsHTML() {
           <div class="form-group">
             <label class="form-label">Amount</label>
             <div class="currency-amount-wrap">
-              <select class="form-control currency-select" id="qcur-${i}">
+              <select class="form-control currency-select" id="qcur-${i}" onchange="onQuoteCurrencyChange(${i})">
                 ${CURRENCIES.map(cur=>`<option value="${cur}" ${cur==='INR'?'selected':''}>${cur}</option>`).join('')}
               </select>
-              <input class="form-control currency-input" id="qamt-${i}" type="number" placeholder="0.00"/>
+              <input class="form-control currency-input" id="qamt-${i}" type="number" placeholder="0.00" oninput="calcQuoteINR(${i})"/>
             </div>
           </div>
           <div class="form-group"><label class="form-label">Lead Time (days)</label><input class="form-control" id="qlt-${i}" type="number" placeholder="7"/></div>
+
+          <!-- Exchange rate row — hidden by default, shown for non-INR -->
+          <div class="form-group full" id="qfxrow-${i}" style="display:none">
+            <label class="form-label">Exchange Rate</label>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:0.78rem;color:var(--gray-3);white-space:nowrap">1 <strong id="qfxlabel-${i}"></strong> =</span>
+              <input class="form-control" id="qfxrate-${i}" type="number" placeholder="e.g. 83.50" style="width:110px" oninput="calcQuoteINR(${i})"/>
+              <span style="font-size:0.78rem;color:var(--gray-3)">INR</span>
+              <div id="qinr-${i}" style="display:none;margin-left:6px;padding:4px 12px;background:rgba(22,163,74,0.07);border:1px solid rgba(22,163,74,0.25);border-radius:5px;font-family:var(--font-mono);font-size:0.82rem;font-weight:700;color:#16a34a;white-space:nowrap"></div>
+            </div>
+            <div style="font-size:0.68rem;color:var(--gray-4);margin-top:3px">INR equivalent will be saved in notes for reference.</div>
+          </div>
+
           <div class="form-group full"><label class="form-label">Notes</label><input class="form-control" id="qnote-${i}" placeholder="Any notes..."/></div>
         </div>
       </div>`).join('')}
   </div>`;
+}
+
+function onQuoteCurrencyChange(i) {
+  const cur = document.getElementById(`qcur-${i}`)?.value || 'INR';
+  const fxRow   = document.getElementById(`qfxrow-${i}`);
+  const fxLabel = document.getElementById(`qfxlabel-${i}`);
+  if (fxRow)   fxRow.style.display   = cur !== 'INR' ? 'flex' : 'none';
+  if (fxLabel) fxLabel.textContent   = cur;
+  // Reset INR display when switching back
+  const inrEl = document.getElementById(`qinr-${i}`);
+  if (inrEl) { inrEl.style.display = 'none'; inrEl.textContent = ''; }
+  calcQuoteINR(i);
+}
+
+function calcQuoteINR(i) {
+  const cur     = document.getElementById(`qcur-${i}`)?.value || 'INR';
+  const amt     = parseFloat(document.getElementById(`qamt-${i}`)?.value) || 0;
+  const fxRate  = parseFloat(document.getElementById(`qfxrate-${i}`)?.value) || 0;
+  const inrEl   = document.getElementById(`qinr-${i}`);
+  if (!inrEl) return;
+  if (cur === 'INR' || !amt || !fxRate) {
+    inrEl.style.display = 'none';
+    inrEl.textContent = '';
+    return;
+  }
+  const inrAmt = amt * fxRate;
+  inrEl.style.display = 'inline-block';
+  inrEl.textContent = `≈ ₹ ${inrAmt.toLocaleString('en-IN', {minimumFractionDigits:2})}`;
 }
 
 function handleDrop(e){e.preventDefault();document.getElementById('quoteDZ').classList.remove('dragover');handleQuoteFiles({target:{files:e.dataTransfer.files}});}
@@ -1101,13 +1159,24 @@ async function shareQuotations() {
       const ltEl = document.getElementById(`qlt-${i}`);
       const noteEl = document.getElementById(`qnote-${i}`);
       const curEl = document.getElementById(`qcur-${i}`);
+
+      const fxRateEl = document.getElementById(`qfxrate-${i}`);
+      const fxRate   = fxRateEl ? (parseFloat(fxRateEl.value) || null) : null;
+      const origAmt  = amtEl?.value ? parseFloat(amtEl.value) : null;
+      const cur      = curEl?.value || 'INR';
+
+      const baseNote  = noteEl?.value ? noteEl.value.trim() : null;
+      const fxNote    = (cur !== 'INR' && origAmt && fxRate)
+        ? `[FX: ${cur} ${origAmt.toLocaleString()} × ${fxRate} = ₹ ${(origAmt*fxRate).toLocaleString('en-IN', {minimumFractionDigits:2})}]`
+        : null;
+      const finalNote = [baseNote, fxNote].filter(Boolean).join(' — ') || null;
       await db.from('pr_quotations').insert({
         pr_id: currentPR.id, vendor_id: vendorId, vendor_name: vendorName,
         file_name: f.name, file_url: f.data, file_type: f.type,
         amount: amtEl?.value ? parseFloat(amtEl.value) : null,
         currency: curEl?.value || 'INR',
         lead_time_days: ltEl?.value ? parseInt(ltEl.value) : null,
-        notes: noteEl?.value ? noteEl.value.trim() : null,
+        notes: finalNote,
         uploaded_by: currentUser?.id || null
       });
     }
@@ -1266,15 +1335,15 @@ async function invokeGRN() {
   if (!currentPR) return;
   showLoader(true);
   const { error } = await db.from('procurement_requests').update({
-    phase:'grn_pending', updated_at:new Date().toISOString(), phase_timestamps:addPhaseTimestamp(currentPR,'grn_pending')
+    phase:'grn_initiated', updated_at:new Date().toISOString(), phase_timestamps:addPhaseTimestamp(currentPR,'grn_initiated')
   }).eq('id',currentPR.id);
-  notifyPhaseChange(currentPR.id,'grn_pending',currentUser?.id);
+  notifyPhaseChange(currentPR.id,'grn_initiated',currentUser?.id);
   if (!error) {
-    await window.postComment(currentPR.id, currentUser?.id, '📦 Goods received — engineer notified for QC.');
+    await window.postComment(currentPR.id, currentUser?.id, '📦 GRN invoked — Store Manager notified to receive goods.');
   }
   showLoader(false);
   if (error) { showToast('Error: '+error.message,'error'); return; }
-  showToast('GRN invoked!','success');
+  showToast('GRN invoked — Store Manager notified!','success');
   closeModal('prModal'); await loadRequests();
 }
 
@@ -1309,7 +1378,7 @@ async function openPOModal(prId) {
   const now=new Date();
   const fy=now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;
   const fyShort=`${String(fy).slice(2)}-${String(fy+1).slice(2)}`;
-  const poNumber=`IIIPO/${fyShort}/${String(pr.request_number).padStart(4,'0')}`;
+  const poNumber=`O2C/PO/${fyShort}/${String(pr.request_number).padStart(4,'0')}`;
   const todayStr=now.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/');
   const deliveryDate=selectedQ?.lead_time_days
     ? new Date(Date.now()+selectedQ.lead_time_days*86400000).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/')
@@ -1332,7 +1401,9 @@ async function openPOModal(prId) {
   const logoSrc=savedLogo||'../on2cooklogo-bg.png';
   const sigSrc=savedSig||'../stamp.png';
 
-  const defaultTermsHTML=`- <strong>Packing :</strong> Goods must be packed in new containers with clear markings for content, gross weight, tare weight, net weight, and hazard info. We will reject goods that don't meet these packing requirements.
+  const defaultTermsHTML=`- <strong>Terms &amp; Conditions :</strong>
+- <strong>Quality :</strong> Supply of goods under this purchase order should be as per our agreed specifications and approved samples. Any change in supplier production process with respect to change in raw material &amp; additives that can change specification (or other technical parameters not appearing on specifications), should be notified to ON2COOK and prior consent should be taken before supply.
+- <strong>Packing :</strong> Goods must be packed in new containers with clear markings for content, gross weight, tare weight, net weight, and hazard information. We will reject goods that do not meet these packing requirements.
 - <strong>Delivery :</strong> Goods should be delivered at the desired destination between 9 AM to 5 PM. We shall allow the delivery of the vehicle inside our premises at any time, but unloading of goods is as per Instructions.
 - <strong>Payment :</strong> This will be according to the terms mentioned in the Purchase Order.
 - <strong>Weight &amp; Purity :</strong> Both the parameters should be in accordance with the order form. Any difference in weight or purity will be calculated to achieve the real quantity supplied and payment shall be made on this real quantity.
@@ -1390,14 +1461,14 @@ async function openPOModal(prId) {
       <div class="po-addr-grid" style="border-top:1px solid #999">
         <div class="po-addr-cell">
           <div class="cell-head">Name and Address of Buyer :</div>
-          <div class="company-name">INVENTINDIA INNOVATIONS PVT. LTD.</div>
+          <div class="company-name">ON2COOK INDIA PVT. LTD.</div>
           Ch03, Inspire Business Park,<br/>
           Adani Shantigram, Near Vaishnodevi Circle, Gandhinagar,<br/>
           Ahmedabad (Gujarat) India - 382421<br/>
           GSTIN : 24AACCI7644H1ZK<br/>
-          Contact Person: Jaimin Prajapati<br/>
-          Email: Jaimin.p@inventindia.com<br/>
-          Contact No.: 9924077107<br/>
+          Contact Person: Charmi Shah<br/>
+          Email: charmi@on2cook.com<br/>
+          Contact No.: 7227029540<br/>
           Place of Supply: Gujarat.India
         </div>
         <div class="po-addr-cell">
@@ -1408,7 +1479,7 @@ async function openPOModal(prId) {
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Payment Terms :</td><td>${ptLabel}</td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Terms :</td><td>NA</td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Mode of Transport :</td><td>NA</td></tr>
-            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Final Destination :</td><td>Inventindia</td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Final Destination :</td><td>On2Cook</td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Quote Ref :</td><td><input class="po-meta-input" id="poQuoteRef" placeholder="—"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Indent Number :</td><td><input class="po-meta-input" id="poIndent" value="NA"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Project Code/Name :</td><td><input class="po-meta-input" id="poProjectCode" value="${pr.project_name||'NA'}"/></td></tr>
@@ -1432,14 +1503,14 @@ async function openPOModal(prId) {
         </div>
         <div class="po-addr-cell">
           <div class="cell-head">Shipping Details :</div>
-          <div class="company-name">INVENTINDIA INNOVATIONS PVT. LTD.</div>
-          Ch03, Inspire Business Park,<br/>
-          Adani Shantigram, Ahmedabad (Gujarat) India - 382421<br/>
-          GSTIN : 24AACC17644H1ZK<br/>
-          Contact Person: Jaimin Prajapati<br/>
-          Email: Jaimin.p@inventindia.com<br/>
-          Contact No.: 9924077107<br/>
-          Place of Supply: Gujarat.India
+          <input class="po-meta-input" id="shippingCompany" value="ON2COOK INDIA PVT. LTD." style="font-weight:700;margin-bottom:4px;width:100%;box-sizing:border-box"/><br/>
+          <input class="po-meta-input" id="shippingAddress1" value="Ch03, Inspire Business Park," style="width:100%;box-sizing:border-box"/><br/>
+          <input class="po-meta-input" id="shippingAddress2" value="Adani Shantigram, Ahmedabad (Gujarat) India - 382421" style="width:100%;box-sizing:border-box"/><br/>
+          GSTIN : <input class="po-meta-input" id="shippingGSTIN" value="24AACC17644H1ZK" style="width:calc(100% - 60px);box-sizing:border-box"/><br/>
+          Contact Person: <input class="po-meta-input" id="shippingContact" value="Charmi Shah" style="width:calc(100% - 120px);box-sizing:border-box"/><br/>
+          Email: <input class="po-meta-input" id="shippingEmail" value="charmi@on2cook.com" style="width:calc(100% - 50px);box-sizing:border-box"/><br/>
+          Contact No.: <input class="po-meta-input" id="shippingPhone" value="7227029540" style="width:calc(100% - 100px);box-sizing:border-box"/><br/>
+          Place of Supply: <input class="po-meta-input" id="shippingPlace" value="Gujarat.India" style="width:calc(100% - 130px);box-sizing:border-box"/>
         </div>
       </div>
 
@@ -1469,15 +1540,7 @@ async function openPOModal(prId) {
 
         <div class="po-left-bottom">
           <!-- Bank Details -->
-          <div class="bank-section">
-            <div style="font-weight:700;font-size:0.71rem;margin-bottom:5px">Bank Details:</div>
-            <table style="width:100%">
-              <tr><td>Account Holder Name</td><td>: Inventindia Innovations Private Limited</td></tr>
-              <tr><td>Bank Name</td><td>: ICICI Bank</td></tr>
-              <tr><td>A/C No</td><td>: 461105000085</td></tr>
-              <tr><td>IFCS Code</td><td>: ICIC0004611</td></tr>
-            </table>
-          </div>
+          
           <!-- Terms & Conditions (editable) -->
           <div class="po-terms-section">
             <div class="terms-head">Terms &amp; Conditions:</div>
