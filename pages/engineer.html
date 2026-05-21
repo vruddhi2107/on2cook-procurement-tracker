@@ -882,7 +882,20 @@ async function submitEngineerVerification() {
   if(!selectedQ){showToast('Selected quotation not found','error');return;}
 
   const amount = parseFloat(selectedQ.amount || 0);
-  const needsDirector = amount >= ENGINEER_APPROVAL_LIMIT;
+  // Compute INR equivalent for threshold check.
+  // Prefer the stored inr_amount column (set by procurement when uploading).
+  // Fall back to parsing the FX rate from the notes string for older records.
+  let amountINR = amount;
+  if (selectedQ.currency && selectedQ.currency !== 'INR') {
+    if (selectedQ.inr_amount) {
+      amountINR = parseFloat(selectedQ.inr_amount);
+    } else {
+      const fxMatch = selectedQ.notes && selectedQ.notes.match(/×\s*([\d.]+)\s*=/);
+      const fxRate = fxMatch ? parseFloat(fxMatch[1]) : 0;
+      if (fxRate > 0) amountINR = amount * fxRate;
+    }
+  }
+  const needsDirector = amountINR >= ENGINEER_APPROVAL_LIMIT;
   const newPhase = needsDirector ? 'pending_sandy_approval' : 'pending_pm_final_approval';
 
   showLoader(true);
@@ -901,14 +914,17 @@ async function submitEngineerVerification() {
 
   if(!error){
     const routedTo = needsDirector ? 'Director (amount ≥ ₹5,000)' : 'Project Manager';
+    const amtDisplay = selectedQ.currency && selectedQ.currency !== 'INR'
+      ? `${selectedQ.currency} ${amount.toLocaleString()} ≈ ₹${amountINR.toLocaleString('en-IN')}`
+      : `₹${amountINR.toLocaleString('en-IN')}`;
     await postComment(currentPR.id, currentUser.id,
-      `✅ Engineer verified quotation from ${selectedQ.vendor_name||'vendor'} (₹${amount.toLocaleString('en-IN')}). Forwarded to ${routedTo}.`);
+      `✅ Engineer verified quotation from ${selectedQ.vendor_name||'vendor'} (${amtDisplay}). Forwarded to ${routedTo}.`);
     notifyPhaseChange(currentPR.id, newPhase, currentUser?.id);
   }
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
   showToast(needsDirector
-    ? `⬆️ Amount ₹${amount.toLocaleString('en-IN')} ≥ ₹5,000 — forwarded to Director for approval.`
+    ? `⬆️ Amount ${amtDisplay} ≥ ₹5,000 — forwarded to Director for approval.`
     : `✅ Verified — forwarded to Project Manager.`,'success');
   selectedQuotationId=null;
   closeModal('prModal');await loadRequests();

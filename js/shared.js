@@ -47,18 +47,44 @@ function _safePreview(url, name) {
   // Fallback: inline modal (for pages without the full preview engine)
   const isImg = /\.(png|jpe?g|gif|webp)$/i.test(name) || url.startsWith('data:image');
   const isPDF = /\.pdf$/i.test(name) || url.startsWith('data:application/pdf');
+
+  // Browsers block base64 data URIs inside iframes (blank page / CSP violation).
+  // Convert to a real Blob URL so the PDF viewer works.
+  let pdfSrc = url;
+  let blobUrlToRevoke = null;
+  if (isPDF && url.startsWith('data:')) {
+    try {
+      const arr = url.split(','), mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]); let n = bstr.length; const u8 = new Uint8Array(n);
+      while (n--) u8[n] = bstr.charCodeAt(n);
+      pdfSrc = URL.createObjectURL(new Blob([u8], {type: mime}));
+      blobUrlToRevoke = pdfSrc;
+    } catch(e) { /* fall back to data URI */ }
+  }
+
   const o = document.createElement('div');
   o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px';
   const inner = isImg
     ? `<div style="max-width:90vw;max-height:85vh;overflow:auto;border-radius:10px;background:white;padding:4px"><img src="${url}" style="max-width:100%;display:block;border-radius:8px" alt="${name}"/></div>`
     : isPDF
-    ? `<div style="width:84vw;height:82vh;border-radius:10px;overflow:hidden;background:white"><iframe src="${url}" style="width:100%;height:100%;border:none" title="${name}"></iframe></div>`
+    ? `<div style="width:84vw;height:82vh;border-radius:10px;overflow:hidden;background:white"><iframe src="${pdfSrc}" style="width:100%;height:100%;border:none" title="${name}"></iframe></div>`
     : `<div style="padding:48px;background:white;border-radius:10px;text-align:center;color:#6b7280"><div style="font-size:3rem;margin-bottom:12px">📄</div><div style="font-weight:600">${name}</div><div style="font-size:0.8rem;margin-top:8px">Preview not available</div></div>`;
   o.innerHTML = inner + `<div style="display:flex;gap:10px;margin-top:14px">
-    <button style="background:white;border:none;padding:8px 22px;border-radius:6px;font-weight:600;cursor:pointer" onclick="_safeDownload(_fileRegistry[${_fileRegistry.length}]?.url,_fileRegistry[${_fileRegistry.length}]?.name)">⬇ Download</button>
+    <button style="background:white;border:none;padding:8px 22px;border-radius:6px;font-weight:600;cursor:pointer" id="_previewDlBtn">⬇ Download</button>
     <button style="background:white;border:none;padding:8px 22px;border-radius:6px;font-weight:600;cursor:pointer" onclick="this.closest('[style*=fixed]').remove()">✕ Close</button>
   </div>`;
-  o.onclick = e => { if(e.target===o) o.remove(); };
+  // Wire download button via closure — avoids stale registry-index bug
+  o.querySelector('#_previewDlBtn').addEventListener('click', () => _safeDownload(url, name));
+  o.onclick = e => {
+    if (e.target === o) {
+      if (blobUrlToRevoke) URL.revokeObjectURL(blobUrlToRevoke);
+      o.remove();
+    }
+  };
+  // Revoke blob URL when Close button is clicked too
+  o.querySelector('[onclick*="remove"]')?.addEventListener('click', () => {
+    if (blobUrlToRevoke) URL.revokeObjectURL(blobUrlToRevoke);
+  });
   document.body.appendChild(o);
 }
 

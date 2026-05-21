@@ -1175,6 +1175,8 @@ async function shareQuotations() {
         file_name: f.name, file_url: f.data, file_type: f.type,
         amount: amtEl?.value ? parseFloat(amtEl.value) : null,
         currency: curEl?.value || 'INR',
+        fx_rate: (cur !== 'INR' && fxRate) ? fxRate : null,
+        inr_amount: (cur !== 'INR' && origAmt && fxRate) ? origAmt * fxRate : (origAmt || null),
         lead_time_days: ltEl?.value ? parseInt(ltEl.value) : null,
         notes: finalNote,
         uploaded_by: currentUser?.id || null

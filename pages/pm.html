@@ -320,13 +320,26 @@ async function finalDecision(decision) {
 
   // ── Engineer already selected the quote; just read it ────
   let selectedAmount = 0;
+  let selectedAmountINR = 0;
+  let selectedQ = null;
   if(decision==='approved') {
-    const selectedQ = prQuotations.find(q=>q.id===currentPR.selected_quotation_id) || prQuotations.find(q=>q.is_selected);
+    selectedQ = prQuotations.find(q=>q.id===currentPR.selected_quotation_id) || prQuotations.find(q=>q.is_selected);
     selectedAmount = parseFloat(selectedQ?.amount || 0);
+    // Compute INR equivalent: prefer stored inr_amount, fall back to parsing notes
+    selectedAmountINR = selectedAmount;
+    if (selectedQ?.currency && selectedQ.currency !== 'INR') {
+      if (selectedQ.inr_amount) {
+        selectedAmountINR = parseFloat(selectedQ.inr_amount);
+      } else {
+        const fxMatch = selectedQ.notes && selectedQ.notes.match(/×\s*([\d.]+)\s*=/);
+        const fxRate = fxMatch ? parseFloat(fxMatch[1]) : 0;
+        if (fxRate > 0) selectedAmountINR = selectedAmount * fxRate;
+      }
+    }
   }
 
-  // ── Escalate to Director if amount >= ₹5,000 ─────────────
-  const needsDirectorApproval = decision==='approved' && selectedAmount >= PM_APPROVAL_LIMIT;
+  // ── Escalate to Director if INR-equivalent amount >= ₹5,000 ─────────────
+  const needsDirectorApproval = decision==='approved' && selectedAmountINR >= PM_APPROVAL_LIMIT;
 
   let newPhase;
   if(decision==='rejected') newPhase='rejected';
@@ -347,8 +360,12 @@ async function finalDecision(decision) {
   notifyPhaseChange(currentPR.id,newPhase,currentUser?.id);
 
   let commentText;
-  if(needsDirectorApproval)
-    commentText=`⬆️ Escalated to Director for approval — amount ₹${selectedAmount.toLocaleString('en-IN')} meets/exceeds PM limit of ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}. PM notes: ${notes}`;
+  if(needsDirectorApproval) {
+    const amtDisplay = selectedQ?.currency && selectedQ.currency !== 'INR'
+      ? `${selectedQ.currency} ${selectedAmount.toLocaleString()} ≈ ₹${selectedAmountINR.toLocaleString('en-IN')}`
+      : `₹${selectedAmountINR.toLocaleString('en-IN')}`;
+    commentText=`⬆️ Escalated to Director for approval — amount ${amtDisplay} meets/exceeds PM limit of ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}. PM notes: ${notes}`;
+  }
   else if(decision==='approved')
     commentText=`✅ PM Final Approved: ${notes}`;
   else
@@ -359,7 +376,7 @@ async function finalDecision(decision) {
   if(error){showToast('Error: '+error.message,'error');return;}
 
   if(needsDirectorApproval)
-    showToast(`⬆️ Amount ₹${selectedAmount.toLocaleString('en-IN')} meets/exceeds ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')} — escalated to Director.`,'info');
+    showToast(`⬆️ Amount ₹${selectedAmountINR.toLocaleString('en-IN')} meets/exceeds ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')} — escalated to Director.`,'info');
   else
     showToast(decision==='approved'?'✅ Approved! Procurement may now place the order.':needsMoreVendors?'Rejected — Procurement will find more vendors.':'Rejected — request closed.',decision==='approved'?'success':'error');
   closeModal('prModal'); await loadRequests();
