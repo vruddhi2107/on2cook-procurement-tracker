@@ -67,6 +67,10 @@ function updateStats() {
   document.getElementById('sQcPending').textContent = allRequests.filter(function(r){ return r.phase === 'qc_pending' || r.phase === 'rework_returned'; }).length;
   document.getElementById('sQcPassed').textContent  = allRequests.filter(function(r){ return r.phase === 'qc_passed' || r.phase === 'accepted'; }).length;
   document.getElementById('sRework').textContent    = allRequests.filter(function(r){ return r.phase === 'rework_pending'; }).length;
+
+  // update rejected stat (use existing sRework slot or add a new stat if available)
+  var rejEl = document.getElementById('sQcRejected');
+  if (rejEl) rejEl.textContent = allRequests.filter(function(r){ return r.phase === 'qc_rejected'; }).length;
 }
 
 // ─── Tables ───────────────────────────────────────────────────────────────────
@@ -74,7 +78,7 @@ function renderTable() {
   var actionPhases = ['qc_pending', 'rework_returned'];
   var rows = activeTab === 'action'
     ? allRequests.filter(function(r){ return actionPhases.indexOf(r.phase) !== -1; })
-    : allRequests.filter(function(r){ return ['qc_pending','qc_passed','rework_pending','rework_returned','accepted'].indexOf(r.phase) !== -1; });
+    : allRequests.filter(function(r){ return ['qc_pending','qc_passed','rework_pending','rework_returned','accepted','qc_rejected'].indexOf(r.phase) !== -1; });
 
   var tbody = document.getElementById('mainTbody');
   if (!rows.length) {
@@ -130,8 +134,9 @@ window.openPR = async function openPR(id) {
   var result = await db.from('procurement_requests').select('*').eq('id', id).single();
   showLoader(false);
   if (result.error) { showToast('Error loading request', 'error'); return; }
-  currentPR   = result.data;
-  qcSelection = null;
+  currentPR        = result.data;
+  qcSelection      = null;
+  reworkQCSelection = null;
   renderModal();
   openModal('prModal');
 };
@@ -203,10 +208,21 @@ function renderModal() {
       + '<div class="qc-result-row">'
         + '<div class="qc-option pass" id="optPass" onclick="selectQC(\'pass\')">'
           + '<div class="qc-icon">✅</div><div class="qc-label">QC Passed</div>'
-          + '<div class="qc-desc">Goods meet all quality specs</div></div>'
+          + '<div class="qc-desc">All goods meet quality specs</div></div>'
         + '<div class="qc-option fail" id="optFail" onclick="selectQC(\'fail\')">'
-          + '<div class="qc-icon">❌</div><div class="qc-label">QC Failed — Rework</div>'
-          + '<div class="qc-desc">Raise Job Work Challan for rework</div></div>'
+          + '<div class="qc-icon">🔄</div><div class="qc-label">QC Failed — Rework</div>'
+          + '<div class="qc-desc">Raise JWC — send for rework</div></div>'
+        + '<div class="qc-option reject" id="optReject" onclick="selectQC(\'reject\')">'
+          + '<div class="qc-icon">🚫</div><div class="qc-label">QC Rejected</div>'
+          + '<div class="qc-desc">Outright rejection — no rework</div></div>'
+      + '</div>'
+      + '<div id="samplesSection" style="display:none" class="samples-section">'
+        + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px">📦 Sample Rejection Quantities</div>'
+        + '<div style="font-size:0.76rem;color:var(--gray-3);margin-bottom:8px">Enter the number of samples rejected per item. Defaults to GRN rejected qty — edit if only some are being rejected.</div>'
+        + '<div style="overflow-x:auto"><table class="samples-table">'
+          + '<thead><tr><th>#</th><th style="text-align:left">Item</th><th>Received</th><th>Rejected Qty</th><th>Accepted (auto)</th></tr></thead>'
+          + '<tbody id="samplesBody"></tbody>'
+        + '</table></div>'
       + '</div>'
       + '<div><label class="form-label">Inspection Notes *</label>'
         + '<textarea class="form-control" id="qcNotes" rows="3" placeholder="Describe findings, defects, measurements checked…"></textarea></div>'
@@ -227,7 +243,7 @@ function renderModal() {
             + '<input class="form-control" id="jwcProcess" placeholder="e.g. For Re-work / Re-coating" style="font-size:0.82rem"/></div>'
         + '</div>'
         + '<div style="margin-bottom:10px">'
-          + '<label class="form-label" style="font-size:0.7rem">REWORK ITEMS (from GRN rejected qty)</label>'
+          + '<label class="form-label" style="font-size:0.7rem">REWORK ITEMS (quantities from sample table above)</label>'
           + '<div id="jwcItemsGrid" style="overflow-x:auto">'
             + '<table class="jwc-table">'
               + '<thead><tr><th>Sr.</th><th>Description of Goods (Out)</th><th>Issued Qty</th><th>Unit Rate</th><th>Est. Value</th></tr></thead>'
@@ -247,6 +263,27 @@ function renderModal() {
     actionSection = '<div class="action-section" style="background:rgba(22,163,74,0.04);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:14px">'
       + '<div class="action-section-title" style="color:#16a34a">✅ QC Passed</div>'
       + (pr.qc_notes ? '<p style="font-size:0.82rem;color:var(--gray-3)">' + pr.qc_notes + '</p>' : '')
+      + '</div>';
+
+  } else if (pr.phase === 'qc_rejected') {
+    var rejDetails = (pr.qc_criteria && pr.qc_criteria.rejection_details) ? pr.qc_criteria.rejection_details : [];
+    var rejRows = rejDetails.length
+      ? '<div style="overflow-x:auto;margin-top:10px"><table class="grn-table" style="font-size:0.78rem">'
+        + '<thead><tr><th>Item</th><th>Received</th><th>Rejected</th><th>Accepted</th></tr></thead>'
+        + '<tbody>' + rejDetails.map(function(d) {
+            return '<tr>'
+              + '<td>' + (d.item_name || '—') + '</td>'
+              + '<td style="text-align:center">' + (d.received || 0) + '</td>'
+              + '<td style="text-align:center;color:#dc2626;font-weight:600">' + (d.rejected || 0) + '</td>'
+              + '<td style="text-align:center;color:#16a34a;font-weight:600">' + (d.accepted || 0) + '</td>'
+              + '</tr>';
+          }).join('') + '</tbody></table></div>'
+      : '';
+    actionSection = '<div class="action-section" style="background:rgba(124,58,237,0.04);border:1px solid rgba(124,58,237,0.25);border-radius:var(--radius);padding:14px">'
+      + '<div class="action-section-title" style="color:#7c3aed">🚫 QC Rejected</div>'
+      + '<p style="font-size:0.82rem;color:var(--gray-3);margin:6px 0">' + (pr.qc_notes || '—') + '</p>'
+      + (pr.qc_criteria && pr.qc_criteria.qc_inspector ? '<div style="font-size:0.75rem;color:var(--gray-4)">Inspected by: <strong>' + pr.qc_criteria.qc_inspector + '</strong></div>' : '')
+      + rejRows
       + '</div>';
 
   } else if (pr.phase === 'rework_pending') {
@@ -269,24 +306,40 @@ function renderModal() {
   } else if (pr.phase === 'rework_returned') {
     var jwcReworkData = (pr.qc_criteria && pr.qc_criteria.jwc) ? pr.qc_criteria.jwc : {};
     actionSection = '<div class="action-section">'
-      + '<div class="action-section-title">\uD83D\uDD04 Post-Rework QC Inspection <span class="action-badge">ACTION REQUIRED</span></div>'
+      + '<div class="action-section-title">🔄 Post-Rework QC Inspection <span class="action-badge">ACTION REQUIRED</span></div>'
       + grnSummary
       + (jwcReworkData.jwc_number
           ? '<div style="margin-bottom:14px;padding:10px 12px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);font-size:0.82rem">'
-            + '<div style="font-weight:700;color:#dc2626;margin-bottom:4px">\uD83D\uDCC4 Rework History — JWC ' + jwcReworkData.jwc_number + '</div>'
+            + '<div style="font-weight:700;color:#dc2626;margin-bottom:4px">📄 Rework History — JWC ' + jwcReworkData.jwc_number + '</div>'
             + '<div>Rework Vendor: <strong>' + (jwcReworkData.rework_vendor || '—') + '</strong></div>'
             + '<div>Process: <strong>' + (jwcReworkData.process || '—') + '</strong></div>'
             + (jwcReworkData.notes ? '<div>Rework Notes: ' + jwcReworkData.notes + '</div>' : '')
-            + '<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="previewJWC()">\uD83D\uDCC4 View JWC</button>'
+            + '<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="previewJWC()">📄 View JWC</button>'
             + '</div>'
           : '')
       + '<div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;font-size:0.82rem">'
-        + '<strong>\u26A0\uFE0F Goods returned from rework.</strong> Please inspect the reworked items and confirm they now meet quality specifications before approving.'
+        + '<strong>⚠️ Goods returned from rework.</strong> Inspect the reworked items — pass if they now meet specs, or reject if still defective.'
+      + '</div>'
+      + '<div class="qc-result-row" style="grid-template-columns:1fr 1fr;max-width:480px">'
+        + '<div class="qc-option pass" id="rwOptPass" onclick="selectReworkQC(\'pass\')">'
+          + '<div class="qc-icon">✅</div><div class="qc-label">QC Passed</div>'
+          + '<div class="qc-desc">Rework accepted — meets specs</div></div>'
+        + '<div class="qc-option reject" id="rwOptReject" onclick="selectReworkQC(\'reject\')">'
+          + '<div class="qc-icon">🚫</div><div class="qc-label">QC Rejected</div>'
+          + '<div class="qc-desc">Still defective — outright rejection</div></div>'
+      + '</div>'
+      + '<div id="rwSamplesSection" style="display:none" class="samples-section">'
+        + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px">📦 Sample Rejection Quantities</div>'
+        + '<div style="font-size:0.76rem;color:var(--gray-3);margin-bottom:8px">Enter the number of reworked samples still being rejected.</div>'
+        + '<div style="overflow-x:auto"><table class="samples-table">'
+          + '<thead><tr><th>#</th><th style="text-align:left">Item</th><th>Received</th><th>Rejected Qty</th><th>Accepted (auto)</th></tr></thead>'
+          + '<tbody id="rwSamplesBody"></tbody>'
+        + '</table></div>'
       + '</div>'
       + '<div><label class="form-label">Post-Rework Inspection Notes *</label>'
         + '<textarea class="form-control" id="qcNotesRework" rows="3" placeholder="Describe rework quality findings — measurements checked, defects resolved, overall condition…"></textarea></div>'
       + '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'
-        + '<button class="btn btn-primary" onclick="submitPostReworkPass()" style="background:#16a34a;border-color:#16a34a">\u2705 Confirm QC Passed after Rework \u2192</button>'
+        + '<button class="btn btn-primary" id="btnSubmitRework" onclick="submitPostReworkQC()">Submit Post-Rework Result →</button>'
       + '</div>'
       + '</div>';
   }
@@ -315,35 +368,114 @@ function renderModal() {
 // ─── QC option selection ──────────────────────────────────────────────────────
 window.selectQC = function selectQC(choice) {
   qcSelection = choice;
-  var passEl = document.getElementById('optPass');
-  var failEl = document.getElementById('optFail');
-  var jwcSec = document.getElementById('jwcFormSection');
-  if (passEl) passEl.classList.toggle('selected', choice === 'pass');
-  if (failEl) failEl.classList.toggle('selected', choice === 'fail');
+  var opts = { pass: 'optPass', fail: 'optFail', reject: 'optReject' };
+  Object.keys(opts).forEach(function(k) {
+    var el = document.getElementById(opts[k]);
+    if (el) el.classList.toggle('selected', k === choice);
+  });
+  var samplesSection = document.getElementById('samplesSection');
+  var jwcSec         = document.getElementById('jwcFormSection');
+  if (samplesSection) {
+    samplesSection.style.display = (choice === 'fail' || choice === 'reject') ? 'block' : 'none';
+    if (choice === 'fail' || choice === 'reject') populateSamplesTable();
+  }
   if (jwcSec) jwcSec.style.display = choice === 'fail' ? 'block' : 'none';
+  if (choice === 'fail') syncJWCFromSamples();
 };
 
-// ─── Populate JWC items from GRN rejected lines ───────────────────────────────
-function populateJWCItems() {
+// ─── Populate sample rejection table ─────────────────────────────────────────
+function getSourceLines() {
   var grn           = (currentPR && currentPR.qc_criteria && currentPR.qc_criteria.grn) ? currentPR.qc_criteria.grn : {};
   var lines         = grn.lines || [];
   var rejectedLines = lines.filter(function(l){ return l.rejected > 0; });
-  var tbody         = document.getElementById('jwcItemsBody');
+  return rejectedLines.length ? rejectedLines : (currentPR.parts || []);
+}
+
+function populateSamplesTable() {
+  var sourceLines = getSourceLines();
+  var grn         = (currentPR && currentPR.qc_criteria && currentPR.qc_criteria.grn) ? currentPR.qc_criteria.grn : {};
+  var hasGRN      = !!(grn.lines && grn.lines.length);
+  var tbody       = document.getElementById('samplesBody');
   if (!tbody) return;
 
-  var sourceLines = rejectedLines.length ? rejectedLines : (currentPR.parts || []);
-
   tbody.innerHTML = sourceLines.map(function(l, i) {
-    var name = l.item_name || l.name || '—';
-    var qty  = rejectedLines.length ? (l.rejected || 1) : (l.qty || 1);
+    var name     = l.item_name || l.name || '—';
+    var received = hasGRN ? (l.received || l.qty || 0) : (l.qty || 0);
+    var defRej   = hasGRN ? (l.rejected || 0) : 0;
+    var defAcc   = received - defRej;
     return '<tr>'
       + '<td style="text-align:center">' + (i + 1) + '</td>'
       + '<td>' + name + '</td>'
+      + '<td style="text-align:center">' + received + '</td>'
+      + '<td style="text-align:center"><input class="form-control" type="number" id="smpRej_' + i + '"'
+        + ' value="' + defRej + '" min="0" max="' + received + '"'
+        + ' style="width:70px;font-size:0.8rem;text-align:center"'
+        + ' oninput="onSampleRejChange(' + i + ',' + received + ')" /></td>'
+      + '<td id="smpAcc_' + i + '" style="text-align:center;font-weight:600;color:#16a34a">' + defAcc + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+window.onSampleRejChange = function onSampleRejChange(i, received) {
+  var rejEl = document.getElementById('smpRej_' + i);
+  var accEl = document.getElementById('smpAcc_' + i);
+  if (!rejEl || !accEl) return;
+  var rej = Math.min(Math.max(parseInt(rejEl.value || '0', 10) || 0, 0), received);
+  rejEl.value = rej;
+  accEl.textContent = received - rej;
+  accEl.style.color = (received - rej) > 0 ? '#16a34a' : '#dc2626';
+  if (qcSelection === 'fail') syncJWCFromSamples();
+};
+
+// ─── Read sample rejection inputs ─────────────────────────────────────────────
+function readSampleRejections() {
+  var sourceLines = getSourceLines();
+  var grn         = (currentPR && currentPR.qc_criteria && currentPR.qc_criteria.grn) ? currentPR.qc_criteria.grn : {};
+  var hasGRN      = !!(grn.lines && grn.lines.length);
+  return sourceLines.map(function(l, i) {
+    var rejEl    = document.getElementById('smpRej_' + i);
+    var received = hasGRN ? (l.received || l.qty || 0) : (l.qty || 0);
+    var rej      = rejEl ? (parseInt(rejEl.value || '0', 10) || 0) : (hasGRN ? (l.rejected || 0) : 0);
+    return {
+      item_name: l.item_name || l.name || '—',
+      received:  received,
+      rejected:  rej,
+      accepted:  received - rej
+    };
+  });
+}
+
+// ─── Sync JWC items table from samples table ───────────────────────────────────
+function syncJWCFromSamples() {
+  var rejections  = readSampleRejections();
+  var rejOnly     = rejections.filter(function(r){ return r.rejected > 0; });
+  var sourceLines = rejOnly.length ? rejOnly : rejections;
+  var tbody       = document.getElementById('jwcItemsBody');
+  if (!tbody) return;
+
+  // preserve existing rate values if rows already exist
+  var prevRates = {};
+  sourceLines.forEach(function(_, i) {
+    var el = document.getElementById('jwcRate_' + i);
+    if (el) prevRates[i] = el.value;
+  });
+
+  tbody.innerHTML = sourceLines.map(function(l, i) {
+    var qty  = l.rejected || 1;
+    var rate = prevRates[i] || '';
+    return '<tr>'
+      + '<td style="text-align:center">' + (i + 1) + '</td>'
+      + '<td>' + l.item_name + '</td>'
       + '<td><input class="form-control" type="number" id="jwcQty_' + i + '" value="' + qty + '" style="font-size:0.8rem;width:70px"/></td>'
-      + '<td><input class="form-control" type="number" id="jwcRate_' + i + '" placeholder="0" style="font-size:0.8rem;width:80px" oninput="calcJWCRow(' + i + ')"/></td>'
+      + '<td><input class="form-control" type="number" id="jwcRate_' + i + '" placeholder="0" value="' + rate + '" style="font-size:0.8rem;width:80px" oninput="calcJWCRow(' + i + ')"/></td>'
       + '<td id="jwcVal_' + i + '" style="text-align:center;font-family:var(--font-mono)">—</td>'
       + '</tr>';
   }).join('');
+}
+
+// ─── Populate JWC items (initial load for qc_pending) ────────────────────────
+function populateJWCItems() {
+  syncJWCFromSamples();
 }
 
 window.calcJWCRow = function calcJWCRow(i) {
@@ -358,33 +490,42 @@ window.calcJWCRow = function calcJWCRow(i) {
 
 // ─── Submit QC ────────────────────────────────────────────────────────────────
 window.submitQC = async function submitQC() {
-  if (!qcSelection) { showToast('Please select Pass or Fail', 'error'); return; }
+  if (!qcSelection) { showToast('Please select Pass, Fail, or Reject', 'error'); return; }
 
   var notesEl = document.getElementById('qcNotes');
   var notes   = notesEl ? notesEl.value.trim() : '';
   if (!notes) { showToast('Please add inspection notes', 'error'); return; }
 
-  var isPassed = qcSelection === 'pass';
-  var jwcData  = null;
+  var isPassed   = qcSelection === 'pass';
+  var isRejected = qcSelection === 'reject';   // outright reject (no rework)
+  var isFail     = qcSelection === 'fail';     // fail → rework JWC
+  var jwcData    = null;
 
-  if (!isPassed) {
+  // ── Collect per-item rejection details (fail or reject) ──────────────────
+  var rejectionDetails = [];
+  if (isFail || isRejected) {
+    rejectionDetails = readSampleRejections();
+    var totalRej = rejectionDetails.reduce(function(s, r){ return s + r.rejected; }, 0);
+    if (totalRej === 0) {
+      showToast('No samples marked as rejected — please enter rejection quantities', 'error');
+      return;
+    }
+  }
+
+  // ── JWC data (fail only) ──────────────────────────────────────────────────
+  if (isFail) {
     var jwcNumberEl = document.getElementById('jwcNumber');
     var jwcNumber   = jwcNumberEl ? jwcNumberEl.value.trim() : '';
     if (!jwcNumber) { showToast('Please enter JWC Number', 'error'); return; }
 
-    var grn           = (currentPR.qc_criteria && currentPR.qc_criteria.grn) ? currentPR.qc_criteria.grn : {};
-    var lines         = grn.lines || [];
-    var rejectedLines = lines.filter(function(l){ return l.rejected > 0; });
-    var sourceLines   = rejectedLines.length ? rejectedLines : (currentPR.parts || []);
-
-    var jwcItems = sourceLines.map(function(l, i) {
+    var jwcItems = rejectionDetails.filter(function(r){ return r.rejected > 0; }).map(function(l, i) {
       var qtyEl  = document.getElementById('jwcQty_'  + i);
       var rateEl = document.getElementById('jwcRate_' + i);
-      var qty    = parseInt((qtyEl  ? qtyEl.value  : '0'), 10) || 0;
-      var rate   = parseFloat(rateEl ? rateEl.value : '0')      || 0;
+      var qty    = parseInt((qtyEl  ? qtyEl.value  : String(l.rejected)), 10) || l.rejected;
+      var rate   = parseFloat(rateEl ? rateEl.value : '0') || 0;
       return {
         sr:          i + 1,
-        description: l.item_name || l.name || '—',
+        description: l.item_name,
         qty:         qty,
         rate:        rate,
         value:       qty * rate
@@ -399,26 +540,27 @@ window.submitQC = async function submitQC() {
     var jwcNotesEl   = document.getElementById('jwcNotes');
 
     jwcData = {
-      jwc_number:     jwcNumber,
-      jwc_date:       jwcDateEl    ? jwcDateEl.value    : new Date().toISOString().split('T')[0],
-      expected_days:  jwcDaysEl    ? jwcDaysEl.value    : '15',
-      rework_vendor:  jwcVendorEl  ? jwcVendorEl.value.trim()  : '',
-      vehicle_no:     jwcVehicleEl ? jwcVehicleEl.value.trim() : '',
-      process:        jwcProcessEl ? jwcProcessEl.value.trim() : 'For Re-work',
-      notes:          jwcNotesEl   ? jwcNotesEl.value.trim()   : '',
-      items:          jwcItems
+      jwc_number:    jwcNumber,
+      jwc_date:      jwcDateEl    ? jwcDateEl.value             : new Date().toISOString().split('T')[0],
+      expected_days: jwcDaysEl    ? jwcDaysEl.value             : '15',
+      rework_vendor: jwcVendorEl  ? jwcVendorEl.value.trim()   : '',
+      vehicle_no:    jwcVehicleEl ? jwcVehicleEl.value.trim()  : '',
+      process:       jwcProcessEl ? jwcProcessEl.value.trim()  : 'For Re-work',
+      notes:         jwcNotesEl   ? jwcNotesEl.value.trim()    : '',
+      items:         jwcItems
     };
   }
 
   showLoader(true);
-  var newPhase  = isPassed ? 'qc_passed'  : 'rework_pending';
-  var qcResult  = isPassed ? 'accepted'   : 'rejected';
+  var newPhase = isPassed ? 'qc_passed' : isFail ? 'rework_pending' : 'qc_rejected';
+  var qcResult = isPassed ? 'accepted'  : isFail ? 'rejected'       : 'rejected';
 
   var updatedCriteria = Object.assign({}, currentPR.qc_criteria || {}, {
     qc_inspector: currentUser.name,
     qc_date:      new Date().toISOString()
   });
-  if (jwcData) updatedCriteria.jwc = jwcData;
+  if (jwcData)               updatedCriteria.jwc               = jwcData;
+  if (rejectionDetails.length) updatedCriteria.rejection_details = rejectionDetails;
 
   var updateResult = await db.from('procurement_requests').update({
     phase:            newPhase,
@@ -436,17 +578,21 @@ window.submitQC = async function submitQC() {
 
   var commentText = isPassed
     ? '✅ QC Passed — ' + notes
-    : '❌ QC Failed — Rework JWC raised (' + (jwcData ? jwcData.jwc_number : '—') + '). ' + notes;
+    : isFail
+      ? '❌ QC Failed — Rework JWC raised (' + (jwcData ? jwcData.jwc_number : '—') + '). ' + notes
+      : '🚫 QC Rejected — ' + notes;
   await window.postComment(currentPR.id, currentUser.id, commentText);
 
   showToast(
     isPassed
       ? '✅ QC Passed — Procurement & Requestor notified!'
-      : '❌ QC Failed — JWC raised, Store Manager notified!',
+      : isFail
+        ? '❌ QC Failed — JWC raised, Store Manager notified!'
+        : '🚫 QC Rejected — Procurement & Requestor notified!',
     'success'
   );
 
-  if (!isPassed && jwcData) {
+  if (isFail && jwcData) {
     currentPR = Object.assign({}, currentPR, { qc_criteria: updatedCriteria, phase: 'rework_pending' });
     setTimeout(function(){ previewJWC(); }, 400);
   }
@@ -455,34 +601,124 @@ window.submitQC = async function submitQC() {
   await loadRequests();
 };
 
-// ─── Post-Rework QC Pass ─────────────────────────────────────────────────────
-window.submitPostReworkPass = async function submitPostReworkPass() {
+// ─── Post-Rework QC option selection ─────────────────────────────────────────
+var reworkQCSelection = null;
+
+window.selectReworkQC = function selectReworkQC(choice) {
+  reworkQCSelection = choice;
+  var passEl    = document.getElementById('rwOptPass');
+  var rejectEl  = document.getElementById('rwOptReject');
+  var samplesEl = document.getElementById('rwSamplesSection');
+  if (passEl)   passEl.classList.toggle('selected',   choice === 'pass');
+  if (rejectEl) rejectEl.classList.toggle('selected', choice === 'reject');
+  if (samplesEl) {
+    samplesEl.style.display = choice === 'reject' ? 'block' : 'none';
+    if (choice === 'reject') populateReworkSamplesTable();
+  }
+};
+
+function populateReworkSamplesTable() {
+  var grn      = (currentPR && currentPR.qc_criteria && currentPR.qc_criteria.grn) ? currentPR.qc_criteria.grn : {};
+  var lines    = grn.lines || [];
+  var hasGRN   = lines.length > 0;
+  var srcLines = hasGRN ? lines : (currentPR.parts || []);
+  var tbody    = document.getElementById('rwSamplesBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = srcLines.map(function(l, i) {
+    var name     = l.item_name || l.name || '—';
+    var received = hasGRN ? (l.received || l.qty || 0) : (l.qty || 0);
+    var defRej   = hasGRN ? (l.rejected || 0) : 0;
+    return '<tr>'
+      + '<td style="text-align:center">' + (i + 1) + '</td>'
+      + '<td>' + name + '</td>'
+      + '<td style="text-align:center">' + received + '</td>'
+      + '<td style="text-align:center"><input class="form-control" type="number" id="rwRej_' + i + '"'
+        + ' value="' + defRej + '" min="0" max="' + received + '"'
+        + ' style="width:70px;font-size:0.8rem;text-align:center"'
+        + ' oninput="onReworkSampleChange(' + i + ',' + received + ')" /></td>'
+      + '<td id="rwAcc_' + i + '" style="text-align:center;font-weight:600;color:#16a34a">' + (received - defRej) + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+window.onReworkSampleChange = function onReworkSampleChange(i, received) {
+  var rejEl = document.getElementById('rwRej_' + i);
+  var accEl = document.getElementById('rwAcc_' + i);
+  if (!rejEl || !accEl) return;
+  var rej = Math.min(Math.max(parseInt(rejEl.value || '0', 10) || 0, 0), received);
+  rejEl.value = rej;
+  accEl.textContent = received - rej;
+  accEl.style.color = (received - rej) > 0 ? '#16a34a' : '#dc2626';
+};
+
+function readReworkSampleRejections() {
+  var grn      = (currentPR && currentPR.qc_criteria && currentPR.qc_criteria.grn) ? currentPR.qc_criteria.grn : {};
+  var lines    = grn.lines || [];
+  var hasGRN   = lines.length > 0;
+  var srcLines = hasGRN ? lines : (currentPR.parts || []);
+  return srcLines.map(function(l, i) {
+    var rejEl    = document.getElementById('rwRej_' + i);
+    var received = hasGRN ? (l.received || l.qty || 0) : (l.qty || 0);
+    var rej      = rejEl ? (parseInt(rejEl.value || '0', 10) || 0) : 0;
+    return { item_name: l.item_name || l.name || '—', received: received, rejected: rej, accepted: received - rej };
+  });
+}
+
+// ─── Submit Post-Rework QC (pass or reject) ───────────────────────────────────
+window.submitPostReworkQC = async function submitPostReworkQC() {
+  if (!reworkQCSelection) { showToast('Please select Pass or Reject', 'error'); return; }
+
   var notesEl = document.getElementById('qcNotesRework');
   var notes   = notesEl ? notesEl.value.trim() : '';
   if (!notes) { showToast('Please add post-rework inspection notes', 'error'); return; }
 
+  var isPassed = reworkQCSelection === 'pass';
+  var rejectionDetails = [];
+
+  if (!isPassed) {
+    rejectionDetails = readReworkSampleRejections();
+    var totalRej = rejectionDetails.reduce(function(s, r){ return s + r.rejected; }, 0);
+    if (totalRej === 0) {
+      showToast('No samples marked as rejected — please enter rejection quantities', 'error');
+      return;
+    }
+  }
+
   showLoader(true);
+  var newPhase = isPassed ? 'qc_passed' : 'qc_rejected';
+  var qcResult = isPassed ? 'qc_passed' : 'rejected';
+
   var updatedCriteria = Object.assign({}, currentPR.qc_criteria || {}, {
     post_rework_qc_inspector: currentUser.name,
     post_rework_qc_date:      new Date().toISOString(),
     post_rework_notes:        notes
   });
+  if (rejectionDetails.length) updatedCriteria.post_rework_rejection_details = rejectionDetails;
 
   var updateResult = await db.from('procurement_requests').update({
-    phase:            'qc_passed',
-    qc_result:        'qc_passed',
+    phase:            newPhase,
+    qc_result:        qcResult,
     qc_notes:         notes,
     qc_criteria:      updatedCriteria,
     updated_at:       new Date().toISOString(),
-    phase_timestamps: addPhaseTimestamp(currentPR, 'qc_passed')
+    phase_timestamps: addPhaseTimestamp(currentPR, newPhase)
   }).eq('id', currentPR.id);
 
   showLoader(false);
   if (updateResult.error) { showToast('Error: ' + updateResult.error.message, 'error'); return; }
 
-  notifyPhaseChange(currentPR.id, 'qc_passed', currentUser.id);
-  await window.postComment(currentPR.id, currentUser.id, '\u2705 Post-Rework QC Passed \u2014 ' + notes);
-  showToast('\u2705 Post-Rework QC Passed \u2014 Procurement notified!', 'success');
+  notifyPhaseChange(currentPR.id, newPhase, currentUser.id);
+  var commentText = isPassed
+    ? '✅ Post-Rework QC Passed — ' + notes
+    : '🚫 Post-Rework QC Rejected — ' + notes;
+  await window.postComment(currentPR.id, currentUser.id, commentText);
+  showToast(
+    isPassed
+      ? '✅ Post-Rework QC Passed — Procurement notified!'
+      : '🚫 Post-Rework QC Rejected — Procurement & Requestor notified!',
+    'success'
+  );
   closeModal('prModal');
   await loadRequests();
 };

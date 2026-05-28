@@ -249,13 +249,21 @@
         <option value="accepted">Accepted</option>
         <option value="rejected">Rejected</option>
         <option value="payment_requested">Payment Requested</option>
+        <option value="lp_payment_pending">LP — Payment Pending</option>
+        <option value="lp_payment_done">LP — Payment Done</option>
+      </select>
+      <select id="filterUrgency" onchange="filterTable()" style="min-width:140px">
+        <option value="">All Urgencies</option>
+        <option value="urgent">⚡ Urgent</option>
+        <option value="critical">🔴 Critical</option>
+        <option value="normal">Normal</option>
       </select>
       <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕</button>
     </div>
     <div class="card">
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>PM</th><th>Engineer</th><th>Lead Time</th><th>Updated</th><th></th></tr></thead>
+          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>Urgency</th><th>PM</th><th>Engineer</th><th>Lead Time</th><th>Updated</th><th></th></tr></thead>
           <tbody id="requestsBody"></tbody>
         </table>
       </div>
@@ -583,30 +591,35 @@ function switchTab(t) {
   else filterTable();
 }
 
-function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterPhase').value='';filterTable();}
+function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterPhase').value='';const uf=document.getElementById('filterUrgency');if(uf)uf.value='';filterTable();}
 
 function filterTable(){
   const s=document.getElementById('searchInput').value.toLowerCase();
   const ph=document.getElementById('filterPhase').value;
-  const actionPhases=['procurement_active','approved','advance_requested','grn_pending','qc_passed'];
+  const urg=document.getElementById('filterUrgency')?.value||'';
+  const actionPhases=['procurement_active','approved','advance_requested','grn_pending','qc_passed','lp_payment_pending'];
   let reqs=allRequests;
   if(activeTab==='active') reqs=reqs.filter(r=>actionPhases.includes(r.phase));
   if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
   if(ph) reqs=reqs.filter(r=>r.phase===ph);
+  if(urg) reqs=reqs.filter(r=>(r.urgency||'normal')===urg);
   renderTable(reqs);
 }
 
 function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
-  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>${activeTab==='active'?'All caught up!':'No requests'}</h3></div></td></tr>`;return;}
+  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>${activeTab==='active'?'All caught up!':'No requests'}</h3></div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
-    const needsAction=['procurement_active','approved','grn_pending','qc_passed'].includes(r.phase);
-    const lbl={procurement_active:'Work on it',approved:'Place Order',advance_requested:'View Advance',grn_pending:'Invoke GRN',qc_passed:'Payment Req'}[r.phase]||'View';
+    const needsAction=['procurement_active','approved','grn_pending','qc_passed','lp_payment_pending'].includes(r.phase);
+    const lbl={procurement_active:'Work on it',approved:'Place Order',advance_requested:'View Advance',grn_pending:'Invoke GRN',qc_passed:'Payment Req',lp_payment_pending:'Mark Paid'}[r.phase]||'View';
+    const typeLabel=r.request_category==='vendor_info'?'Vendor Info':r.request_category==='local_purchase'?'Local Purchase':'RFQ';
+    const typeBg=r.request_category==='local_purchase'?'background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.35);color:#15803d':r.request_category==='vendor_info'?'background:rgba(139,92,246,0.08);border-color:rgba(139,92,246,0.3);color:#6d28d9':'background:var(--off-white);border-color:var(--border)';
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
       <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
       <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase||''}</div></td>
-      <td><span style="font-size:0.72rem;background:var(--off-white);border:1px solid var(--border);padding:1px 7px;border-radius:3px">${r.request_category==='vendor_info'?'Vendor Info':'RFQ'}</span></td>
+      <td><span style="font-size:0.72rem;padding:1px 7px;border-radius:3px;border:1px solid;${typeBg}">${typeLabel}</span></td>
       <td>${getPhaseBadge(r.phase)}</td>
+      <td>${getUrgencyBadge(r.urgency)}</td>
       <td style="font-size:0.78rem">${r.project_manager_name||'—'}</td>
       <td style="font-size:0.78rem">${r.users?.name||'—'}</td>
       <td>${leadTimeBadge(r.created_at)}</td>
@@ -683,7 +696,7 @@ async function openPR(id) {
   currentPR=allRequests.find(r=>r.id===id);if(!currentPR)return;
   uploadedFiles=[];
   document.getElementById('prModalTitle').textContent=`PR-${String(currentPR.request_number).padStart(4,'0')} — ${currentPR.project_name}`;
-  document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${currentPR.users?.name||''}`;
+  document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':currentPR.request_category==='local_purchase'?'Local Purchase':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${currentPR.users?.name||''}`;
   showLoader(true);
   await loadVendors();
   const[comments,quotations,vd,poRes,attRes]=await Promise.all([
@@ -718,6 +731,46 @@ async function openPR(id) {
         <textarea class="form-control" id="vendorInfoDetails" placeholder="Vendor name, contact, email, phone, specialization, lead times..." style="min-height:120px"></textarea>
       </div>
       <div style="margin-top:12px"><button class="btn btn-primary" onclick="submitVendorInfo()">Send to Engineer →</button></div>
+    </div>`;
+  }
+
+  // ── LOCAL PURCHASE: procurement_active → mark payment pending ──
+  if(currentPR.phase==='procurement_active'&&currentPR.request_category==='local_purchase') {
+    actionSection=`<div class="action-section" style="border:1px solid rgba(34,197,94,0.3);background:rgba(34,197,94,0.03)">
+      <div class="action-section-title" style="color:#15803d">🛒 Local Purchase <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
+      <p style="font-size:0.8rem;color:var(--gray-3);margin-bottom:14px">Review the request, then mark as <strong>Payment Pending</strong> once ready to process payment.</p>
+      <button class="btn btn-primary" onclick="lpMarkPaymentPending()" style="background:#15803d;border-color:#15803d">Mark as Payment Pending →</button>
+    </div>`;
+  }
+
+  // ── LOCAL PURCHASE: lp_payment_pending → mark payment done ──
+  if(currentPR.phase==='lp_payment_pending') {
+    actionSection=`<div class="action-section" style="border:1px solid rgba(34,197,94,0.4);background:rgba(34,197,94,0.04)">
+      <div class="action-section-title" style="color:#15803d">💳 Mark Payment Done <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
+      <p style="font-size:0.8rem;color:var(--gray-3);margin-bottom:14px">Upload the bill / receipt and mark this Local Purchase as <strong>Payment Done</strong>.</p>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Bill / Receipt <span style="color:var(--red)">*</span></label>
+        <div class="drop-zone" style="min-height:60px;cursor:pointer" onclick="document.getElementById('lpBillFile').click()">
+          <input type="file" id="lpBillFile" accept=".png,.jpg,.jpeg,.pdf" style="display:none" onchange="previewLPBill(event)"/>
+          <div class="drop-zone-label" id="lpBillLabel">📎 Click to upload bill or receipt</div>
+          <div class="drop-zone-hint">PNG, JPG or PDF — max 5MB</div>
+        </div>
+        <div id="lpBillPreview" style="display:none;margin-top:8px"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label class="form-label">Payment Notes (optional)</label>
+        <input class="form-control" id="lpPaymentNote" placeholder="e.g. Paid via petty cash, ref #123"/>
+      </div>
+      <button class="btn btn-primary" onclick="lpMarkPaymentDone()" style="background:#15803d;border-color:#15803d">✅ Mark Payment Done</button>
+    </div>`;
+  }
+
+  // ── LOCAL PURCHASE: lp_payment_done — closed view ──
+  if(currentPR.phase==='lp_payment_done') {
+    const billUrl=currentPR.lp_bill_url;
+    actionSection=`<div style="padding:14px;border:1px solid rgba(34,197,94,0.25);border-radius:var(--radius);background:rgba(34,197,94,0.04)">
+      <div style="font-weight:700;color:#15803d;margin-bottom:6px">✅ Local Purchase — Payment Done</div>
+      ${billUrl?`<div style="margin-top:8px"><a href="${billUrl}" target="_blank" style="font-size:0.82rem;color:#15803d;text-decoration:underline">📄 ${currentPR.lp_bill_name||'View Bill'}</a></div>`:'<p style="font-size:0.8rem;color:var(--gray-3)">No bill attached.</p>'}
     </div>`;
   }
 
@@ -1068,6 +1121,72 @@ async function submitVendorInfo() {
 
   closeModal('prModal');
   await loadRequests();
+}
+
+// ── LOCAL PURCHASE ACTIONS ────────────────────────────────────
+async function lpMarkPaymentPending() {
+  if (!currentPR) return;
+  showLoader(true);
+  const { error } = await db.from('procurement_requests').update({
+    phase: 'lp_payment_pending',
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR, 'lp_payment_pending')
+  }).eq('id', currentPR.id);
+  if (!error) {
+    await window.postComment(currentPR.id, currentUser?.id, '💳 Marked as Payment Pending — procurement will make payment soon.');
+    notifyPhaseChange(currentPR.id, 'lp_payment_pending', currentUser?.id);
+  }
+  showLoader(false);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast('Marked as Payment Pending!', 'success');
+  closeModal('prModal'); await loadRequests();
+}
+
+let lpBillData = null;
+let lpBillFileName = null;
+
+function previewLPBill(e) {
+  const file = e.target.files[0]; if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { showToast('File too large (max 5MB)', 'error'); return; }
+  lpBillFileName = file.name;
+  fileToBase64(file).then(b64 => {
+    lpBillData = b64;
+    const label = document.getElementById('lpBillLabel');
+    const preview = document.getElementById('lpBillPreview');
+    if (label) label.textContent = '✅ ' + file.name;
+    if (preview) {
+      preview.style.display = 'block';
+      if (file.type.startsWith('image/')) {
+        preview.innerHTML = `<img src="${b64}" style="max-width:100%;max-height:180px;object-fit:contain;border-radius:6px;border:1px solid var(--border)"/>`;
+      } else {
+        preview.innerHTML = `<div style="padding:8px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.78rem">📄 ${file.name}</div>`;
+      }
+    }
+  });
+}
+
+async function lpMarkPaymentDone() {
+  if (!currentPR) return;
+  if (!lpBillData) { showToast('Please upload a bill or receipt first', 'error'); return; }
+  const note = document.getElementById('lpPaymentNote')?.value?.trim() || '';
+  showLoader(true);
+  const { error } = await db.from('procurement_requests').update({
+    phase: 'lp_payment_done',
+    lp_bill_url: lpBillData,
+    lp_bill_name: lpBillFileName || 'bill',
+    order_notes: note || null,
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR, 'lp_payment_done')
+  }).eq('id', currentPR.id);
+  if (!error) {
+    await window.postComment(currentPR.id, currentUser?.id, `✅ Payment done. Bill attached.${note ? ' Notes: ' + note : ''}`);
+    notifyPhaseChange(currentPR.id, 'lp_payment_done', currentUser?.id);
+  }
+  showLoader(false);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  lpBillData = null; lpBillFileName = null;
+  showToast('Payment marked as done!', 'success');
+  closeModal('prModal'); await loadRequests();
 }
 
 // ── ADVANCE PAYMENT ───────────────────────────────────────────

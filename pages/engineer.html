@@ -75,13 +75,21 @@
         <option value="qc_passed">QC Passed</option>
         <option value="accepted">Accepted</option>
         <option value="rejected">Rejected</option>
+        <option value="lp_payment_pending">LP — Payment Pending</option>
+        <option value="lp_payment_done">LP — Payment Done</option>
       </select>
       <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Clear</button>
+      <select id="filterUrgency" onchange="filterTable()" style="min-width:130px">
+        <option value="">All Urgencies</option>
+        <option value="urgent">⚡ Within 24 hours</option>
+        <option value="critical">🔴 Within 48 hours</option>
+        <option value="normal">Within 1 Week</option>
+      </select>
     </div>
     <div class="card">
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>PM</th><th>Updated</th><th></th></tr></thead>
+          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>Urgency</th><th>PM</th><th>Updated</th><th></th></tr></thead>
           <tbody id="requestsBody"></tbody>
         </table>
       </div>
@@ -124,6 +132,9 @@
         <div id="vendorInfoNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.18);border-radius:var(--radius-sm);font-size:0.78rem;color:#6d28d9">
           ℹ Vendor Info requests go directly to the Procurement Manager — no PM clearance needed.
         </div>
+        <div id="localPurchaseNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.28);border-radius:var(--radius-sm);font-size:0.78rem;color:#15803d">
+          🛒 Local Purchase requests go directly to the Procurement Manager for payment processing — no PM clearance needed.
+        </div>
       </div>
 
       <!-- ── Screenshot if PM Already Approved ── -->
@@ -150,6 +161,7 @@
             <option value="">Select</option>
             <option value="RFQ">RFQ — Request for Quotation</option>
             <option value="vendor_info">Request for Vendor Information</option>
+            <option value="local_purchase">Local Purchase</option>
           </select>
         </div>
         <div class="form-group">
@@ -194,6 +206,15 @@
         <div class="form-group">
           <label class="form-label">Your Name</label>
           <input class="form-control" id="fTeam" readonly/>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Urgency</label>
+          <select class="form-control" id="fUrgency">
+            <option value="normal">🟢 Within 1 Week</option>
+            <option value="urgent">⚡ Within 24 hours</option>
+            <option value="critical">🔴 Within 48 hours</option>
+          </select>
         </div>
 
         <div class="form-group" id="orderTypeGroup">
@@ -438,33 +459,38 @@ function switchTab(t) {
   else filterTable();
 }
 
-function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterPhase').value='';filterTable();}
+function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterPhase').value='';const uf=document.getElementById('filterUrgency');if(uf)uf.value='';filterTable();}
 
 function filterTable() {
   const s=document.getElementById('searchInput').value.toLowerCase(), ph=document.getElementById('filterPhase').value;
-  const closed=['qc_passed','accepted','rejected','payment_requested'], action=['quotations_shared','grn_pending','vendor_info_shared'];
+  const urg=document.getElementById('filterUrgency')?.value||'';
+  const closed=['qc_passed','accepted','rejected','payment_requested','lp_payment_done'], action=['quotations_shared','grn_pending','vendor_info_shared'];
   let reqs=myRequests;
   if(activeTab==='action') reqs=reqs.filter(r=>action.includes(r.phase));
   if(activeTab==='closed') reqs=reqs.filter(r=>closed.includes(r.phase));
   if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
   if(ph) reqs=reqs.filter(r=>r.phase===ph);
+  if(urg) reqs=reqs.filter(r=>(r.urgency||'normal')===urg);
   renderTable(reqs);
 }
 
 function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
-  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>${activeTab==='action'?'All caught up!':'No requests found'}</h3><p>${activeTab==='action'?'No actions needed right now.':'Submit a new request to get started.'}</p></div></td></tr>`;return;}
+  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>${activeTab==='action'?'All caught up!':'No requests found'}</h3><p>${activeTab==='action'?'No actions needed right now.':'Submit a new request to get started.'}</p></div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
     const needsAction=['quotations_shared','grn_pending','vendor_info_shared'].includes(r.phase);
     const pmName=r.users?.name||r.project_manager_name||'—';
+    const typeLabel=r.request_category==='vendor_info'?'Vendor Info':r.request_category==='local_purchase'?'Local Purchase':'RFQ';
+    const typeBg=r.request_category==='local_purchase'?'background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.35);color:#15803d':r.request_category==='vendor_info'?'background:rgba(139,92,246,0.08);border-color:rgba(139,92,246,0.3);color:#6d28d9':'background:var(--off-white);border-color:var(--border)';
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
       <td>
         <span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span>
         ${needsAction?`<span style="margin-left:6px;font-size:0.6rem;background:var(--red);color:white;padding:1px 5px;border-radius:2px;font-family:var(--font-mono)">ACT</span>`:''}
       </td>
       <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div></td>
-      <td><span style="font-size:0.72rem;background:var(--off-white);border:1px solid var(--border);padding:1px 7px;border-radius:3px">${r.request_category==='vendor_info'?'Vendor Info':'RFQ'}</span></td>
+      <td><span style="font-size:0.72rem;padding:1px 7px;border-radius:3px;border:1px solid;${typeBg}">${typeLabel}</span></td>
       <td>${getPhaseBadge(r.phase)}</td>
+      <td>${getUrgencyBadge(r.urgency)}</td>
       <td style="font-size:0.78rem;color:var(--gray-3)">${pmName}</td>
       <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gray-4)">${fmtDate(r.updated_at||r.created_at)}</td>
       <td style="white-space:nowrap">
@@ -479,11 +505,13 @@ function renderTable(reqs) {
 function onCategoryChange() {
   const cat=document.getElementById('fCategory').value;
   const isVI=cat==='vendor_info';
-  document.getElementById('pmApprovalSection').style.opacity=isVI?'0.5':'1';
-  document.getElementById('pmApprovalSection').style.pointerEvents=isVI?'none':'auto';
+  const isLP=cat==='local_purchase';
+  document.getElementById('pmApprovalSection').style.opacity=(isVI||isLP)?'0.5':'1';
+  document.getElementById('pmApprovalSection').style.pointerEvents=(isVI||isLP)?'none':'auto';
   document.getElementById('vendorInfoNote').style.display=isVI?'block':'none';
-  document.getElementById('orderTypeGroup').style.display=isVI?'none':'flex';
-  if(isVI){document.getElementById('pmScreenshotSection').style.display='none';}
+  document.getElementById('localPurchaseNote').style.display=isLP?'block':'none';
+  document.getElementById('orderTypeGroup').style.display=(isVI||isLP)?'none':'flex';
+  if(isVI||isLP){document.getElementById('pmScreenshotSection').style.display='none';}
 }
 
 function selectPMApproval(v) {
@@ -594,6 +622,7 @@ async function handleBOMFile(e) {
   document.getElementById('pmOptYes').classList.remove('selected');
   document.getElementById('pmOptNo').classList.remove('selected');
   ['fCategory','fProjectSelect','fPhaseSelect','fPMSelect','fOrderType','fVendor','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const urgEl=document.getElementById('fUrgency');if(urgEl)urgEl.value='normal';
   document.getElementById('fTeam').value=currentUser.name;
   if(currentUser.department) document.getElementById('fDept').value=currentUser.department;
   document.getElementById('fPhaseSelect').innerHTML='<option value="">Select project first...</option>';
@@ -619,6 +648,7 @@ function openEditPR(id) {
   document.getElementById('fPMSelect').value=pr.assigned_pm_id||'';
   document.getElementById('fOrderType').value=pr.order_type||'';
   document.getElementById('fVendor').value=pr.vendor_suggestion||'';
+  const urgEditEl=document.getElementById('fUrgency');if(urgEditEl)urgEditEl.value=pr.urgency||'normal';
   document.getElementById('fDesc').value=pr.description||'';
   document.getElementById('fProductLink').value=pr.product_link||'';
   document.getElementById('fQcColor').value=pr.qc_criteria?.preferred_color||'';
@@ -644,8 +674,9 @@ function openEditPR(id) {
 async function submitPR() {
   const cat=document.getElementById('fCategory').value;
   const isVI=cat==='vendor_info';
-  if(!isEditMode&&!isVI&&!selectedPMApproval){showToast('Please indicate PM approval status','error');return;}
-  if(!isEditMode&&!isVI&&selectedPMApproval==='already_approved'&&!pmScreenshotBase64){showToast('Please upload PM approval screenshot','error');return;}
+  const isLP=cat==='local_purchase';
+  if(!isEditMode&&!isVI&&!isLP&&!selectedPMApproval){showToast('Please indicate PM approval status','error');return;}
+  if(!isEditMode&&!isVI&&!isLP&&selectedPMApproval==='already_approved'&&!pmScreenshotBase64){showToast('Please upload PM approval screenshot','error');return;}
   const pmId=document.getElementById('fPMSelect').value;
   if(!pmId){showToast('Please select a Project Manager','error');return;}
   const projectId=document.getElementById('fProjectSelect').value;
@@ -654,8 +685,9 @@ async function submitPR() {
   const projectPhase=document.getElementById('fPhaseSelect').value;
   const dept=document.getElementById('fDept').value;
   const orderType=document.getElementById('fOrderType').value;
+  const urgency=document.getElementById('fUrgency').value||'normal';
   if(!cat||!projectName||!projectPhase||!dept){showToast('Please fill all required fields','error');return;}
-  if(!isVI&&!orderType){showToast('Please select an order type','error');return;}
+  if(!isVI&&!isLP&&!orderType){showToast('Please select an order type','error');return;}
   const parts=getPartsFromEditor();
   if(!parts.length){showToast('Please add at least one part or item','error');return;}
   if(isEditMode){const modNote=document.getElementById('fModNote').value.trim();if(!modNote){showToast('Please describe what changed','error');return;}}
@@ -673,6 +705,7 @@ async function submitPR() {
     project_manager_name:pmUser?.name||'',
     team_member_name:currentUser.name,
     department:dept,
+    urgency,
     vendor_suggestion:document.getElementById('fVendor').value.trim()||null,
     description:document.getElementById('fDesc').value.trim()||null,
     product_link:document.getElementById('fProductLink').value.trim()||null,
@@ -682,14 +715,14 @@ async function submitPR() {
     parts,
     attachments:attachedFiles.map(f=>({name:f.name,type:f.type,data:f.data})),
     created_by:currentUser.id,
-    phase:isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval',
-    initial_pm_approval:isEditMode?'already_approved':(isVI?null:selectedPMApproval),
+    phase:(isVI||isLP)?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval',
+    initial_pm_approval:isEditMode?'already_approved':((isVI||isLP)?null:selectedPMApproval),
     is_modification:isEditMode,
     parent_request_id:isEditMode?editingParentId:null,
     modification_note:isEditMode?document.getElementById('fModNote').value.trim():null,
-    phase_timestamps:(function(){var ts={'submitted':new Date().toISOString()};var ph=isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval';if(ph!=='submitted')ts[ph]=new Date().toISOString();return ts;})()
+    phase_timestamps:(function(){var ts={'submitted':new Date().toISOString()};var ph=(isVI||isLP)?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval';if(ph!=='submitted')ts[ph]=new Date().toISOString();return ts;})()
   };
-  if(!isVI) vals.order_type=orderType;
+  if(!isVI&&!isLP) vals.order_type=orderType;
   showLoader(true);
   const{error,data}=await db.from('procurement_requests').insert(vals).select().single();
   if(!error&&isEditMode&&editingParentId){
@@ -697,7 +730,7 @@ async function submitPR() {
   }
   showLoader(false);
   if(error){showToast('Submit failed: '+error.message,'error');return;}
-  showToast(isEditMode?'↺ Resubmitted as a new modified request!':isVI?'Vendor Info request sent to Procurement!':'Request submitted!','success');
+  showToast(isEditMode?'↺ Resubmitted as a new modified request!':isLP?'Local Purchase request sent to Procurement!':isVI?'Vendor Info request sent to Procurement!':'Request submitted!','success');
   if(newPR?.id) notifyPhaseChange(newPR.id, newPR.phase||'submitted', currentUser?.id);
   closeModal('prFormModal');
   await loadRequests();
@@ -708,7 +741,7 @@ async function openPR(id) {
   currentPR=myRequests.find(r=>r.id===id); if(!currentPR) return;
   selectedQuotationId=currentPR.selected_quotation_id;
   document.getElementById('prModalTitle').textContent=`PR-${String(currentPR.request_number).padStart(4,'0')} — ${currentPR.project_name}`;
-  document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${fmtDate(currentPR.created_at)}`;
+  document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':currentPR.request_category==='local_purchase'?'Local Purchase':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${fmtDate(currentPR.created_at)}`;
   showLoader(true);
   const[comments,quotations,vd,poRes,advRes,payRes]=await Promise.all([
     loadComments(id),
@@ -735,6 +768,27 @@ async function openPR(id) {
         <button class="btn btn-primary" onclick="resolveVendorInfo('convert_to_rfq')">→ Convert to RFQ</button>
       </div>
     </div>`;
+  }
+
+  // ── LOCAL PURCHASE STATUS VIEW (engineer read-only) ──
+  if(currentPR.request_category==='local_purchase') {
+    if(currentPR.phase==='procurement_active') {
+      actionSection=`<div style="padding:12px 14px;border:1px solid rgba(34,197,94,0.25);border-radius:var(--radius);background:rgba(34,197,94,0.04)">
+        <div style="font-weight:700;color:#15803d;margin-bottom:4px">🛒 Local Purchase — Sent to Procurement</div>
+        <p style="font-size:0.78rem;color:var(--gray-3);margin:0">The Procurement Manager is reviewing this request and will process the payment.</p>
+      </div>`;
+    } else if(currentPR.phase==='lp_payment_pending') {
+      actionSection=`<div style="padding:12px 14px;border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);background:rgba(245,158,11,0.04)">
+        <div style="font-weight:700;color:#b45309;margin-bottom:4px">💳 Local Purchase — Payment Pending</div>
+        <p style="font-size:0.78rem;color:var(--gray-3);margin:0">Payment is being arranged by the Procurement Manager.</p>
+      </div>`;
+    } else if(currentPR.phase==='lp_payment_done') {
+      const billUrl=currentPR.lp_bill_url;
+      actionSection=`<div style="padding:12px 14px;border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius);background:rgba(34,197,94,0.05)">
+        <div style="font-weight:700;color:#15803d;margin-bottom:6px">✅ Local Purchase — Payment Done</div>
+        ${billUrl?`<a href="${billUrl}" target="_blank" style="font-size:0.82rem;color:#15803d;text-decoration:underline">📄 ${currentPR.lp_bill_name||'View Bill'}</a>`:'<p style="font-size:0.78rem;color:var(--gray-3);margin:0">No bill attached.</p>'}
+      </div>`;
+    }
   }
 
   if(currentPR.phase==='quotations_shared') {
@@ -863,50 +917,147 @@ async function resolveVendorInfo(action) {
 function buildQuoteReview(quotations) {
   if(!quotations.length) return `<div class="action-section"><div class="action-section-title">📨 Review Quotations <span class="action-badge">ACTION REQUIRED</span></div><p style="color:var(--gray-4);font-size:0.82rem">No quotations yet.</p></div>`;
   return `<div class="action-section">
-    <div class="action-section-title">📨 Verify Quotation <span class="action-badge">ACTION REQUIRED</span></div>
-    <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Review the ${quotations.length} quotation${quotations.length>1?'s':''} below. Select the one that best meets the requirement and click <strong>Verify & Forward</strong> to route it for approval.</p>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">${quotations.map(q=>renderQuotationCard(q,true,selectedQuotationId)).join('')}</div>
-    <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:14px;font-size:0.8rem;color:#4338ca">
+    <div class="action-section-title">📨 Validate Quotations <span class="action-badge">ACTION REQUIRED</span></div>
+    <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Review the ${quotations.length} quotation${quotations.length>1?'s':''} below and check if they meet the requirement. You cannot select a quotation — that will be done by the approver. Click <strong>Validate & Forward</strong> if the quotes are suitable, or use the issue options below if they are not.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">${quotations.map(q=>renderQuotationCard(q,false,null)).join('')}</div>
+    <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:0.8rem;color:#4338ca">
       <strong>ℹ Routing rule:</strong> Quotes below ₹5,000 go to the <strong>Project Manager</strong>. Quotes of ₹5,000 or above go to the <strong>Director</strong> for approval.
     </div>
-    <button class="btn btn-primary" style="width:100%" onclick="submitEngineerVerification()">✓ Verify & Forward for Approval</button>
+
+    <!-- ✅ VALIDATE -->
+    <button class="btn btn-primary" style="width:100%;margin-bottom:12px" onclick="submitEngineerVerification()">✓ Validate & Forward for Approval</button>
+
+    <!-- ⚠️ ISSUES PANEL -->
+    <div style="border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);padding:14px;background:rgba(245,158,11,0.03)">
+      <div style="font-size:0.82rem;font-weight:700;color:#92400e;margin-bottom:10px">⚠️ Quotes don't meet requirements?</div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label" style="font-size:0.78rem">Select action</label>
+        <select class="form-control" id="engineerIssueAction" onchange="onEngineerIssueChange()" style="font-size:0.82rem">
+          <option value="">— Choose what to do —</option>
+          <option value="close">Close the request (with reason)</option>
+          <option value="keep_going">Keep the request going (add a note)</option>
+          <option value="revise">Ask Procurement to re-attach relevant quotes</option>
+        </select>
+      </div>
+
+      <!-- close reason -->
+      <div id="issueClose" style="display:none">
+        <div class="form-group" style="margin-bottom:10px">
+          <label class="form-label" style="font-size:0.78rem">Reason for closing *</label>
+          <textarea class="form-control" id="engineerCloseReason" rows="3" placeholder="Explain why this request is being closed…" style="font-size:0.82rem"></textarea>
+        </div>
+        <button class="btn btn-danger" style="width:100%" onclick="submitEngineerClose()">🚫 Close Request</button>
+      </div>
+
+      <!-- keep going note -->
+      <div id="issueKeepGoing" style="display:none">
+        <div class="form-group" style="margin-bottom:10px">
+          <label class="form-label" style="font-size:0.78rem">Note (optional)</label>
+          <textarea class="form-control" id="engineerKeepNote" rows="2" placeholder="Add any observation or note for the team…" style="font-size:0.82rem"></textarea>
+        </div>
+        <button class="btn btn-secondary" style="width:100%" onclick="submitEngineerKeepGoing()">📌 Add Note & Keep Going</button>
+      </div>
+
+      <!-- revise quotes -->
+      <div id="issueRevise" style="display:none">
+        <div class="form-group" style="margin-bottom:10px">
+          <label class="form-label" style="font-size:0.78rem">What needs to change? *</label>
+          <textarea class="form-control" id="engineerReviseNote" rows="3" placeholder="e.g. Need quotes from a different vendor, require spec sheet attached, pricing is too high — please get quotes under ₹4,000, wrong part quoted…" style="font-size:0.82rem"></textarea>
+        </div>
+        <button class="btn btn-warning" style="width:100%;color:#fff" onclick="submitEngineerReviseRequest()">🔁 Send Back to Procurement for Revised Quotes</button>
+      </div>
+    </div>
   </div>`;
+}
+
+function onEngineerIssueChange() {
+  const val = document.getElementById('engineerIssueAction').value;
+  document.getElementById('issueClose').style.display     = val==='close'      ? '' : 'none';
+  document.getElementById('issueKeepGoing').style.display = val==='keep_going' ? '' : 'none';
+  document.getElementById('issueRevise').style.display    = val==='revise'     ? '' : 'none';
 }
 
 // ── ENGINEER QUOTE VERIFICATION ─────────────────────────────
 const ENGINEER_APPROVAL_LIMIT = 5000; // INR threshold
 
+// ── Close the request ────────────────────────────────────────
+async function submitEngineerClose() {
+  const reason = document.getElementById('engineerCloseReason')?.value?.trim();
+  if(!reason){showToast('Please provide a reason for closing','error');return;}
+  showLoader(true);
+  const{error}=await db.from('procurement_requests').update({
+    phase:'rejected',
+    rejection_reason: reason,
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR,'rejected')
+  }).eq('id',currentPR.id);
+  if(!error) await postComment(currentPR.id,currentUser.id,`🚫 Request closed by engineer: ${reason}`);
+  if(!error) notifyPhaseChange(currentPR.id,'rejected',currentUser?.id);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast('Request closed.','success');
+  closeModal('prModal');await loadRequests();
+}
+
+// ── Keep going — add note ────────────────────────────────────
+async function submitEngineerKeepGoing() {
+  const note = document.getElementById('engineerKeepNote')?.value?.trim();
+  showLoader(true);
+  if(note) await postComment(currentPR.id,currentUser.id,`📌 Engineer note (keeping request active): ${note}`);
+  else await postComment(currentPR.id,currentUser.id,'📌 Engineer reviewed quotations — request kept active.');
+  showLoader(false);
+  showToast('Note added. Request remains active.','success');
+  closeModal('prModal');await loadRequests();
+}
+
+// ── Send back to procurement for revised quotes ──────────────
+async function submitEngineerReviseRequest() {
+  const note = document.getElementById('engineerReviseNote')?.value?.trim();
+  if(!note){showToast('Please describe what needs to change','error');return;}
+  showLoader(true);
+  const{error}=await db.from('procurement_requests').update({
+    phase:'quotes_revision_requested',
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR,'quotes_revision_requested')
+  }).eq('id',currentPR.id);
+  if(!error) await postComment(currentPR.id,currentUser.id,`🔁 Engineer requested quote revision — ${note}`);
+  if(!error) notifyPhaseChange(currentPR.id,'quotes_revision_requested',currentUser?.id);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast('Sent back to Procurement for revised quotes.','warning');
+  closeModal('prModal');await loadRequests();
+}
+
+// ── Validate & Forward (no selection — approver picks quote) ──
 async function submitEngineerVerification() {
-  if(!selectedQuotationId){showToast('Please select a quotation first','error');return;}
-  const selectedQ = prQuotations.find(q=>q.id===selectedQuotationId);
-  if(!selectedQ){showToast('Selected quotation not found','error');return;}
+  // Find any existing selected quotation, or use the highest-value one for routing threshold
+  const selectedQ = prQuotations.find(q=>q.is_selected) || prQuotations[0];
+  if(!selectedQ && !prQuotations.length){showToast('No quotations found','error');return;}
 
   const amount = parseFloat(selectedQ.amount || 0);
   // Compute INR equivalent for threshold check.
   // Prefer the stored inr_amount column (set by procurement when uploading).
-  // Fall back to parsing the FX rate from the notes string for older records.
-  let amountINR = amount;
-  if (selectedQ.currency && selectedQ.currency !== 'INR') {
-    if (selectedQ.inr_amount) {
-      amountINR = parseFloat(selectedQ.inr_amount);
-    } else {
-      const fxMatch = selectedQ.notes && selectedQ.notes.match(/×\s*([\d.]+)\s*=/);
-      const fxRate = fxMatch ? parseFloat(fxMatch[1]) : 0;
-      if (fxRate > 0) amountINR = amount * fxRate;
+  // For routing threshold — use max INR amount across all quotes (conservative routing)
+  let amountINR = 0;
+  for(const q of prQuotations) {
+    let qINR = parseFloat(q.amount || 0);
+    if(q.currency && q.currency !== 'INR') {
+      if(q.inr_amount) qINR = parseFloat(q.inr_amount);
+      else {
+        const fxMatch = q.notes && q.notes.match(/×\s*([\d.]+)\s*=/);
+        const fxRate = fxMatch ? parseFloat(fxMatch[1]) : 0;
+        if(fxRate > 0) qINR = qINR * fxRate;
+      }
     }
+    if(qINR > amountINR) amountINR = qINR;
   }
   const needsDirector = amountINR >= ENGINEER_APPROVAL_LIMIT;
   const newPhase = needsDirector ? 'pending_sandy_approval' : 'pending_pm_final_approval';
 
   showLoader(true);
-  // Mark selected quotation
-  await db.from('pr_quotations').update({is_selected:false}).eq('pr_id',currentPR.id);
-  await db.from('pr_quotations').update({is_selected:true}).eq('id',selectedQuotationId);
-
   const{error}=await db.from('procurement_requests').update({
     phase: newPhase,
     approval_path: 'engineer_verified',
-    selected_quotation_id: selectedQuotationId,
     client_approval_screenshot: null,
     updated_at: new Date().toISOString(),
     phase_timestamps: addPhaseTimestamp(currentPR, newPhase)
@@ -914,24 +1065,23 @@ async function submitEngineerVerification() {
 
   if(!error){
     const routedTo = needsDirector ? 'Director (amount ≥ ₹5,000)' : 'Project Manager';
-    const amtDisplay = selectedQ.currency && selectedQ.currency !== 'INR'
-      ? `${selectedQ.currency} ${amount.toLocaleString()} ≈ ₹${amountINR.toLocaleString('en-IN')}`
-      : `₹${amountINR.toLocaleString('en-IN')}`;
     await postComment(currentPR.id, currentUser.id,
-      `✅ Engineer verified quotation from ${selectedQ.vendor_name||'vendor'} (${amtDisplay}). Forwarded to ${routedTo}.`);
+      `✅ Engineer validated quotations (${prQuotations.length} quote${prQuotations.length!==1?'s':''}). Forwarded to ${routedTo} for approval.`);
     notifyPhaseChange(currentPR.id, newPhase, currentUser?.id);
   }
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
+  const amtDisplay = amountINR ? `₹${amountINR.toLocaleString('en-IN')}` : '';
   showToast(needsDirector
-    ? `⬆️ Amount ${amtDisplay} ≥ ₹5,000 — forwarded to Director for approval.`
-    : `✅ Verified — forwarded to Project Manager.`,'success');
-  selectedQuotationId=null;
+    ? `⬆️ ${amtDisplay ? amtDisplay+' — ' : ''}Forwarded to Director for approval.`
+    : `✅ Validated — forwarded to Project Manager.`,'success');
   closeModal('prModal');await loadRequests();
 }
 
+// selectQuotation removed — engineer no longer selects quotes.
+// Kept as no-op to avoid errors if called from shared renderQuotationCard
 function selectQuotation(qId) {
-  selectedQuotationId=qId;
+  // Engineer view is read-only; selection is not permitted at this stage.
   prQuotations.forEach(q=>{
     const card=document.getElementById(`qcard-${q.id}`);if(!card)return;
     const isNow=q.id===qId;

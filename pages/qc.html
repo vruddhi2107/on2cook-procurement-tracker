@@ -7,11 +7,18 @@
 <link rel="stylesheet" href="../css/styles.css"/>
 <style>
 /* ── QC option cards ─────────────────────────────────────────────────── */
-.qc-result-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.qc-result-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px}
 .qc-option{border:2px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all 0.15s;text-align:center}
 .qc-option:hover{border-color:var(--red)}
 .qc-option.pass.selected{border-color:#16a34a;background:rgba(22,163,74,0.06)}
 .qc-option.fail.selected{border-color:#dc2626;background:rgba(220,38,38,0.06)}
+.qc-option.reject.selected{border-color:#7c3aed;background:rgba(124,58,237,0.06)}
+
+/* ── Samples rejection table ──────────────────────────────────────────── */
+.samples-section{background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px}
+.samples-table{width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:8px}
+.samples-table th{background:#e8e8e8;padding:7px 8px;font-size:0.72rem;font-weight:700;text-transform:uppercase;border:1px solid #ccc;text-align:center}
+.samples-table td{border:1px solid #ccc;padding:5px 7px;vertical-align:middle}
 .qc-option .qc-icon{font-size:1.8rem;margin-bottom:6px}
 .qc-option .qc-label{font-weight:700;font-size:0.88rem}
 .qc-option .qc-desc{font-size:0.75rem;color:var(--gray-3);margin-top:2px}
@@ -66,6 +73,7 @@
     <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sQcPending">—</div><div class="stat-card-label">QC Pending</div><div class="stat-card-icon">🔍</div></div>
     <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sQcPassed">—</div><div class="stat-card-label">QC Passed</div><div class="stat-card-icon">✅</div></div>
     <div class="stat-card" style="--accent:#ef4444"><div class="stat-card-value" id="sRework">—</div><div class="stat-card-label">Rework Raised</div><div class="stat-card-icon">🔄</div></div>
+    <div class="stat-card" style="--accent:#7c3aed"><div class="stat-card-value" id="sQcRejected">—</div><div class="stat-card-label">QC Rejected</div><div class="stat-card-icon">🚫</div></div>
   </div>
 
   <div class="tabs">

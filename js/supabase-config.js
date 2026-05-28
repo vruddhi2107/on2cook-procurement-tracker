@@ -84,6 +84,7 @@ const PHASE_ORDER = [
   'pending_initial_pm_approval',
   'procurement_active',
   'quotations_shared',
+  'quotes_revision_requested',
   'pending_pm_final_approval',
   'approved',
   'advance_raised_to_accounts',

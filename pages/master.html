@@ -492,7 +492,7 @@ async function renderDirectorApprovals() {
   tbody.innerHTML = rows.join('');
 }
 
-let directorCurrentPR = null, directorQuotations = [], directorIsOverride = false;
+let directorCurrentPR = null, directorQuotations = [], directorIsOverride = false, directorSelectedQuotationId = null;
 
 async function openDirectorModal(prId, isOverride = false) {
   directorCurrentPR = allRequests.find(r => r.id === prId);
@@ -501,17 +501,22 @@ async function openDirectorModal(prId, isOverride = false) {
   showLoader(true);
   const { data: quotations } = await db.from('pr_quotations').select('*').eq('pr_id', prId).order('created_at');
   directorQuotations = quotations || [];
-  const selectedQ = directorQuotations.find(q => q.is_selected) || directorQuotations.find(q => q.id === directorCurrentPR.selected_quotation_id);
+  const existingSelectedQ = directorQuotations.find(q => q.is_selected) || directorQuotations.find(q => q.id === directorCurrentPR.selected_quotation_id);
+  directorSelectedQuotationId = existingSelectedQ?.id || null;
   showLoader(false);
 
-  const amt = selectedQ?.amount ? `₹${parseFloat(selectedQ.amount).toLocaleString('en-IN')}` : '—';
   const prLabel = `PR-${String(directorCurrentPR.request_number).padStart(4,'0')}`;
 
   const headerLabel = directorIsOverride
     ? `<div class="action-section-title" style="color:#7c3aed">⚡ Director Override — ${prLabel} <span class="action-badge" style="background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35">OVERRIDE MODE</span></div>
        <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">As Director, you can approve or reject this request at any stage, bypassing the standard workflow.</p>`
     : `<div class="action-section-title" style="color:#7c3aed">👤 Director Approval Required <span class="action-badge" style="background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35">ESCALATED</span></div>
-       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Engineer verified this quotation and the amount <strong>${amt}</strong> meets or exceeds the PM limit of ₹5,000. Your approval is required to proceed.</p>`;
+       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">The amount meets or exceeds ₹5,000. <strong>Select the final quotation</strong> below before approving.</p>`;
+
+  const dirQuotesHTML = directorQuotations.length
+    ? `<div class="detail-key" style="margin-bottom:8px">Select Final Quotation</div>
+       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${directorQuotations.map(q=>renderQuotationCard(q,true,directorSelectedQuotationId)).join('')}</div>`
+    : `<div style="margin-bottom:14px;padding:10px;background:#fff8f0;border:1px solid #f59e0b33;border-radius:var(--radius-sm);font-size:0.82rem;color:#92400e">⚠ No quotations uploaded yet.</div>`;
 
   document.getElementById('modalTitle').textContent = `Director Review — ${prLabel}`;
   document.getElementById('modalBody').innerHTML = `
@@ -520,11 +525,7 @@ async function openDirectorModal(prId, isOverride = false) {
     </div>
     <div class="action-section" style="border-color:#7c3aed33;background:rgba(124,58,237,0.04)">
       ${headerLabel}
-      ${selectedQ ? `<div style="margin-bottom:14px;padding:12px;background:#fafafa;border:1px solid var(--border);border-radius:var(--radius)">
-        <div class="detail-key" style="margin-bottom:6px">Selected Quotation</div>
-        <div style="font-size:0.85rem"><strong>${selectedQ.vendor_name||'Unknown vendor'}</strong> — ${amt}${selectedQ.lead_time_days?` · ${selectedQ.lead_time_days} days lead time`:''}</div>
-        ${selectedQ.notes?`<div style="font-size:0.78rem;color:var(--gray-3);margin-top:4px">${selectedQ.notes}</div>`:''}
-      </div>` : ''}
+      ${dirQuotesHTML}
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Decision Notes *</label>
         <textarea class="form-control" id="directorNotes" placeholder="State your approval rationale or reason for rejection..."></textarea>
@@ -537,10 +538,38 @@ async function openDirectorModal(prId, isOverride = false) {
   openModal('mainModal');
 }
 
+function selectQuotation(qId) {
+  directorSelectedQuotationId = qId;
+  directorQuotations.forEach(q => {
+    const card = document.getElementById(`qcard-${q.id}`);
+    if (!card) return;
+    const isNow = q.id === qId;
+    card.classList.toggle('selected', isNow);
+    const ob = card.querySelector('.sel-badge'); if (ob) ob.remove();
+    if (isNow) card.querySelector('.quotation-card-header').insertAdjacentHTML('beforeend',
+      `<span class="sel-badge" style="background:#22c55e14;color:#16a34a;border:1px solid #22c55e30;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-size:0.62rem;font-weight:600">✓ SELECTED</span>`);
+    card.querySelectorAll('button').forEach(btn => {
+      if (btn.textContent.includes('Select as Final') || btn.textContent.includes('Deselect')) {
+        btn.textContent = isNow ? 'Deselect' : '✓ Select as Final';
+        btn.className = `btn btn-sm ${isNow ? 'btn-danger' : 'btn-primary'}`;
+        btn.onclick = () => selectQuotation(isNow ? null : q.id);
+      }
+    });
+  });
+}
+
 async function directorDecision(decision) {
   const notes = document.getElementById('directorNotes')?.value.trim();
   if (!notes) { showToast('Please add decision notes', 'error'); return; }
+  if (decision === 'approved' && !directorSelectedQuotationId) {
+    showToast('Please select a quotation before approving', 'error'); return;
+  }
   showLoader(true);
+  // Persist the director's quote selection
+  if (decision === 'approved' && directorSelectedQuotationId) {
+    await db.from('pr_quotations').update({is_selected:false}).eq('pr_id', directorCurrentPR.id);
+    await db.from('pr_quotations').update({is_selected:true}).eq('id', directorSelectedQuotationId);
+  }
   const newPhase = decision === 'approved' ? 'approved' : 'rejected';
   const overrideTag = directorIsOverride ? ' [Director Override]' : '';
   const { error } = await db.from('procurement_requests').update({
@@ -548,6 +577,7 @@ async function directorDecision(decision) {
     pm_final_approval_status: decision,
     pm_final_approval_notes: ((directorCurrentPR.pm_final_approval_notes||'') + ` | Director${overrideTag}: ${notes}`).trim(),
     rejection_reason: decision === 'rejected' ? notes : null,
+    selected_quotation_id: decision === 'approved' ? (directorSelectedQuotationId || directorCurrentPR.selected_quotation_id) : directorCurrentPR.selected_quotation_id,
     updated_at: new Date().toISOString(),
     phase_timestamps: addPhaseTimestamp(directorCurrentPR, newPhase)
   }).eq('id', directorCurrentPR.id);

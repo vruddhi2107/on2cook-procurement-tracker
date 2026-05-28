@@ -132,6 +132,7 @@ function getPhaseBadge(phase){
     procurement_active:['Procurement','badge-blue'],
     vendor_info_shared:['Vendor Info Shared','badge-purple'],
     quotations_shared:['Engineer Verification','badge-purple'],
+    quotes_revision_requested:['Quote Revision Requested','badge-orange'],
     pending_pm_final_approval:['PM Approval','badge-orange'],
     pending_sandy_approval:['Director Approval','badge-purple'],
     approved:['Approved','badge-green'],
@@ -142,6 +143,7 @@ function getPhaseBadge(phase){
     rework_pending:['Rework / JWC','badge-orange'],
     rework_returned:['Rework Returned — Re-QC','badge-yellow'],
     qc_passed:['QC Passed','badge-green'],
+    qc_rejected:['QC Rejected','badge-red'],
     accepted:['Accepted & Closed','badge-green'],
     rejected:['Rejected','badge-red'],
     payment_requested:['Payment Requested','badge-purple'],
@@ -149,9 +151,22 @@ function getPhaseBadge(phase){
     advance_approved:['Advance Approved','badge-green'],
     advance_rejected:['Advance Rejected','badge-red'],
     declined:['Declined','badge-red'],
+    lp_payment_pending:['Payment Pending','badge-orange'],
+    lp_payment_done:['Payment Done','badge-green'],
   };
   const[label,cls]=map[phase]||[phase,'badge-gray'];
   return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function getUrgencyBadge(urgency){
+  if(!urgency||urgency==='normal') return '';
+  const map={
+    urgent:['⚡ Within 24 hours','background:rgba(245,158,11,0.12);color:#b45309;border:1px solid rgba(245,158,11,0.35)'],
+    critical:['🔴 Within 48 hours','background:rgba(214,43,43,0.12);color:#b91c1c;border:1px solid rgba(214,43,43,0.35)'],
+  };
+  const[label,style]=map[urgency]||['',''];
+  if(!label) return '';
+  return `<span style="font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:3px;${style};white-space:nowrap">${label}</span>`;
 }
 
 // ── NAVBAR / FOOTER ─────────────────────────────────────────
@@ -349,6 +364,7 @@ const WF_STEPS = [
   {key:'pending_initial_pm_approval',label:'PM Clearance'},
   {key:'procurement_active',label:'Procurement'},
   {key:'quotations_shared',label:'Quotations'},
+  {key:'quotes_revision_requested',label:'Quote Revision',optional:true},
   {key:'pending_pm_final_approval',label:'PM Approval'},
   {key:'pending_sandy_approval',label:'Director Approval'},
   {key:'approved',label:'Approved'},
@@ -536,8 +552,8 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       <p style="font-size:0.83rem">${pr.rejection_reason}</p>
     </div>`:''}
 
-    ${pr.qc_notes?`<div style="margin-top:14px;padding:12px;background:${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'rgba(22,163,74,0.06)':'rgba(214,43,43,0.06)'};border:1px solid ${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'rgba(22,163,74,0.2)':'rgba(214,43,43,0.2)'};border-radius:var(--radius)">
-      <div class="detail-key" style="color:${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'#16a34a':'var(--red)'};margin-bottom:4px">QC — ${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'Passed ✓':'Failed ✗'}</div>
+    ${pr.qc_notes?`<div style="margin-top:14px;padding:12px;background:${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'rgba(22,163,74,0.06)':pr.phase==='qc_rejected'?'rgba(124,58,237,0.06)':'rgba(214,43,43,0.06)'};border:1px solid ${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'rgba(22,163,74,0.2)':pr.phase==='qc_rejected'?'rgba(124,58,237,0.25)':'rgba(214,43,43,0.2)'};border-radius:var(--radius)">
+      <div class="detail-key" style="color:${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'#16a34a':pr.phase==='qc_rejected'?'#7c3aed':'var(--red)'};margin-bottom:4px">QC — ${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'Passed ✓':pr.phase==='qc_rejected'?'Rejected 🚫':'Failed ✗'}</div>
       <p style="font-size:0.83rem">${pr.qc_notes}</p>
     </div>`:''}
 

@@ -118,9 +118,23 @@ function getPhaseBadge(phase){
     advance_requested:['Advance Requested','badge-orange'],
     advance_approved:['Advance Approved','badge-green'],
     advance_rejected:['Advance Rejected','badge-red'],
+    lp_payment_pending:['Payment Pending','badge-orange'],
+    lp_payment_done:['Payment Done','badge-green'],
   };
   const[label,cls]=map[phase]||[phase,'badge-gray'];
   return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function getUrgencyBadge(urgency){
+  if(!urgency||urgency==='normal') return '';
+  const map={
+    urgent:['⚡ Within 24 hours','background:rgba(245,158,11,0.12);color:#b45309;border:1px solid rgba(245,158,11,0.35)'],
+    critical:['🔴 Within 48 hours','background:rgba(214,43,43,0.12);color:#b91c1c;border:1px solid rgba(214,43,43,0.35)'],
+    normal:['🟢 Within 1 Week','background:rgba(34,197,94,0.12);color:#166534;border:1px solid rgba(34,197,94,0.35)'],
+  };
+  const[label,style]=map[urgency]||['',''];
+  if(!label) return '';
+  return `<span style="font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:3px;${style};white-space:nowrap">${label}</span>`;
 }
 
 // ── NAVBAR / FOOTER ─────────────────────────────────────────

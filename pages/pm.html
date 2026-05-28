@@ -85,6 +85,7 @@ function addPhaseTimestamp(pr, phaseName) {
   return ts;
 }
 let prQuotations=[];
+let pmSelectedQuotationId=null; // quote selected by PM during final approval
 
 function handleAttachmentDownload(e, url, fileName) {
   if (!url) return;
@@ -221,13 +222,18 @@ async function openPR(id) {
 
   // ── FINAL APPROVAL ──
   if(currentPR.phase==='pending_pm_final_approval') {
-    const selectedQ=quotations.find(q=>q.id===currentPR.selected_quotation_id)||quotations.find(q=>q.is_selected);
+    // PM selects the final quote during approval
+    pmSelectedQuotationId = currentPR.selected_quotation_id || quotations.find(q=>q.is_selected)?.id || null;
 
-    // Engineer has already verified & selected the quote; PM reviews and approves/rejects.
+    const quotesHTML = quotations.length
+      ? `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${quotations.map(q=>renderQuotationCard(q,true,pmSelectedQuotationId)).join('')}</div>`
+      : `<div style="margin-bottom:14px;padding:10px;background:#fff8f0;border:1px solid #f59e0b33;border-radius:var(--radius-sm);font-size:0.82rem;color:#92400e">⚠ No quotations uploaded yet — contact procurement.</div>`;
+
     actionSection=`<div class="action-section">
       <div class="action-section-title">✍️ Final Approval <span class="action-badge">ACTION REQUIRED</span></div>
-      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">The engineer has verified and selected this quotation. Review and make your final decision. Amounts of <strong>₹5,000 or above</strong> will be automatically escalated to the Director.</p>
-      ${selectedQ?`<div style="margin-bottom:14px"><div class="detail-key" style="margin-bottom:8px">Engineer's Verified Quotation</div>${renderQuotationCard(selectedQ,false)}</div>`:`<div style="margin-bottom:14px;padding:10px;background:#fff8f0;border:1px solid #f59e0b33;border-radius:var(--radius-sm);font-size:0.82rem;color:#92400e">⚠ No quotation pre-selected — contact engineer.</div>`}
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Select the final quotation below, then approve or reject. Amounts of <strong>₹5,000 or above</strong> will be automatically escalated to the Director.</p>
+      <div class="detail-key" style="margin-bottom:8px">Select Final Quotation</div>
+      ${quotesHTML}
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Decision Notes *</label>
         <textarea class="form-control" id="approvalNotes" placeholder="Approval rationale or reason for rejection..."></textarea>
@@ -302,6 +308,27 @@ async function grantClearance(decision) {
   closeModal('prModal'); await loadRequests();
 }
 
+// ── PM QUOTE SELECTION ───────────────────────────────────────
+function selectQuotation(qId) {
+  pmSelectedQuotationId = qId;
+  prQuotations.forEach(q => {
+    const card = document.getElementById(`qcard-${q.id}`);
+    if (!card) return;
+    const isNow = q.id === qId;
+    card.classList.toggle('selected', isNow);
+    const ob = card.querySelector('.sel-badge'); if (ob) ob.remove();
+    if (isNow) card.querySelector('.quotation-card-header').insertAdjacentHTML('beforeend',
+      `<span class="sel-badge" style="background:#22c55e14;color:#16a34a;border:1px solid #22c55e30;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-size:0.62rem;font-weight:600">✓ SELECTED</span>`);
+    card.querySelectorAll('button').forEach(btn => {
+      if (btn.textContent.includes('Select as Final') || btn.textContent.includes('Deselect')) {
+        btn.textContent = isNow ? 'Deselect' : '✓ Select as Final';
+        btn.className = `btn btn-sm ${isNow ? 'btn-danger' : 'btn-primary'}`;
+        btn.onclick = () => selectQuotation(isNow ? null : q.id);
+      }
+    });
+  });
+}
+
 // ── APPROVAL THRESHOLD ─────────────────────────────────────
 // PM can approve quotes strictly below ₹5,000.
 // ₹5,000 and above is escalated to the Director (sandy@on2cook.com).
@@ -318,12 +345,13 @@ async function finalDecision(decision) {
   }
   showLoader(true);
 
-  // ── Engineer already selected the quote; just read it ────
+  // ── PM selects the quote during approval ────
   let selectedAmount = 0;
   let selectedAmountINR = 0;
   let selectedQ = null;
   if(decision==='approved') {
-    selectedQ = prQuotations.find(q=>q.id===currentPR.selected_quotation_id) || prQuotations.find(q=>q.is_selected);
+    if(!pmSelectedQuotationId){showLoader(false);showToast('Please select a quotation before approving','error');return;}
+    selectedQ = prQuotations.find(q=>q.id===pmSelectedQuotationId);
     selectedAmount = parseFloat(selectedQ?.amount || 0);
     // Compute INR equivalent: prefer stored inr_amount, fall back to parsing notes
     selectedAmountINR = selectedAmount;
@@ -346,11 +374,16 @@ async function finalDecision(decision) {
   else if(needsDirectorApproval) newPhase='pending_sandy_approval';
   else newPhase='approved';
 
+  // Persist the PM's quote selection on all quotation rows
+  if(decision==='approved' && pmSelectedQuotationId) {
+    await db.from('pr_quotations').update({is_selected:false}).eq('pr_id',currentPR.id);
+    await db.from('pr_quotations').update({is_selected:true}).eq('id',pmSelectedQuotationId);
+  }
   const{error}=await db.from('procurement_requests').update({
     phase:newPhase,
     pm_final_approval_status:needsDirectorApproval?'pending':decision,
     pm_final_approval_notes:notes,
-    selected_quotation_id:currentPR.selected_quotation_id,
+    selected_quotation_id:decision==='approved'?(pmSelectedQuotationId||currentPR.selected_quotation_id):currentPR.selected_quotation_id,
     rejection_reason:decision==='rejected'?notes:null,
     needs_more_vendors:needsMoreVendors,
     updated_at:new Date().toISOString(),

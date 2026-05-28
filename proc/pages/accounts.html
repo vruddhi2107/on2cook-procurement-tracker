@@ -62,9 +62,9 @@
       <input type="text" id="searchInput" placeholder="Search by project or vendor..." oninput="filterPayments()"/>
       <select id="filterUrgency" onchange="filterPayments()">
         <option value="">All Urgency</option>
-        <option value="critical">🔴 Critical</option>
-        <option value="urgent">🟡 Urgent</option>
-        <option value="normal">⚪ Normal</option>
+        <option value="critical">🔴 Within 48 hours</option>
+        <option value="urgent">🟡 Within 24 hours</option>
+        <option value="normal">🟢 Within 1 Week</option>
       </select>
       <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕</button>
     </div>
