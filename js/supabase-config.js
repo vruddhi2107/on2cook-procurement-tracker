@@ -6,7 +6,34 @@
 const SUPABASE_URL = 'https://jjoipvugyingxhddszcc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impqb2lwdnVneWluZ3hoZGRzemNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzgyMDcsImV4cCI6MjA5MzExNDIwN30.n2Eq0m0P5uaKOLlz4648zl3aW2o79Zyt_gkBFB9XnWM';
 const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// _appUserId is set after login. The db client is recreated with the
+// user ID in global headers so every PostgREST call carries x-app-user-id,
+// which RLS policies read via public.app_user_id().
+let _appUserId = null;
+let db = _makeClient(null);
+
+function _makeClient(userId) {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: {
+      headers: userId ? { 'x-app-user-id': userId } : {}
+    }
+  });
+}
+
+// Call after login and on every page load.
+function setAppUser(user) {
+  if (user && user.id) {
+    _appUserId = user.id;
+    // Recreate the client with the user ID header baked in.
+    // All existing code that uses `db` will automatically use the new client
+    // because they reference the module-level `db` variable.
+    db = _makeClient(user.id);
+  } else {
+    _appUserId = null;
+    db = _makeClient(null);
+  }
+}
 // ============================================================
 // SUPABASE CONFIGURATION — ProcureOps v2
 // Replace YOUR_SUPABASE_URL and YOUR_SUPABASE_ANON_KEY below
@@ -17,8 +44,16 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // SESSION
 // ============================================================
 const Session = {
-  set(user) { localStorage.setItem('procurement_user', JSON.stringify(user)); },
-  get() { const u = localStorage.getItem('procurement_user'); return u ? JSON.parse(u) : null; },
+  set(user) {
+    localStorage.setItem('procurement_user', JSON.stringify(user));
+    setAppUser(user);
+  },
+  get() {
+    const u = localStorage.getItem('procurement_user');
+    const user = u ? JSON.parse(u) : null;
+    if (user) setAppUser(user); // restore headers on every page load
+    return user;
+  },
   clear() { localStorage.removeItem('procurement_user'); },
   require(allowedRoles) {
     const user = this.get();

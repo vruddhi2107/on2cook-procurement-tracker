@@ -3,10 +3,37 @@
 // Replace with your actual Supabase project URL and anon key
 // ============================================================
 
-const SUPABASE_URL = 'https://i.supabase.co';
-const SUPABASE_ANON_KEY = 'lZiI6Im54aHZ4ZnZmaHZia3ltZ3Ztd3dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5OTg5MjQsImV4cCI6MjA4NzU3NDkyNH0.U5lrYtTXBEbqpF5ZO7GcMWQ8IGhsGqWsvGiDZ4FQnK0';
+const SUPABASE_URL = 'https://jjoipvugyingxhddszcc.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impqb2lwdnVneWluZ3hoZGRzemNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzgyMDcsImV4cCI6MjA5MzExNDIwN30.n2Eq0m0P5uaKOLlz4648zl3aW2o79Zyt_gkBFB9XnWM';
 const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// _appUserId is set after login. The db client is recreated with the
+// user ID in global headers so every PostgREST call carries x-app-user-id,
+// which RLS policies read via public.app_user_id().
+let _appUserId = null;
+let db = _makeClient(null);
+
+function _makeClient(userId) {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: {
+      headers: userId ? { 'x-app-user-id': userId } : {}
+    }
+  });
+}
+
+// Call after login and on every page load.
+function setAppUser(user) {
+  if (user && user.id) {
+    _appUserId = user.id;
+    // Recreate the client with the user ID header baked in.
+    // All existing code that uses `db` will automatically use the new client
+    // because they reference the module-level `db` variable.
+    db = _makeClient(user.id);
+  } else {
+    _appUserId = null;
+    db = _makeClient(null);
+  }
+}
 // ============================================================
 // SUPABASE CONFIGURATION — ProcureOps v2
 // Replace YOUR_SUPABASE_URL and YOUR_SUPABASE_ANON_KEY below
@@ -17,8 +44,16 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // SESSION
 // ============================================================
 const Session = {
-  set(user) { localStorage.setItem('procurement_user', JSON.stringify(user)); },
-  get() { const u = localStorage.getItem('procurement_user'); return u ? JSON.parse(u) : null; },
+  set(user) {
+    localStorage.setItem('procurement_user', JSON.stringify(user));
+    setAppUser(user);
+  },
+  get() {
+    const u = localStorage.getItem('procurement_user');
+    const user = u ? JSON.parse(u) : null;
+    if (user) setAppUser(user); // restore headers on every page load
+    return user;
+  },
   clear() { localStorage.removeItem('procurement_user'); },
   require(allowedRoles) {
     const user = this.get();
@@ -44,10 +79,14 @@ const PHASES = {
   advance_requested:            { label: 'Advance Requested',        color: '#f59e0b', icon: '💳' },
   advance_approved:             { label: 'Advance Approved',         color: '#22c55e', icon: '💳' },
   advance_rejected:             { label: 'Advance Rejected',         color: '#ef4444', icon: '💳' },
+  advance_raised_to_accounts:   { label: 'Advance Raised',           color: '#f59e0b', icon: '📤' },
+  advance_payment_received:     { label: 'Advance Received',         color: '#22c55e', icon: '💳' },
   order_placed:                 { label: 'Order Placed',             color: '#14b8a6', icon: '🛒' },
   grn_pending:                  { label: 'GRN / QC Pending',         color: '#f59e0b', icon: '📦' },
   qc_passed:                    { label: 'QC Passed',                color: '#22c55e', icon: '✔️'  },
   payment_requested:            { label: 'Payment Requested',        color: '#8b5cf6', icon: '💰' },
+  payment_raised_to_accounts:   { label: 'Payment Raised',           color: '#8b5cf6', icon: '📤' },
+  payment_received:             { label: 'Payment Received',         color: '#22c55e', icon: '✅' },
   accepted:                     { label: 'Accepted & Closed',        color: '#22c55e', icon: '✔️'  },
   rejected:                     { label: 'Rejected & Closed',        color: '#ef4444', icon: '✖️' }
 };
@@ -64,7 +103,6 @@ const DEPARTMENTS = {
   mech:        'Mechanical Design Engineering',
   id:          'Industrial Design',
   electronics: 'Production & Operations - Electronics',
-  // New department keys
   npd:          'Production & Operations - NPD',
   assembly:     'Production & Operations - Assembly',
   scm_stores:   'SCM - Stores & Logistics',
@@ -81,14 +119,17 @@ const PHASE_ORDER = [
   'pending_initial_pm_approval',
   'procurement_active',
   'quotations_shared',
+  'quotes_revision_requested',
   'pending_pm_final_approval',
-  'pending_sandy_approval',
   'approved',
+  'advance_raised_to_accounts',
+  'advance_payment_received',
   'order_placed',
   'grn_pending',
   'qc_passed',
-  'payment_requested',
-  'accepted' 
+  'payment_raised_to_accounts',
+  'payment_received',
+  'accepted'
 ];
 
 function formatDate(d) {
