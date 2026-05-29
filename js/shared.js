@@ -1,3 +1,9 @@
+// ── UTILITY ───────────────────────────────────────────────────
+function escHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 // ══════════════════════════════════════════════════════════════
 // SAFE FILE REGISTRY — eliminates base64-in-HTML-attribute bugs
 // All large file URLs are stored here; buttons reference by index only.
@@ -763,6 +769,7 @@ function renderVendorCards(vendors, gridId, canEdit=false) {
           <button class="btn btn-secondary btn-sm" onclick="editVendor('${v.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="toggleVendorActive('${v.id}',${v.is_active})">${v.is_active?'Deactivate':'Activate'}</button>
           <button class="btn btn-ghost btn-sm" onclick="openVendorHistory('${v.id}')">📋 History</button>
+          <button class="btn btn-ghost btn-sm" onclick="openVendorPartsModal('${v.id}','${v.name.replace(/'/g,'\\\'')}')" style="color:#6366f1;border-color:rgba(99,102,241,0.3)">🔩 Parts</button>
         `:`
           <button class="btn btn-secondary btn-sm" onclick="openVendorEnquiry(${JSON.stringify(v).split('"').join('&quot;')})">📬 Enquire</button>
           <button class="btn btn-ghost btn-sm" onclick="openVendorHistory('${v.id}')">📋 History</button>
@@ -1062,9 +1069,25 @@ function parseBOMFile(file) {
 
 // ── PARTS EDITOR ─────────────────────────────────────────────
 var _partsEditorRows = _partsEditorRows || [];
-function initPartsEditor(containerId, initialParts=[]) {
+var _partsEditorProductionMode = false; // true when project phase is "Production"
+var _partsCatalogCache = null; // in-memory cache to avoid re-fetching
+
+function initPartsEditor(containerId, initialParts=[], productionMode=false) {
   _partsEditorRows = initialParts.map((p,i)=>({...p,_id:p._id||i}));
+  _partsEditorProductionMode = productionMode;
   renderPartsEditor(containerId);
+  if (productionMode && !_partsCatalogCache) _preloadPartsCatalog();
+}
+window.initPartsEditor = initPartsEditor;
+
+// Pre-fetch parts catalog so autocomplete feels instant
+async function _preloadPartsCatalog() {
+  try {
+    const { data } = await db.from('parts_catalog')
+      .select('id,part_number,part_name,category,unit,description')
+      .order('part_number');
+    _partsCatalogCache = data || [];
+  } catch(e) { _partsCatalogCache = []; }
 }
 const DEPT_OPTIONS = [
   {val:'',label:'— Dept —'},
@@ -1081,11 +1104,16 @@ const DEPT_OPTIONS = [
 ];
 function renderPartsEditor(containerId) {
   const c=document.getElementById(containerId); if(!c) return;
+  const pm = _partsEditorProductionMode;
   c.innerHTML=`
+    ${pm ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:6px;font-size:0.78rem;color:#6366f1">
+      🔩 <strong>Production mode</strong> — Part numbers are required. Use the search to auto-fill from catalog.
+    </div>` : ''}
     <div style="overflow-x:auto">
-    <table class="parts-table" style="width:100%;min-width:600px">
+    <table class="parts-table" style="width:100%;min-width:${pm?'720':'600'}px">
       <thead><tr>
         <th style="width:28px">#</th>
+        ${pm ? `<th style="width:120px">Part Number *</th>` : ''}
         <th>Part Name *</th>
         <th style="width:65px">Qty *</th>
         <th style="width:50px">UOM</th>
@@ -1101,23 +1129,99 @@ function renderPartsEditor(containerId) {
 }
 function partsRowHTML(i, p={}) {
   const deptOpts = DEPT_OPTIONS.map(d=>`<option value="${d.val}" ${(p.department||'')==d.val?'selected':''}>${d.label}</option>`).join('');
-  return `<tr id="prow-${p._id??i}">
+  const pm = _partsEditorProductionMode;
+  const rid = p._id??i;
+  const partNumCell = pm ? `<td style="position:relative">
+    <input type="text" class="parts-table part-num-input" id="pnum-${rid}"
+      placeholder="Search #…" value="${p.part_number||''}"
+      autocomplete="off"
+      oninput="onPartNumInput(${rid}, this.value, 'partsEditorContainer')"
+      onchange="updatePartField(${rid},'part_number',this.value)"
+      style="width:100%;border:1px solid var(--border);border-radius:4px;font-family:var(--font-mono);font-size:0.75rem;padding:3px 6px;background:white"/>
+    <div id="pnum-dropdown-${rid}" style="display:none;position:absolute;z-index:9999;left:0;top:100%;min-width:260px;max-height:200px;overflow-y:auto;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div>
+  </td>` : '';
+  return `<tr id="prow-${rid}">
     <td style="color:var(--gray-4);text-align:center;font-family:var(--font-mono);font-size:0.72rem">${i+1}</td>
-    <td><input type="text" class="parts-table" placeholder="e.g. M8 Bolt" value="${p.name||''}" onchange="updatePartField(${p._id??i},'name',this.value)" style="width:100%;border:none;outline:none;font-family:var(--font-body);font-size:0.82rem;padding:2px 4px;background:transparent"/></td>
+    ${partNumCell}
+    <td><input type="text" class="parts-table" id="pname-${rid}" placeholder="e.g. M8 Bolt" value="${p.name||''}" onchange="updatePartField(${rid},'name',this.value)" style="width:100%;border:none;outline:none;font-family:var(--font-body);font-size:0.82rem;padding:2px 4px;background:transparent"/></td>
     <td><div class="qty-cell">
-      <button type="button" class="qty-btn" onclick="changeQty(${p._id??i},-1)">−</button>
-      <input type="number" class="qty-input" value="${p.qty||1}" min="1" onchange="updatePartField(${p._id??i},'qty',+this.value||1)"/>
-      <button type="button" class="qty-btn" onclick="changeQty(${p._id??i},1)">+</button>
+      <button type="button" class="qty-btn" onclick="changeQty(${rid},-1)">−</button>
+      <input type="number" class="qty-input" value="${p.qty||1}" min="1" onchange="updatePartField(${rid},'qty',+this.value||1)"/>
+      <button type="button" class="qty-btn" onclick="changeQty(${rid},1)">+</button>
     </div></td>
-    <td><input type="text" placeholder="pcs" value="${p.uom||''}" onchange="updatePartField(${p._id??i},'uom',this.value)" style="width:100%;border:none;outline:none;font-size:0.78rem;padding:2px 4px;background:transparent;text-align:center"/></td>
-    <td><select onchange="updatePartField(${p._id??i},'department',this.value)" style="width:100%;border:1px solid var(--border);border-radius:4px;font-size:0.75rem;padding:2px 4px;background:white">${deptOpts}</select></td>
-    <td><input type="text" placeholder="Material, grade, dimensions..." value="${p.spec||''}" onchange="updatePartField(${p._id??i},'spec',this.value)" style="width:100%;border:none;outline:none;font-family:var(--font-body);font-size:0.82rem;padding:2px 4px;background:transparent"/></td>
-    <td><button type="button" class="btn btn-danger btn-sm" style="padding:3px 7px" onclick="removePartsRow(${p._id??i},'partsEditorContainer')">✕</button></td>
+    <td><input type="text" id="puom-${rid}" placeholder="pcs" value="${p.uom||''}" onchange="updatePartField(${rid},'uom',this.value)" style="width:100%;border:none;outline:none;font-size:0.78rem;padding:2px 4px;background:transparent;text-align:center"/></td>
+    <td><select onchange="updatePartField(${rid},'department',this.value)" style="width:100%;border:1px solid var(--border);border-radius:4px;font-size:0.75rem;padding:2px 4px;background:white">${deptOpts}</select></td>
+    <td><input type="text" id="pspec-${rid}" placeholder="Material, grade, dimensions..." value="${p.spec||''}" onchange="updatePartField(${rid},'spec',this.value)" style="width:100%;border:none;outline:none;font-family:var(--font-body);font-size:0.82rem;padding:2px 4px;background:transparent"/></td>
+    <td><button type="button" class="btn btn-danger btn-sm" style="padding:3px 7px" onclick="removePartsRow(${rid},'partsEditorContainer')">✕</button></td>
   </tr>`;
+}
+
+// ── Catalog autocomplete for production mode ──────────────────
+async function onPartNumInput(rowId, query, containerId) {
+  updatePartField(rowId, 'part_number', query);
+  const dd = document.getElementById(`pnum-dropdown-${rowId}`);
+  if (!dd) return;
+  if (!query || query.length < 1) { dd.style.display='none'; return; }
+
+  // Ensure catalog is loaded
+  if (!_partsCatalogCache) await _preloadPartsCatalog();
+
+  const q = query.toLowerCase();
+  const matches = (_partsCatalogCache||[]).filter(p =>
+    p.part_number.toLowerCase().includes(q) ||
+    p.part_name.toLowerCase().includes(q)
+  ).slice(0, 10);
+
+  if (!matches.length) { dd.style.display='none'; return; }
+
+  dd.style.display = 'block';
+  dd.innerHTML = matches.map(p => `
+    <div onclick="selectCatalogPart(${rowId}, ${JSON.stringify(JSON.stringify(p))}, '${containerId}')"
+         style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;transition:background 0.1s"
+         onmouseover="this.style.background='rgba(99,102,241,0.06)'"
+         onmouseout="this.style.background='white'">
+      <span style="font-family:var(--font-mono);font-size:0.75rem;font-weight:700;color:#6366f1;min-width:80px">${p.part_number}</span>
+      <div>
+        <div style="font-size:0.8rem;font-weight:600">${p.part_name}</div>
+        ${p.category ? `<div style="font-size:0.7rem;color:var(--gray-4)">${p.category}${p.unit?' · '+p.unit:''}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  // Close on outside click
+  document.addEventListener('click', function _closer(e){
+    if(!dd.contains(e.target) && e.target.id !== `pnum-${rowId}`){
+      dd.style.display='none';
+      document.removeEventListener('click',_closer);
+    }
+  });
+}
+
+function selectCatalogPart(rowId, jsonStr, containerId) {
+  const part = JSON.parse(jsonStr);
+  const r = _partsEditorRows.find(r => r._id === rowId);
+  if (r) {
+    r.part_number = part.part_number;
+    r.name        = part.part_name;
+    r.uom         = part.unit || r.uom || 'pcs';
+    r.spec        = part.description || r.spec || '';
+    r.catalog_id  = part.id;
+  }
+  // Update DOM fields directly (avoid full re-render which loses focus)
+  const pnum = document.getElementById(`pnum-${rowId}`);
+  if (pnum) pnum.value = part.part_number;
+  const pname = document.getElementById(`pname-${rowId}`);
+  if (pname) pname.value = part.part_name;
+  const puom = document.getElementById(`puom-${rowId}`);
+  if (puom) puom.value = part.unit || 'pcs';
+  const pspec = document.getElementById(`pspec-${rowId}`);
+  if (pspec) pspec.value = part.description || '';
+  const dd = document.getElementById(`pnum-dropdown-${rowId}`);
+  if (dd) dd.style.display = 'none';
 }
 function addPartsRow(containerId) {
   const id=Date.now();
-  _partsEditorRows.push({_id:id,name:'',qty:1,uom:'pcs',department:'',spec:''});
+  _partsEditorRows.push({_id:id,part_number:'',name:'',qty:1,uom:'pcs',department:'',spec:''});
   renderPartsEditor(containerId);
 }
 function removePartsRow(rowId, containerId) {
@@ -1137,15 +1241,35 @@ function getPartsFromEditor() {
     const row=document.getElementById(`prow-${r._id}`); if(!row) return;
     const inputs=row.querySelectorAll('input');
     const selects=row.querySelectorAll('select');
-    if(inputs[0]) r.name=inputs[0].value.trim();
-    if(inputs[1]) r.qty=+inputs[1].value||1;
-    if(inputs[2]) r.uom=inputs[2].value.trim();
-    if(selects[0]) r.department=selects[0].value;
-    if(inputs[3]) r.spec=inputs[3].value.trim();
+    if(_partsEditorProductionMode){
+      // In production mode columns: part_number(0), name(1), qty(2), uom(3), spec(4)
+      if(inputs[0]) r.part_number=inputs[0].value.trim();
+      if(inputs[1]) r.name=inputs[1].value.trim();
+      if(inputs[2]) r.qty=+inputs[2].value||1;
+      if(inputs[3]) r.uom=inputs[3].value.trim();
+      if(selects[0]) r.department=selects[0].value;
+      if(inputs[4]) r.spec=inputs[4].value.trim();
+    } else {
+      if(inputs[0]) r.name=inputs[0].value.trim();
+      if(inputs[1]) r.qty=+inputs[1].value||1;
+      if(inputs[2]) r.uom=inputs[2].value.trim();
+      if(selects[0]) r.department=selects[0].value;
+      if(inputs[3]) r.spec=inputs[3].value.trim();
+    }
   });
-  return _partsEditorRows.filter(r=>r.name).map(({name,qty,uom,department,spec})=>({
+  return _partsEditorRows.filter(r=>r.name).map(({part_number,catalog_id,name,qty,uom,department,spec})=>({
+    part_number: part_number||'', catalog_id: catalog_id||null,
     name, qty:qty||1, uom:uom||'pcs', department:department||'', spec:spec||''
   }));
 }
+
+// Expose parts-editor functions called from inline HTML attributes
+window.addPartsRow        = addPartsRow;
+window.removePartsRow     = removePartsRow;
+window.updatePartField    = updatePartField;
+window.changeQty          = changeQty;
+window.getPartsFromEditor = getPartsFromEditor;
+window.onPartNumInput     = onPartNumInput;
+window.selectCatalogPart  = selectCatalogPart;
 
 }

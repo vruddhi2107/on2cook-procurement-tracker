@@ -235,6 +235,7 @@
     <button class="tab-btn active" onclick="switchTab('active')">🔔 Action Needed</button>
     <button class="tab-btn" onclick="switchTab('all')">All Requests</button>
     <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendor DB</button>
+    <button class="tab-btn" onclick="switchTab('parts')">🔩 Parts Catalog</button>
   </div>
 
   <div id="tabRequests">
@@ -276,10 +277,48 @@
 
   <div id="tabVendors" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px">
-      <input type="text" id="vendorSearch" class="form-control" placeholder="Search vendors by name ..." style="max-width:320px"/>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input type="text" id="vendorSearch" class="form-control" placeholder="Search vendors by name ..." style="max-width:220px"/>
+        <span style="color:var(--gray-4);font-size:0.8rem">or</span>
+        <div style="position:relative">
+          <input type="text" id="vendorPartSearch" class="form-control" placeholder="🔩 Search by part number..." style="max-width:220px"
+            oninput="onVendorPartSearch(this.value)" autocomplete="off"/>
+          <div id="vendorPartDropdown" style="display:none;position:absolute;z-index:999;left:0;top:100%;min-width:280px;max-height:220px;overflow-y:auto;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="clearVendorPartFilter()" id="clearPartFilterBtn" style="display:none">✕ Clear filter</button>
+      </div>
       <button class="btn btn-primary" onclick="openVendorModal()">+ Add Vendor</button>
     </div>
+    <div id="vendorPartFilterBanner" style="display:none;margin-bottom:10px;padding:8px 12px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:6px;font-size:0.78rem;color:#6366f1"></div>
     <div class="vendor-grid" id="vendorGrid"></div>
+  </div>
+
+  <!-- ── PARTS CATALOG TAB ─────────────────────────────────── -->
+  <div id="tabParts" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+      <input type="text" id="partsSearch" class="form-control" placeholder="Search by part number or name..." style="max-width:340px" oninput="filterPartsTable()"/>
+      <button class="btn btn-primary" onclick="openPartModal()">+ Add Part</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table" id="partsTable">
+          <thead>
+            <tr>
+              <th>Part Number</th>
+              <th>Part Name</th>
+              <th>Category</th>
+              <th>Unit</th>
+              <th>Primary Vendor</th>
+              <th style="text-align:center">Alt Vendors</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="partsBody">
+            <tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">🔩</div><h3>Loading...</h3></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -470,13 +509,119 @@
 <div id="toast-container"></div>
 <div id="footerMount"></div>
 
+<!-- ── ADD / EDIT PART MODAL ─────────────────────────────────── -->
+<div class="modal-overlay" id="partModal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="partModalTitle">Add Part</div>
+      <button class="modal-close" onclick="closeModal('partModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pmId"/>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Part Number *</label>
+          <input class="form-control" id="pmNumber" placeholder="e.g. PN-001, BRG-6205"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Part Name *</label>
+          <input class="form-control" id="pmName" placeholder="e.g. Deep Groove Ball Bearing"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <input class="form-control" id="pmCategory" placeholder="e.g. Bearings, Electronics, Fasteners"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unit</label>
+          <input class="form-control" id="pmUnit" placeholder="pcs, kg, meters..."/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Description</label>
+          <input class="form-control" id="pmDescription" placeholder="Technical specs, dimensions, standards..."/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Internal Notes</label>
+          <textarea class="form-control" id="pmNotes" placeholder="Storage tips, sourcing notes..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('partModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePart()">Save Part</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MANAGE VENDORS FOR A PART MODAL ───────────────────────── -->
+<div class="modal-overlay" id="partVendorsModal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="pvModalTitle">Manage Vendors</div>
+        <div class="modal-title-sub" id="pvModalSub"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('partVendorsModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Existing linked vendors list -->
+      <div id="pvLinkedList" style="margin-bottom:18px"></div>
+
+      <!-- Link a new vendor form -->
+      <div style="border-top:1px solid var(--border);padding-top:16px">
+        <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray-4);margin-bottom:10px">＋ Link a Vendor</div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
+          <div class="form-group full">
+            <label class="form-label">Vendor *</label>
+            <select class="form-control" id="pvVendorSelect">
+              <option value="">— Select vendor —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Unit Price</label>
+            <input class="form-control" id="pvPrice" type="number" min="0" step="0.01" placeholder="0.00"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Currency</label>
+            <select class="form-control" id="pvCurrency">
+              <option value="INR">INR</option>
+              <option value="AED">AED</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Lead Time (days)</label>
+            <input class="form-control" id="pvLeadTime" type="number" min="0" placeholder="e.g. 7"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Make Primary?</label>
+            <select class="form-control" id="pvIsPrimary">
+              <option value="false">No — Additional vendor</option>
+              <option value="true">Yes — Primary vendor</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Notes</label>
+            <input class="form-control" id="pvNotes" placeholder="MOQ, lead time variation, contact notes..."/>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="linkVendorToPart()" style="margin-top:4px">Link Vendor</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('partVendorsModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="../js/supabase-config.js"></script>
 <script src="../js/shared.js"></script>
 <script>
-let currentUser, allRequests=[], allVendors=[], activeTab='active', currentPR=null;
+let currentUser, allRequests=[], allVendors=[], allParts=[], activeTab='active', currentPR=null;
 function addPhaseTimestamp(pr, phaseName) {
   var existing = (pr && pr.phase_timestamps) ? pr.phase_timestamps : {};
   var ts = Object.assign({}, existing);
@@ -588,10 +733,12 @@ function updateStats() {
 
 function switchTab(t) {
   activeTab=t;
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['active','all','vendors'][i]===t));
-  document.getElementById('tabRequests').style.display=t==='vendors'?'none':'block';
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['active','all','vendors','parts'][i]===t));
+  document.getElementById('tabRequests').style.display=['vendors','parts'].includes(t)?'none':'block';
   document.getElementById('tabVendors').style.display=t==='vendors'?'block':'none';
+  document.getElementById('tabParts').style.display=t==='parts'?'block':'none';
   if(t==='vendors') renderVendorCards(allVendors,'vendorGrid',true);
+  else if(t==='parts') loadPartsTab();
   else filterTable();
 }
 
@@ -636,13 +783,134 @@ function renderTable(reqs) {
 // ── VENDOR DB ─────────────────────────────────────────────────
 async function refreshVendors(){
   await loadVendors();
-  renderVendorCards(allVendors,'vendorGrid',true);
-  const search=document.getElementById('vendorSearch')?.value.toLowerCase()||'';
-  if(search) renderVendorCards(allVendors.filter(v=>v.name.toLowerCase().includes(search)||(v.specialization||'').toLowerCase().includes(search)),'vendorGrid',true);
+  clearVendorPartFilter();
 }
+
+// -- REVERSE VENDOR-PART SEARCH --
+let _vendorPartSearchCache = null;
+
+async function _loadVendorPartsLookup() {
+  if (_vendorPartSearchCache) return _vendorPartSearchCache;
+  const { data } = await db.from('vendor_parts_lookup').select('*').order('part_number');
+  _vendorPartSearchCache = data || [];
+  return _vendorPartSearchCache;
+}
+
+async function onVendorPartSearch(query) {
+  const dd = document.getElementById('vendorPartDropdown');
+  if (!query || query.length < 1) { dd.style.display='none'; return; }
+  const lookup = await _loadVendorPartsLookup();
+  const q = query.toLowerCase();
+  const seenParts = new Set();
+  const matchedParts = lookup.filter(row => {
+    if (seenParts.has(row.part_number)) return false;
+    const match = row.part_number.toLowerCase().includes(q) || row.part_name.toLowerCase().includes(q);
+    if (match) { seenParts.add(row.part_number); return true; }
+    return false;
+  }).slice(0, 12);
+  if (!matchedParts.length) { dd.style.display='none'; return; }
+  dd.style.display = 'block';
+  dd.innerHTML = matchedParts.map(p => {
+    const vendorCount = lookup.filter(r => r.part_number === p.part_number).length;
+    const catHtml = p.part_category ? `<div style="font-size:0.7rem;color:var(--gray-4)">${escHtml(p.part_category)}</div>` : '';
+    return `<div onclick="applyVendorPartFilter(${JSON.stringify(JSON.stringify(p))})"
+      style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;transition:background 0.1s"
+      onmouseover="this.style.background='rgba(99,102,241,0.06)'" onmouseout="this.style.background='white'">
+      <span style="font-family:var(--font-mono);font-size:0.75rem;font-weight:700;color:#6366f1;min-width:80px">${escHtml(p.part_number)}</span>
+      <div style="flex:1"><div style="font-size:0.8rem;font-weight:600">${escHtml(p.part_name)}</div>${catHtml}</div>
+      <span style="font-size:0.7rem;padding:1px 7px;border-radius:10px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);color:#6366f1;white-space:nowrap">${vendorCount} vendor${vendorCount!==1?'s':''}</span>
+    </div>`;
+  }).join('');
+  document.addEventListener('click', function _closer(e){
+    if(!dd.contains(e.target) && e.target.id!=='vendorPartSearch'){ dd.style.display='none'; document.removeEventListener('click',_closer); }
+  });
+}
+
+async function applyVendorPartFilter(jsonStr) {
+  const part = JSON.parse(jsonStr);
+  document.getElementById('vendorPartDropdown').style.display='none';
+  document.getElementById('vendorPartSearch').value = part.part_number;
+  document.getElementById('clearPartFilterBtn').style.display='';
+  const lookup = await _loadVendorPartsLookup();
+  const vendorIds = new Set(lookup.filter(r => r.part_number === part.part_number).map(r => r.vendor_id));
+  const filteredVendors = allVendors.filter(v => vendorIds.has(v.id));
+  const banner = document.getElementById('vendorPartFilterBanner');
+  banner.style.display = '';
+  banner.innerHTML = `🔧 Showing <strong>${filteredVendors.length}</strong> vendor${filteredVendors.length!==1?'s':''} for part <strong style="font-family:var(--font-mono)">${escHtml(part.part_number)}</strong> — ${escHtml(part.part_name)}`;
+  renderVendorCards(filteredVendors,'vendorGrid',true);
+  const vs = document.getElementById('vendorSearch'); if(vs) vs.value='';
+}
+
+function clearVendorPartFilter() {
+  const ps = document.getElementById('vendorPartSearch'); if(ps) ps.value='';
+  const cb = document.getElementById('clearPartFilterBtn'); if(cb) cb.style.display='none';
+  const bn = document.getElementById('vendorPartFilterBanner'); if(bn) bn.style.display='none';
+  renderVendorCards(allVendors,'vendorGrid',true);
+}
+
+// ── VENDOR → PARTS modal (reverse link view from vendor card) ─────────────────
+async function openVendorPartsModal(vendorId, vendorName) {
+  let mo = document.getElementById('_vendorPartsModal');
+  if (!mo) {
+    mo = document.createElement('div');
+    mo.id = '_vendorPartsModal';
+    mo.className = 'modal-overlay';
+    mo.onclick = e => { if (e.target === mo) mo.classList.remove('active'); };
+    document.body.appendChild(mo);
+  }
+  mo.innerHTML = `<div class="modal" style="max-width:660px">
+    <div class="modal-header">
+      <div><div class="modal-title">🔩 Parts Supplied</div><div class="modal-title-sub" id="_vpTitle">Loading...</div></div>
+      <button class="modal-close" onclick="document.getElementById('_vendorPartsModal').classList.remove('active')">✕</button>
+    </div>
+    <div class="modal-body" id="_vpBody"><div style="text-align:center;padding:32px;color:var(--gray-4)">Loading linked parts...</div></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById('_vendorPartsModal').classList.remove('active')">Close</button></div>
+  </div>`;
+  mo.classList.add('active');
+  document.getElementById('_vpTitle').textContent = vendorName;
+
+  const lookup = await _loadVendorPartsLookup();
+  const parts = lookup.filter(r => r.vendor_id === vendorId);
+
+  const body = document.getElementById('_vpBody');
+  if (!parts.length) {
+    body.innerHTML = `<div style="text-align:center;padding:32px;color:var(--gray-4)">
+      <div style="font-size:2rem;margin-bottom:8px">🔩</div>
+      <div style="font-weight:600">No parts linked yet</div>
+      <div style="font-size:0.78rem;margin-top:4px">Go to the Parts Catalog tab to link parts to this vendor.</div>
+    </div>`;
+    return;
+  }
+
+  body.innerHTML = `
+    <p style="font-size:0.78rem;color:var(--gray-4);margin-bottom:14px">${parts.length} part${parts.length!==1?'s':''} linked to this vendor.</p>
+    <div style="overflow-x:auto">
+    <table class="data-table">
+      <thead><tr>
+        <th>Part Number</th><th>Part Name</th><th>Category</th>
+        <th style="text-align:right">Unit Price</th><th>Lead Time</th><th>Primary?</th>
+      </tr></thead>
+      <tbody>
+        ${parts.map(p => `<tr>
+          <td><span style="font-family:var(--font-mono);font-size:0.8rem;font-weight:700;color:#6366f1">${escHtml(p.part_number)}</span></td>
+          <td style="font-weight:600;font-size:0.83rem">${escHtml(p.part_name)}</td>
+          <td style="font-size:0.76rem;color:var(--gray-3)">${p.part_category ? escHtml(p.part_category) : '—'}</td>
+          <td style="text-align:right;font-family:var(--font-mono);font-size:0.8rem">
+            ${p.unit_price != null ? `${p.currency || 'INR'} ${Number(p.unit_price).toLocaleString()}` : '—'}
+          </td>
+          <td style="font-size:0.78rem">${p.lead_time_days != null ? p.lead_time_days + ' days' : '—'}</td>
+          <td style="text-align:center">${p.is_primary ? '<span style="color:#047857;font-weight:700">⭐ Yes</span>' : '<span style="color:var(--gray-4);font-size:0.75rem">Alt</span>'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>`;
+}
+
+
 
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('vendorSearch')?.addEventListener('input',e=>{
+    if(document.getElementById('vendorPartSearch')?.value) return;
     const s=e.target.value.toLowerCase();
     renderVendorCards(allVendors.filter(v=>!s||v.name.toLowerCase().includes(s)||(v.specialization||'').toLowerCase().includes(s)),'vendorGrid',true);
   });
@@ -2717,6 +2985,294 @@ function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existin
     </div>
   </div>`;
 }
+// ── PARTS CATALOG ────────────────────────────────────────────
+
+let currentPartId = null; // part being managed in the vendors modal
+
+// Load parts + their vendor linkages, render the table
+async function loadPartsTab() {
+  const tbody = document.getElementById('partsBody');
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--gray-4)">Loading...</td></tr>`;
+
+  // Bust the vendor-parts reverse-lookup cache so vendor search stays in sync
+  _vendorPartSearchCache = null;
+
+  const { data: parts, error } = await db
+    .from('parts_catalog')
+    .select('*, part_vendors(*, vendors(name,is_active))')
+    .order('part_number');
+
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:16px">${error.message}</td></tr>`;
+    return;
+  }
+
+  allParts = parts || [];
+  renderPartsTable(allParts);
+}
+
+function renderPartsTable(parts) {
+  const tbody = document.getElementById('partsBody');
+  if (!parts.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">🔩</div><h3>No parts yet</h3><p style="color:var(--gray-4);font-size:0.82rem">Add your first part to start building the catalog.</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = parts.map(p => {
+    const linkedVendors = p.part_vendors || [];
+    const primary = linkedVendors.find(pv => pv.is_primary);
+    const altCount = linkedVendors.filter(pv => !pv.is_primary).length;
+    return `<tr>
+      <td><span style="font-family:var(--font-mono);font-size:0.8rem;font-weight:700;color:#6366f1">${escHtml(p.part_number)}</span></td>
+      <td style="font-weight:600;font-size:0.85rem">${escHtml(p.part_name)}</td>
+      <td style="font-size:0.78rem;color:var(--gray-3)">${p.category ? escHtml(p.category) : '—'}</td>
+      <td style="font-size:0.78rem;color:var(--gray-3)">${p.unit ? escHtml(p.unit) : '—'}</td>
+      <td>
+        ${primary
+          ? `<span style="font-size:0.78rem;font-weight:600;color:#047857;background:rgba(5,150,105,0.08);padding:2px 8px;border-radius:4px;border:1px solid rgba(5,150,105,0.2)">⭐ ${escHtml(primary.vendors?.name||'Unknown')}</span>`
+          : `<span style="font-size:0.75rem;color:var(--gray-4);font-style:italic">No primary set</span>`
+        }
+      </td>
+      <td style="text-align:center">
+        ${altCount > 0
+          ? `<span style="font-size:0.75rem;padding:2px 8px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#6366f1">+${altCount} more</span>`
+          : `<span style="font-size:0.72rem;color:var(--gray-4)">—</span>`
+        }
+      </td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" onclick="openPartVendorsModal('${p.id}')">🏢 Vendors</button>
+        <button class="btn btn-ghost btn-sm" onclick="openPartModal('${p.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deletePart('${p.id}',${JSON.stringify(p.part_number)})">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterPartsTable() {
+  const s = document.getElementById('partsSearch').value.toLowerCase();
+  if (!s) { renderPartsTable(allParts); return; }
+  renderPartsTable(allParts.filter(p =>
+    p.part_number.toLowerCase().includes(s) ||
+    p.part_name.toLowerCase().includes(s) ||
+    (p.category||'').toLowerCase().includes(s)
+  ));
+}
+
+// ── Add / Edit Part modal ─────────────────────────────────────
+
+function openPartModal(id = null) {
+  const part = id ? allParts.find(p => p.id === id) : null;
+  document.getElementById('partModalTitle').textContent = part ? 'Edit Part' : 'Add Part';
+  document.getElementById('pmId').value = part ? part.id : '';
+  document.getElementById('pmNumber').value = part ? (part.part_number||'') : '';
+  document.getElementById('pmName').value = part ? (part.part_name||'') : '';
+  document.getElementById('pmCategory').value = part ? (part.category||'') : '';
+  document.getElementById('pmUnit').value = part ? (part.unit||'') : '';
+  document.getElementById('pmDescription').value = part ? (part.description||'') : '';
+  document.getElementById('pmNotes').value = part ? (part.notes||'') : '';
+  openModal('partModal');
+}
+
+async function savePart() {
+  const number = document.getElementById('pmNumber').value.trim();
+  const name   = document.getElementById('pmName').value.trim();
+  if (!number) { showToast('Part number is required','error'); return; }
+  if (!name)   { showToast('Part name is required','error'); return; }
+
+  const id = document.getElementById('pmId').value;
+  const vals = {
+    part_number: number,
+    part_name:   name,
+    category:    document.getElementById('pmCategory').value.trim() || null,
+    unit:        document.getElementById('pmUnit').value.trim() || null,
+    description: document.getElementById('pmDescription').value.trim() || null,
+    notes:       document.getElementById('pmNotes').value.trim() || null,
+    created_by:  currentUser.id,
+  };
+
+  showLoader(true);
+  const { error } = id
+    ? await db.from('parts_catalog').update(vals).eq('id', id)
+    : await db.from('parts_catalog').insert(vals);
+  showLoader(false);
+
+  if (error) {
+    if (error.message.includes('parts_catalog_part_number_key')) {
+      showToast('That part number already exists','error');
+    } else {
+      showToast('Error: ' + error.message, 'error');
+    }
+    return;
+  }
+  showToast(id ? 'Part updated.' : 'Part added!', 'success');
+  closeModal('partModal');
+  await loadPartsTab();
+}
+
+async function deletePart(id, partNumber) {
+  if (!confirm(`Delete part "${partNumber}"? This will also remove all vendor links for this part.`)) return;
+  showLoader(true);
+  const { error } = await db.from('parts_catalog').delete().eq('id', id);
+  showLoader(false);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast('Part deleted.', 'success');
+  await loadPartsTab();
+}
+
+// ── Manage Vendors for a Part modal ──────────────────────────
+
+async function openPartVendorsModal(partId) {
+  currentPartId = partId;
+  const part = allParts.find(p => p.id === partId);
+  document.getElementById('pvModalTitle').textContent = `Vendors — ${part.part_number}`;
+  document.getElementById('pvModalSub').textContent = part.part_name;
+
+  // Populate vendor select (exclude already-linked vendors)
+  populatePvVendorSelect(part.part_vendors || []);
+
+  // Reset the link form
+  ['pvVendorSelect','pvPrice','pvLeadTime','pvNotes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = id === 'pvVendorSelect' ? '' : '';
+  });
+  document.getElementById('pvCurrency').value = 'INR';
+  document.getElementById('pvIsPrimary').value = 'false';
+
+  // Render existing linked vendors
+  renderLinkedVendors(part.part_vendors || []);
+  openModal('partVendorsModal');
+}
+
+function populatePvVendorSelect(linked) {
+  const linkedIds = new Set(linked.map(pv => pv.vendor_id));
+  const sel = document.getElementById('pvVendorSelect');
+  sel.innerHTML = '<option value="">— Select vendor —</option>' +
+    allVendors
+      .filter(v => v.is_active && !linkedIds.has(v.id))
+      .sort((a,b) => a.name.localeCompare(b.name))
+      .map(v => `<option value="${v.id}">${escHtml(v.name)}</option>`)
+      .join('');
+}
+
+function renderLinkedVendors(linkedVendors) {
+  const el = document.getElementById('pvLinkedList');
+  if (!linkedVendors.length) {
+    el.innerHTML = `<div style="text-align:center;padding:18px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius);color:var(--gray-4);font-size:0.82rem">No vendors linked yet. Use the form below to add one.</div>`;
+    return;
+  }
+
+  // Primary first, then alphabetical
+  const sorted = [...linkedVendors].sort((a,b) => {
+    if (a.is_primary && !b.is_primary) return -1;
+    if (!a.is_primary && b.is_primary) return 1;
+    return (a.vendors?.name||'').localeCompare(b.vendors?.name||'');
+  });
+
+  el.innerHTML = `
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray-4);margin-bottom:8px">Linked Vendors (${linkedVendors.length})</div>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      ${sorted.map(pv => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius);${pv.is_primary ? 'border-left:3px solid #047857' : ''}">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:7px;margin-bottom:2px">
+              <span style="font-weight:700;font-size:0.85rem">${escHtml(pv.vendors?.name||'Unknown vendor')}</span>
+              ${pv.is_primary
+                ? `<span style="font-size:0.62rem;padding:1px 6px;background:rgba(5,150,105,0.1);color:#047857;border:1px solid rgba(5,150,105,0.25);border-radius:3px">PRIMARY</span>`
+                : `<span style="font-size:0.62rem;padding:1px 6px;background:var(--off-white);color:var(--gray-4);border:1px solid var(--border);border-radius:3px">ADDITIONAL</span>`
+              }
+            </div>
+            <div style="font-size:0.73rem;color:var(--gray-3);display:flex;gap:12px;flex-wrap:wrap">
+              ${pv.unit_price != null ? `<span>💰 ${pv.currency||'INR'} ${Number(pv.unit_price).toLocaleString()}</span>` : ''}
+              ${pv.lead_time_days != null ? `<span>⏱ ${pv.lead_time_days}d lead</span>` : ''}
+              ${pv.notes ? `<span style="color:var(--gray-4);font-style:italic">${escHtml(pv.notes)}</span>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:5px;flex-shrink:0">
+            ${!pv.is_primary
+              ? `<button class="btn btn-secondary btn-sm" onclick="setPrimaryVendor('${pv.id}')">★ Set Primary</button>`
+              : ''
+            }
+            <button class="btn btn-danger btn-sm" onclick="unlinkVendor('${pv.id}')">Remove</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function linkVendorToPart() {
+  const vendorId = document.getElementById('pvVendorSelect').value;
+  if (!vendorId) { showToast('Please select a vendor','error'); return; }
+
+  const isPrimary = document.getElementById('pvIsPrimary').value === 'true';
+  const price     = document.getElementById('pvPrice').value;
+  const currency  = document.getElementById('pvCurrency').value;
+  const leadTime  = document.getElementById('pvLeadTime').value;
+  const notes     = document.getElementById('pvNotes').value.trim();
+
+  // If making this one primary, demote the existing primary first
+  if (isPrimary) {
+    await db.from('part_vendors')
+      .update({ is_primary: false })
+      .eq('part_id', currentPartId)
+      .eq('is_primary', true);
+  }
+
+  const { error } = await db.from('part_vendors').insert({
+    part_id:        currentPartId,
+    vendor_id:      vendorId,
+    is_primary:     isPrimary,
+    unit_price:     price ? parseFloat(price) : null,
+    currency:       currency,
+    lead_time_days: leadTime ? parseInt(leadTime) : null,
+    notes:          notes || null,
+    added_by:       currentUser.id,
+  });
+
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast('Vendor linked!', 'success');
+  await reloadPartVendors();
+}
+
+async function unlinkVendor(pvId) {
+  if (!confirm('Remove this vendor from the part?')) return;
+  const { error } = await db.from('part_vendors').delete().eq('id', pvId);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast('Vendor removed.', 'success');
+  await reloadPartVendors();
+}
+
+async function setPrimaryVendor(pvId) {
+  // Demote current primary, then promote this one
+  await db.from('part_vendors')
+    .update({ is_primary: false })
+    .eq('part_id', currentPartId)
+    .eq('is_primary', true);
+
+  const { error } = await db.from('part_vendors')
+    .update({ is_primary: true })
+    .eq('id', pvId);
+
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast('Primary vendor updated.', 'success');
+  await reloadPartVendors();
+}
+
+// Refresh both allParts and the modal's linked list after any vendor change
+async function reloadPartVendors() {
+  await loadPartsTab(); // refreshes allParts with latest part_vendors
+  const updated = allParts.find(p => p.id === currentPartId);
+  if (updated) {
+    renderLinkedVendors(updated.part_vendors || []);
+    populatePvVendorSelect(updated.part_vendors || []);
+  }
+}
+
+// Tiny HTML escaper (used in parts table to avoid XSS from user data)
+function escHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 init();
 </script>
 </body>

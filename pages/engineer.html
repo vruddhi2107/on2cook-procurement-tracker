@@ -57,6 +57,7 @@
     <button class="tab-btn active" onclick="switchTab('all')">All</button>
     <button class="tab-btn" onclick="switchTab('action')">🔔 Action Needed</button>
     <button class="tab-btn" onclick="switchTab('closed')">Closed</button>
+    <button class="tab-btn" onclick="switchTab('parts')">🔩 Parts Catalog</button>
     <!-- <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendors</button> -->
   </div>
 
@@ -100,6 +101,29 @@
     <div class="filter-bar"><input type="text" id="vendorSearch" placeholder="Search vendors..."/></div>
     <p style="font-size:0.78rem;color:var(--gray-4);margin-bottom:14px">Read-only view — contact the Procurement Manager to add or enquire about vendors.</p>
     <div class="vendor-grid" id="vendorGrid"><div style="color:var(--gray-4);padding:24px;grid-column:1/-1">Loading...</div></div>
+  </div>
+
+  <!-- ── PARTS CATALOG TAB (read-only for engineers) ── -->
+  <div id="tabParts" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+      <input type="text" id="partsSearchEng" class="form-control" placeholder="Search part number or name..." style="max-width:340px" oninput="filterEngPartsTable()"/>
+      <span style="font-size:0.78rem;color:var(--gray-4)">🔒 Read-only — managed by Procurement</span>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Part Number</th><th>Part Name</th><th>Category</th><th>Unit</th>
+              <th>Primary Vendor</th><th style="text-align:center">Alt Vendors</th><th>Description</th>
+            </tr>
+          </thead>
+          <tbody id="engPartsBody">
+            <tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">🔩</div><h3>Loading...</h3></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -192,7 +216,7 @@
         <!-- Project Phase — dropdown based on selected project -->
         <div class="form-group">
           <label class="form-label">Project Phase *</label>
-          <select class="form-control" id="fPhaseSelect">
+          <select class="form-control" id="fPhaseSelect" onchange="onPhaseChange()">
             <option value="">Select project first...</option>
           </select>
         </div>
@@ -387,7 +411,7 @@ async function init() {
   initNavbar(currentUser);
   document.getElementById('fTeam').value=currentUser.name;
   if(currentUser.department) document.getElementById('fDept').value=currentUser.department;
-  initPartsEditor('partsEditorContainer',[{_id:1,name:'',qty:1,spec:''}]);
+  initPartsEditor('partsEditorContainer',[{_id:1,part_number:'',name:'',qty:1,spec:''}],false);
   showLoader(true);
   await Promise.all([loadRequests(), loadPMs(), loadProjects()]);
   showLoader(false);
@@ -427,6 +451,14 @@ function onProjectChange() {
   phSel.innerHTML='<option value="">Select Phase...</option>'+phases.map(ph=>`<option value="${ph.name}">${ph.name}</option>`).join('');
   // Auto-fill PM if project has a default PM
   if(project.default_pm_id) document.getElementById('fPMSelect').value=project.default_pm_id;
+  // Trigger phase-change check in case a phase is already selected
+  onPhaseChange();
+}
+
+function onPhaseChange() {
+  const phase = (document.getElementById('fPhaseSelect').value||'').toLowerCase().trim();
+  const isProduction = phase === 'production';
+  initPartsEditor('partsEditorContainer', _partsEditorRows.length ? _partsEditorRows : [{_id:1,part_number:'',name:'',qty:1,spec:''}], isProduction);
 }
 
 // ── STATS / BANNER ───────────────────────────────────────────
@@ -453,11 +485,69 @@ function renderBanner() {
 
 function switchTab(t) {
   activeTab=t;
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['all','action','closed','vendors'][i]===t));
-  document.getElementById('tabRequests').style.display=t==='vendors'?'none':'block';
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['all','action','closed','parts','vendors'][i]===t));
+  document.getElementById('tabRequests').style.display=['vendors','parts'].includes(t)?'none':'block';
   document.getElementById('tabVendors').style.display=t==='vendors'?'block':'none';
+  document.getElementById('tabParts').style.display=t==='parts'?'block':'none';
   if(t==='vendors') loadAndRenderVendors('vendorGrid','vendorSearch');
+  else if(t==='parts') loadEngPartsCatalog();
   else filterTable();
+}
+
+// ── PARTS CATALOG (read-only for engineer) ────────────────────
+let _engAllParts = [];
+
+async function loadEngPartsCatalog() {
+  const tbody = document.getElementById('engPartsBody');
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--gray-4)">Loading...</td></tr>`;
+  const { data, error } = await db
+    .from('parts_catalog')
+    .select('*, part_vendors(*, vendors(name,is_active))')
+    .order('part_number');
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:16px">${error.message}</td></tr>`;
+    return;
+  }
+  _engAllParts = data || [];
+  renderEngPartsTable(_engAllParts);
+}
+
+function renderEngPartsTable(parts) {
+  const tbody = document.getElementById('engPartsBody');
+  if (!parts.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">🔩</div><h3>No parts in catalog yet</h3></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = parts.map(p => {
+    const linked = p.part_vendors || [];
+    const primary = linked.find(pv => pv.is_primary);
+    const altCount = linked.filter(pv => !pv.is_primary).length;
+    return `<tr>
+      <td><span style="font-family:var(--font-mono);font-size:0.8rem;font-weight:700;color:#6366f1">${escHtml(p.part_number)}</span></td>
+      <td style="font-weight:600;font-size:0.85rem">${escHtml(p.part_name)}</td>
+      <td style="font-size:0.78rem;color:var(--gray-3)">${p.category ? escHtml(p.category) : '—'}</td>
+      <td style="font-size:0.78rem;color:var(--gray-3)">${p.unit ? escHtml(p.unit) : '—'}</td>
+      <td>${primary
+        ? `<span style="font-size:0.78rem;font-weight:600;color:#047857;background:rgba(5,150,105,0.08);padding:2px 8px;border-radius:4px;border:1px solid rgba(5,150,105,0.2)">⭐ ${escHtml(primary.vendors?.name||'Unknown')}</span>`
+        : `<span style="font-size:0.75rem;color:var(--gray-4);font-style:italic">—</span>`
+      }</td>
+      <td style="text-align:center">${altCount > 0
+        ? `<span style="font-size:0.75rem;padding:2px 8px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:10px;color:#6366f1">+${altCount}</span>`
+        : `<span style="font-size:0.72rem;color:var(--gray-4)">—</span>`
+      }</td>
+      <td style="font-size:0.76rem;color:var(--gray-3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(p.description||'')}">${p.description ? escHtml(p.description) : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterEngPartsTable() {
+  const s = document.getElementById('partsSearchEng').value.toLowerCase();
+  if (!s) { renderEngPartsTable(_engAllParts); return; }
+  renderEngPartsTable(_engAllParts.filter(p =>
+    p.part_number.toLowerCase().includes(s) ||
+    p.part_name.toLowerCase().includes(s) ||
+    (p.category||'').toLowerCase().includes(s)
+  ));
 }
 
 function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterPhase').value='';const uf=document.getElementById('filterUrgency');if(uf)uf.value='';filterTable();}
@@ -595,7 +685,7 @@ async function handleBOMFile(e) {
   try {
     const parts=await parseBOMFile(file);
     if(!parts.length){status.innerHTML=`<span style="color:var(--red)">No valid rows found in file</span>`;return;}
-    initPartsEditor('partsEditorContainer',parts.map((p,i)=>({...p,_id:i+1})));
+    initPartsEditor('partsEditorContainer',parts.map((p,i)=>({...p,_id:i+1})), _partsEditorProductionMode);
     status.innerHTML=`<span style="color:#16a34a">✓ ${parts.length} part${parts.length>1?'s':''} imported from BOM!</span>`;
     showToast(`${parts.length} parts imported from BOM!`,'success');
   } catch(err) {
@@ -627,7 +717,7 @@ async function handleBOMFile(e) {
   document.getElementById('fTeam').value=currentUser.name;
   if(currentUser.department) document.getElementById('fDept').value=currentUser.department;
   document.getElementById('fPhaseSelect').innerHTML='<option value="">Select project first...</option>';
-  initPartsEditor('partsEditorContainer',[{_id:1,name:'',qty:1,spec:''}]);
+  initPartsEditor('partsEditorContainer',[{_id:1,part_number:'',name:'',qty:1,spec:''}],false);
   onCategoryChange();
   openModal('prFormModal');
 }
@@ -666,8 +756,9 @@ function openEditPR(id) {
   const proj=allProjects.find(p=>p.name===pr.project_name);
   if(proj){document.getElementById('fProjectSelect').value=proj.id;}
   const parts=(pr.parts||[]).map((p,i)=>({...p,_id:i+1}));
-  if(!parts.length) parts.push({_id:1,name:'',qty:1,spec:''});
-  initPartsEditor('partsEditorContainer',parts);
+  if(!parts.length) parts.push({_id:1,part_number:'',name:'',qty:1,spec:''});
+  const _editPhase=(pr.project_phase||'').toLowerCase().trim();
+  initPartsEditor('partsEditorContainer',parts, _editPhase==='production');
   onCategoryChange();
   openModal('prFormModal');
 }
@@ -691,6 +782,14 @@ async function submitPR() {
   if(!isVI&&!isLP&&!orderType){showToast('Please select an order type','error');return;}
   const parts=getPartsFromEditor();
   if(!parts.length){showToast('Please add at least one part or item','error');return;}
+  // In production phase, every part must have a part number
+  if(_partsEditorProductionMode){
+    const missing=parts.filter(p=>!p.part_number||!p.part_number.trim());
+    if(missing.length){
+      showToast(`Production phase requires a Part Number for every item (${missing.length} missing)`, 'error');
+      return;
+    }
+  }
   if(isEditMode){const modNote=document.getElementById('fModNote').value.trim();if(!modNote){showToast('Please describe what changed','error');return;}}
   const pmUser=allPMs.find(p=>p.id===pmId);
   const qcCriteria={
