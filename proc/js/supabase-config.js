@@ -92,6 +92,7 @@ const PHASES = {
 };
 
 const ORDER_TYPES = {
+  new:          'New Order (Not Previously Requested)',
   repeat:       'Repeat Order (Previously Requested)',
   custom:       'Custom Order (Vendor Customization)',
   modification: 'Modification Request (Change to Previous)',
