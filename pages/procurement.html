@@ -1826,7 +1826,7 @@ async function openPOModal(prId) {
   const baseAmt=parseFloat(selectedQ?.amount||0);
   const cgstPct=9, sgstPct=9;
   const cgstAmt=Math.round(baseAmt*cgstPct/100*100)/100;
-  const sgstAmt=Math.round(baseAmt*sgstPct/100*100)/100;
+  const sgstAmt=Math.round(baseAmt *sgstPct/100*100)/100;
   const netPayable=baseAmt+cgstAmt+sgstAmt;
 
   const savedLogo=localStorage.getItem('po_logo');
@@ -1869,12 +1869,13 @@ async function openPOModal(prId) {
     <div style="margin-bottom:12px;padding:9px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:6px;font-size:0.78rem;display:flex;align-items:center;flex-wrap:wrap;gap:12px">
       <span>⚙️ Review and edit fields directly in the PO below. Adjust tax rates here:</span>
       <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
-        <label style="font-size:0.74rem;white-space:nowrap">CGST %</label>
-        <input id="cgstInput" type="number" value="${cgstPct}" class="po-tax-input" onchange="recalcPO()"/>
+        <label style="font-size:0.74rem;white-space:nowrap">P&amp;F (₹)</label>
+        <input id="pnfInput" type="number" value="0" min="0" class="po-tax-input" style="width:80px" onchange="recalcPO()" title="P&F is added to the discounted amount before GST is applied"/>
+        <label style="font-size:0.74rem;white-space:nowrap;margin-left:4px">CGST %</label>
+        <input id="cgstInput" type="number" value="${cgstPct}" min="0" max="28" class="po-tax-input" onchange="recalcPO()"/>
         <label style="font-size:0.74rem;white-space:nowrap">SGST %</label>
-        <input id="sgstInput" type="number" value="${sgstPct}" class="po-tax-input" onchange="recalcPO()"/>
-        <label style="font-size:0.74rem;white-space:nowrap">P&amp;F</label>
-        <input id="pnfInput" type="number" value="0" class="po-tax-input" style="width:70px" onchange="recalcPO()"/>
+        <input id="sgstInput" type="number" value="${sgstPct}" min="0" max="28" class="po-tax-input" onchange="recalcPO()"/>
+        <span style="font-size:0.7rem;color:#92400e;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:2px 7px;white-space:nowrap">GST on Basic + P&amp;F</span>
       </div>
     </div>
 
@@ -1988,6 +1989,7 @@ async function openPOModal(prId) {
             <tr><td>Discount (%) :</td><td id="poDiscount">0.00</td></tr>
             <tr><td>Amount after Discount :</td><td id="poAfterDiscount">${currSymbol} ${baseAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr><td>P&amp;F Charge :</td><td id="poPnf">${currSymbol} 0.00</td></tr>
+            <tr><td>Taxable Value :</td><td id="poTaxableValue">${currSymbol} ${baseAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr><td>CGST % &nbsp; <span id="poCgstPctLabel">${cgstPct}</span>.00 :</td><td id="poCgst">${currSymbol} ${cgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr><td>SGST % &nbsp; <span id="poSgstPctLabel">${sgstPct}</span>.00 :</td><td id="poSgst">${currSymbol} ${sgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr class="net-row"><td>Net Payable (INR) :</td><td id="poNet">${currSymbol} ${netPayable.toLocaleString('en-IN',{minimumFractionDigits:0})}</td></tr>
@@ -2037,9 +2039,11 @@ function recalcPO() {
 
   const discAmt = Math.round(base * discPct / 100 * 100) / 100;
   const afterDiscount = base - discAmt;
-  const cgstAmt = Math.round(afterDiscount * cgst / 100 * 100) / 100;
-  const sgstAmt = Math.round(afterDiscount * sgst / 100 * 100) / 100;
-  const subtotal = afterDiscount + cgstAmt + sgstAmt + pnf + other;
+  // P&F is added to discounted amount BEFORE tax — taxable value = afterDiscount + pnf
+  const taxableValue = afterDiscount + pnf;
+  const cgstAmt = Math.round(taxableValue * cgst / 100 * 100) / 100;
+  const sgstAmt = Math.round(taxableValue * sgst / 100 * 100) / 100;
+  const subtotal = taxableValue + cgstAmt + sgstAmt + other;
   const net = Math.round(subtotal);
   const roundOff = Math.round((net - subtotal) * 100) / 100;
 
@@ -2048,9 +2052,10 @@ function recalcPO() {
   s('poCgstPctLabel', cgst);
   s('poSgstPctLabel', sgst);
   s('poAfterDiscount', `${sym} ${f(afterDiscount)}`);
+  s('poPnf',   `${sym} ${f(pnf)}`);
+  s('poTaxableValue', `${sym} ${f(taxableValue)}`);
   s('poCgst',  `${sym} ${f(cgstAmt)}`);
   s('poSgst',  `${sym} ${f(sgstAmt)}`);
-  s('poPnf',   `${sym} ${f(pnf)}`);
   s('poRoundOff', roundOff.toFixed(2));
   s('poNet',   `${sym} ${net.toLocaleString('en-IN',{minimumFractionDigits:0})}`);
   s('poWords', numToWords(net));
@@ -2251,7 +2256,12 @@ async function confirmGeneratePO() {
   const sgstPct  = parseFloat(document.getElementById('sgstInput')?.value || 9);
   const pnf      = parseFloat(document.getElementById('pnfInput')?.value  || 0);
   const base     = window._poBaseAmt || 0;
-  const netPayable = base + Math.round(base*cgstPct/100*100)/100 + Math.round(base*sgstPct/100*100)/100 + pnf;
+  // P&F is part of taxable value; tax applies on (base + pnf)
+  const discPct = parseFloat(document.getElementById('poDiscountPct')?.value || 0) || 0;
+  const discAmt = Math.round(base * discPct / 100 * 100) / 100;
+  const afterDiscount = base - discAmt;
+  const taxableValue = afterDiscount + pnf;
+  const netPayable = taxableValue + Math.round(taxableValue*cgstPct/100*100)/100 + Math.round(taxableValue*sgstPct/100*100)/100;
 
   const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',currentPR.id);
   const selectedQ=quotations?.find(q=>q.is_selected)||quotations?.[0];

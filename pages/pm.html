@@ -14,6 +14,7 @@
   <div class="page-header">
     <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px">
       <div><h1 class="page-title">Project Manager <span>Portal</span></h1><p class="page-sub">Review, approve, and track procurement requests assigned to you</p></div>
+      <button class="btn btn-primary" onclick="openNewPR()">+ New Request</button>
     </div>
   </div>
 
@@ -28,10 +29,11 @@
   <div id="pendingBanner" style="display:none;margin-bottom:16px"></div>
 
   <div class="tabs">
-  <button class="tab-btn active" onclick="switchTab('clearance')">🔐 Clearance</button>
-  <button class="tab-btn" onclick="switchTab('final')">✍️ Final Approval</button>
-  <button class="tab-btn" onclick="switchTab('all')">All Requests</button>
-  <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendors</button>
+  <button class="tab-btn active" data-tab="clearance" onclick="switchTab('clearance')">🔐 Clearance</button>
+  <button class="tab-btn" data-tab="final" onclick="switchTab('final')">✍️ Final Approval</button>
+  <button class="tab-btn" data-tab="all" onclick="switchTab('all')">All Requests</button>
+  <button class="tab-btn" data-tab="mine" onclick="switchTab('mine')">📝 My Requests</button>
+  <button class="tab-btn" data-tab="vendors" onclick="switchTab('vendors')">🏢 Vendors</button>
 
   <button class="tab-btn" onclick="goToProjects()">📋 Projects</button>
 </div>
@@ -57,6 +59,175 @@
     <div class="vendor-grid" id="vendorGrid"></div>
   </div>
 </main>
+
+<!-- NEW REQUEST FORM MODAL -->
+<div class="modal-overlay" id="prFormModal">
+  <div class="modal" style="max-width:820px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="prFormTitle">New Procurement Request</div><div class="modal-title-sub" id="prFormSub">All starred fields are required</div></div>
+      <button class="modal-close" onclick="closeModal('prFormModal')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:82vh;overflow-y:auto;padding-right:4px">
+
+      <!-- PM Approval Section (hidden for PM — they self-approve) -->
+      <div id="pmApprovalSection" style="display:none">
+        <div class="pm-approval-choice">
+          <div class="pm-approval-option selected" id="pmOptYes"><div class="pm-approval-option-icon"></div><div class="pm-approval-option-label">PM Approved</div><div class="pm-approval-option-sub">You are the PM</div></div>
+        </div>
+        <div id="vendorInfoNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.18);border-radius:var(--radius-sm);font-size:0.78rem;color:#6d28d9">ℹ Vendor Info requests go directly to the Procurement Manager — no PM clearance needed.</div>
+        <div id="localPurchaseNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.28);border-radius:var(--radius-sm);font-size:0.78rem;color:#15803d">🛒 Local Purchase requests go directly to the Procurement Manager for payment processing.</div>
+      </div>
+      <div id="pmScreenshotSection" style="display:none"></div>
+
+      <!-- Core Fields -->
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Request Type *</label>
+          <select class="form-control" id="fCategory" onchange="onCategoryChange()">
+            <option value="">Select</option>
+            <option value="RFQ">RFQ — Request for Quotation</option>
+            <option value="vendor_info">Request for Vendor Information</option>
+            <option value="local_purchase">Local Purchase</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Department *</label>
+          <select class="form-control" id="fDept">
+            <option value="">Select</option>
+            <option value="npd">Production &amp; Operations - NPD</option>
+            <option value="electronics">Production &amp; Operations - Electronics</option>
+            <option value="id">Industrial Design</option>
+            <option value="assembly">Production &amp; Operations - Assembly</option>
+            <option value="scm_stores">SCM - Stores &amp; Logistics</option>
+            <option value="service">Production &amp; Operations - Service</option>
+            <option value="machine_shop">Production &amp; Operations - Machine Shop</option>
+            <option value="quality">Production &amp; Operations - Quality</option>
+            <option value="mech_design">Mechanical Design Engineering</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Project Name *</label>
+          <select class="form-control" id="fProjectSelect" onchange="onProjectChange()">
+            <option value="">Select Project...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Project Phase *</label>
+          <select class="form-control" id="fPhaseSelect" onchange="onPhaseChange()">
+            <option value="">Select project first...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Project Manager</label>
+          <input class="form-control" id="fPMName" readonly style="background:var(--off-white);color:var(--gray-3)"/>
+          <input type="hidden" id="fPMSelect"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Your Name</label>
+          <input class="form-control" id="fTeam" readonly/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Urgency</label>
+          <select class="form-control" id="fUrgency">
+            <option value="normal">🟢 Within 1 Week</option>
+            <option value="urgent">⚡ Within 24 hours</option>
+            <option value="critical">🔴 Within 48 hours</option>
+          </select>
+        </div>
+        <div class="form-group" id="orderTypeGroup">
+          <label class="form-label">Order Type <span style="color:var(--red)">*</span></label>
+          <select class="form-control" id="fOrderType">
+            <option value="">Select</option>
+            <option value="new">New Order</option>
+            <option value="repeat">Repeat Order</option>
+            <option value="custom">Custom Order</option>
+            <option value="modification">Modification Request</option>
+            <option value="inventory">Inventory Item</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vendor Suggestion <span style="color:var(--gray-4);font-weight:400">(optional)</span></label>
+          <input class="form-control" id="fVendor" placeholder="Preferred vendor, if any"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Product Link <span style="color:var(--gray-4);font-weight:400">(optional)</span></label>
+          <input class="form-control" id="fProductLink" type="url" placeholder="https://example.com/product"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Sourcing</label>
+          <div class="sourcing-options">
+            <label class="sourcing-chip" id="srcDomestic" onclick="toggleSourcing('domestic')">🏠 Domestic</label>
+            <label class="sourcing-chip" id="srcInternational" onclick="toggleSourcing('international')">🌍 International</label>
+          </div>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Additional Notes / Description</label>
+          <textarea class="form-control" id="fDesc" placeholder="Any additional context, special requirements, or references..." style="min-height:60px"></textarea>
+        </div>
+      </div>
+
+      <!-- QC Criteria -->
+      <div style="margin-top:14px;padding:14px;border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius);background:rgba(99,102,241,0.03)">
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:10px;color:#6366f1">🔍 QC Criteria <span style="color:var(--gray-4);font-weight:400;font-size:0.72rem">(optional)</span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Preferred Color / Finish</label><input class="form-control" id="fQcColor" placeholder="e.g. Matte black, RAL 7016, Silver"/></div>
+          <div class="form-group"><label class="form-label">Preferred Material</label><input class="form-control" id="fQcMaterial" placeholder="e.g. Stainless steel 316L, ABS plastic"/></div>
+          <div class="form-group full"><label class="form-label">Additional QC Notes</label><textarea class="form-control" id="fQcCustom" placeholder="Dimensional tolerances, certifications, compliance standards..." style="min-height:54px"></textarea></div>
+        </div>
+      </div>
+
+      <!-- Attachments -->
+      <div style="margin-top:14px">
+        <label class="form-label" style="margin-bottom:6px;display:block">Attachments <span style="color:var(--gray-4);font-weight:400;font-size:0.72rem">(drawings, specs, reference images)</span></label>
+        <div class="bom-upload-zone" id="attachZone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleAttachDrop(event)">
+          <input type="file" id="attachFile" accept="image/*,.pdf,.doc,.docx" multiple onchange="handleAttachFiles(event)"/>
+          <div style="font-size:1.3rem;margin-bottom:4px">📎</div>
+          <div style="font-size:0.8rem;font-weight:600">Drag &amp; drop or click to attach files</div>
+          <div style="font-size:0.72rem;color:var(--gray-4)">Images, PDF, DOC — max 5MB each</div>
+        </div>
+        <div id="attachList" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
+      </div>
+
+      <!-- BOM Upload -->
+      <div style="margin-top:14px;padding:14px;border:1.5px dashed rgba(34,197,94,0.4);border-radius:var(--radius);background:rgba(34,197,94,0.03)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+          <div style="font-size:0.82rem;font-weight:600;color:#16a34a">📊 Upload BOM (Bill of Materials) — Auto-fills parts below</div>
+          <a id="bomTemplateLink" href="#" onclick="downloadBOMTemplate(event)" style="font-size:0.72rem;font-weight:600;color:#6366f1;text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border:1px solid #6366f130;border-radius:6px;background:#6366f108;white-space:nowrap">⬇ Download Template</a>
+        </div>
+        <div class="bom-upload-zone" id="bomZone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleBOMDrop(event)">
+          <input type="file" id="bomFile" accept=".csv,.xlsx,.xls,.xlsm" onchange="handleBOMFile(event)"/>
+          <div style="font-size:1.3rem;margin-bottom:4px">📊</div>
+          <div style="font-size:0.8rem;font-weight:600">Upload BOM CSV</div>
+          <div style="font-size:0.72rem;color:var(--gray-4)">CSV or Excel (.xlsx) — auto-parses into parts table</div>
+        </div>
+        <div id="bomStatus" style="margin-top:8px;font-size:0.78rem"></div>
+      </div>
+
+      <!-- Parts / Items Table -->
+      <div style="margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label class="form-label" style="margin:0">Parts / Items *</label>
+          <span style="font-size:0.72rem;color:var(--gray-4)">Add at least one part or upload a BOM</span>
+        </div>
+        <div id="partsEditorContainer"></div>
+      </div>
+
+      <!-- Modification Note -->
+      <div id="modificationNoteSection" style="display:none;margin-top:16px;padding:14px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius)">
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;color:#6366f1">↺ Resubmitting as a Modified Request</div>
+        <div class="form-group">
+          <label class="form-label">What changed? *</label>
+          <textarea class="form-control" id="fModNote" placeholder="Briefly describe what was changed from the original request..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('prFormModal')">Cancel</button>
+      <button class="btn btn-primary" id="prFormSubmitBtn" onclick="submitPR()">Submit Request →</button>
+    </div>
+  </div>
+</div>
 
 <!-- PR DETAIL MODAL -->
 <div class="modal-overlay" id="prModal">
@@ -109,17 +280,26 @@ async function init() {
   document.getElementById('footerMount').innerHTML=buildFooter();
   initNavbar(currentUser);
   showLoader(true);
-  await loadRequests();
+  await Promise.all([loadRequests(), loadPMs(), loadProjects()]);
   showLoader(false);
 }
 
 async function loadRequests() {
-  // Load requests assigned to this specific PM
-  const{data}=await db.from('procurement_requests')
-    .select('*, users!procurement_requests_created_by_fkey(name,email)')
-    .eq('assigned_pm_id', currentUser.id)
-    .order('updated_at',{ascending:false});
-  allRequests=data||[];
+  // Load requests assigned to this PM OR created by this PM
+  const[assigned, created]=await Promise.all([
+    db.from('procurement_requests')
+      .select('*, users!procurement_requests_created_by_fkey(name,email)')
+      .eq('assigned_pm_id', currentUser.id)
+      .order('updated_at',{ascending:false}),
+    db.from('procurement_requests')
+      .select('*, users!procurement_requests_created_by_fkey(name,email)')
+      .eq('created_by', currentUser.id)
+      .order('updated_at',{ascending:false})
+  ]);
+  // Merge and deduplicate by id
+  const map=new Map();
+  for(const r of [...(assigned.data||[]),...(created.data||[])]) map.set(r.id,r);
+  allRequests=[...map.values()].sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
   updateStats(); renderBanner(); filterTable();
 }
 
@@ -148,7 +328,7 @@ function renderBanner() {
 
 function switchTab(t) {
   activeTab=t;
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['clearance','final','all','vendors'][i]===t));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('data-tab')===t));
   document.getElementById('tabContent').style.display=t==='vendors'?'none':'block';
   document.getElementById('tabVendors').style.display=t==='vendors'?'block':'none';
   if(t==='vendors') loadAndRenderVendors('vendorGrid','vendorSearch');
@@ -160,13 +340,14 @@ function filterTable() {
   let reqs=allRequests;
   if(activeTab==='clearance') reqs=reqs.filter(r=>r.phase==='pending_initial_pm_approval');
   else if(activeTab==='final') reqs=reqs.filter(r=>r.phase==='pending_pm_final_approval');
+  else if(activeTab==='mine') reqs=reqs.filter(r=>r.created_by===currentUser.id);
   if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
   renderTable(reqs);
 }
 
 function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
-  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${activeTab==='clearance'?'🔐':'✍️'}</div><h3>No requests here</h3><p>${activeTab==='clearance'?'No pending clearance requests.':activeTab==='final'?'No final approvals pending.':'No requests assigned to you yet.'}</p></div></td></tr>`;return;}
+  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${activeTab==='clearance'?'🔐':activeTab==='mine'?'📝':'✍️'}</div><h3>No requests here</h3><p>${activeTab==='clearance'?'No pending clearance requests.':activeTab==='final'?'No final approvals pending.':activeTab==='mine'?'You haven\'t submitted any requests yet. Click + New Request to get started.':'No requests assigned to you yet.'}</p>${activeTab==='mine'?'<button class="btn btn-primary" style="margin-top:12px" onclick="openNewPR()">+ New Request</button>':''}</div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
     const needsAction=['pending_initial_pm_approval','pending_pm_final_approval'].includes(r.phase);
     const isClearance=r.phase==='pending_initial_pm_approval', isFinal=r.phase==='pending_pm_final_approval';
@@ -425,6 +606,201 @@ async function addComment(){
 function goToProjects() {
   window.location.href = 'projects.html';
 }
+
+// ── NEW REQUEST FUNCTIONALITY ─────────────────────────────────
+let allProjects=[], allPMs=[];
+let isEditMode=false, editingParentId=null;
+let selectedSourcing=[], attachedFiles=[], pmSelectedForNewPR=null;
+
+async function loadPMs() {
+  const{data}=await db.from('users').select('id,name').eq('role','project_manager').order('name');
+  allPMs=data||[];
+}
+
+async function loadProjects() {
+  const{data}=await db.from('projects').select('*,project_phases(id,name)').eq('is_active',true).order('name');
+  allProjects=data||[];
+  populateProjectDropdown();
+}
+
+function populateProjectDropdown() {
+  const sel=document.getElementById('fProjectSelect');
+  if(!sel) return;
+  sel.innerHTML='<option value="">Select Project...</option>'+allProjects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+}
+
+function onProjectChange() {
+  const pid=document.getElementById('fProjectSelect').value;
+  const project=allProjects.find(p=>p.id===pid);
+  const phSel=document.getElementById('fPhaseSelect');
+  if(!project){phSel.innerHTML='<option value="">Select project first...</option>';return;}
+  const phases=project.project_phases||[];
+  if(!phases.length){phSel.innerHTML='<option value="">No phases added yet</option>';return;}
+  phSel.innerHTML='<option value="">Select Phase...</option>'+phases.map(ph=>`<option value="${ph.name}">${ph.name}</option>`).join('');
+  onPhaseChange();
+}
+
+function onPhaseChange() {
+  const phase=(document.getElementById('fPhaseSelect').value||'').toLowerCase().trim();
+  const isProduction=phase==='production';
+  initPartsEditor('partsEditorContainer',_partsEditorRows&&_partsEditorRows.length?_partsEditorRows:[{_id:1,part_number:'',name:'',qty:1,spec:''}],isProduction);
+}
+
+function onCategoryChange() {
+  const cat=document.getElementById('fCategory').value;
+  const isVI=cat==='vendor_info';
+  const isLP=cat==='local_purchase';
+  document.getElementById('vendorInfoNote').style.display=isVI?'block':'none';
+  document.getElementById('localPurchaseNote').style.display=isLP?'block':'none';
+  document.getElementById('orderTypeGroup').style.display=(isVI||isLP)?'none':'flex';
+}
+
+function toggleSourcing(val) {
+  const idx=selectedSourcing.indexOf(val);
+  if(idx>=0) selectedSourcing.splice(idx,1); else selectedSourcing.push(val);
+  document.getElementById('srcDomestic').classList.toggle('selected',selectedSourcing.includes('domestic'));
+  document.getElementById('srcInternational').classList.toggle('selected',selectedSourcing.includes('international'));
+}
+
+function handleAttachDrop(e){e.preventDefault();document.getElementById('attachZone').classList.remove('dragover');handleAttachFiles({target:{files:e.dataTransfer.files}});}
+async function handleAttachFiles(e) {
+  for(const file of [...e.target.files]){
+    if(file.size>5*1024*1024){showToast(`${file.name} too large`,'error');continue;}
+    const b64=await fileToBase64(file);
+    attachedFiles.push({name:file.name,type:file.type,data:b64});
+  }
+  document.getElementById('attachFile').value='';
+  renderAttachList();
+}
+function renderAttachList() {
+  document.getElementById('attachList').innerHTML=attachedFiles.map((f,i)=>`
+    <div class="upload-item">
+      <span>${f.type.includes('pdf')?'📄':f.type.includes('image')?'🖼️':'📎'}</span>
+      <span class="upload-item-name">${f.name}</span>
+      <button class="btn btn-danger btn-sm" onclick="removeAttach(${i})">✕</button>
+    </div>`).join('');
+}
+function removeAttach(i){attachedFiles.splice(i,1);renderAttachList();}
+
+function downloadBOMTemplate(e) {
+  e.preventDefault();
+  const rows=[
+    ['Sr. No.','Part Number','Part Name','Material Specifications','Department','Quantity (per Set)','Unit of Measurement','Total Qty','Unit of Measurement','Vendor Name','Vendor Contact Details','Country','Cost','Purchase Link','Attachment (if Any)'],
+    ['1','NA','Example Part — M Size Gloves','Nitrile Latex Powder Free','Mech','8','Box','400','Pair','Surgical House','NA','India','NA','NA','NA'],
+  ];
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='BOM_Template.csv';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1000);
+}
+
+function handleBOMDrop(e){e.preventDefault();document.getElementById('bomZone').classList.remove('dragover');handleBOMFile({target:{files:e.dataTransfer.files}});}
+async function handleBOMFile(e) {
+  const file=e.target.files[0];if(!file)return;
+  const status=document.getElementById('bomStatus');
+  status.innerHTML=`<span style="color:#6366f1">⏳ Parsing BOM...</span>`;
+  try{
+    const parts=await parseBOMFile(file);
+    if(!parts.length){status.innerHTML=`<span style="color:var(--red)">No valid rows found</span>`;return;}
+    initPartsEditor('partsEditorContainer',parts.map((p,i)=>({...p,_id:i+1})),_partsEditorProductionMode);
+    status.innerHTML=`<span style="color:#16a34a">✓ ${parts.length} part${parts.length>1?'s':''} imported!</span>`;
+    showToast(`${parts.length} parts imported from BOM!`,'success');
+  }catch(err){status.innerHTML=`<span style="color:var(--red)">⚠ ${err.message}</span>`;}
+  document.getElementById('bomFile').value='';
+}
+
+function openNewPR() {
+  isEditMode=false; editingParentId=null;
+  selectedSourcing=[]; attachedFiles=[];
+  document.getElementById('prFormTitle').textContent='New Procurement Request';
+  document.getElementById('prFormSub').textContent='All starred fields are required — you are the assigned PM';
+  document.getElementById('prFormSubmitBtn').textContent='Submit Request →';
+  document.getElementById('modificationNoteSection').style.display='none';
+  document.getElementById('srcDomestic').classList.remove('selected');
+  document.getElementById('srcInternational').classList.remove('selected');
+  document.getElementById('attachList').innerHTML='';
+  document.getElementById('bomStatus').innerHTML='';
+  ['fCategory','fProjectSelect','fOrderType','fVendor','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  document.getElementById('fPhaseSelect').innerHTML='<option value="">Select project first...</option>';
+  const urgEl=document.getElementById('fUrgency');if(urgEl)urgEl.value='normal';
+  document.getElementById('fTeam').value=currentUser.name;
+  document.getElementById('fPMName').value=currentUser.name;
+  document.getElementById('fPMSelect').value=currentUser.id;
+  if(currentUser.department) document.getElementById('fDept').value=currentUser.department;
+  populateProjectDropdown();
+  initPartsEditor('partsEditorContainer',[{_id:1,part_number:'',name:'',qty:1,spec:''}],false);
+  onCategoryChange();
+  openModal('prFormModal');
+}
+
+async function submitPR() {
+  const cat=document.getElementById('fCategory').value;
+  const isVI=cat==='vendor_info';
+  const isLP=cat==='local_purchase';
+  const pmId=currentUser.id; // PM is always themselves
+  const projectId=document.getElementById('fProjectSelect').value;
+  const projectObj=allProjects.find(p=>p.id===projectId);
+  const projectName=projectObj?.name||document.getElementById('fProjectSelect').options[document.getElementById('fProjectSelect').selectedIndex]?.text||'';
+  const projectPhase=document.getElementById('fPhaseSelect').value;
+  const dept=document.getElementById('fDept').value;
+  const orderType=document.getElementById('fOrderType').value;
+  const urgency=document.getElementById('fUrgency').value||'normal';
+  if(!cat||!projectName||!projectPhase||!dept){showToast('Please fill all required fields','error');return;}
+  if(!isVI&&!isLP&&!orderType){showToast('Please select an order type','error');return;}
+  const parts=getPartsFromEditor();
+  if(!parts.length){showToast('Please add at least one part or item','error');return;}
+  if(_partsEditorProductionMode){
+    const missing=parts.filter(p=>!p.part_number||!p.part_number.trim());
+    if(missing.length){showToast(`Production phase requires a Part Number for every item (${missing.length} missing)`,'error');return;}
+  }
+  if(isEditMode){const modNote=document.getElementById('fModNote').value.trim();if(!modNote){showToast('Please describe what changed','error');return;}}
+  const qcCriteria={
+    preferred_color:document.getElementById('fQcColor').value.trim()||null,
+    preferred_material:document.getElementById('fQcMaterial').value.trim()||null,
+    custom:document.getElementById('fQcCustom').value.trim()||null
+  };
+  // PM submitting their own request — treat as already approved (goes straight to procurement_active)
+  const vals={
+    request_category:cat,
+    project_name:projectName,
+    project_phase:projectPhase,
+    assigned_pm_id:pmId,
+    project_manager_name:currentUser.name,
+    team_member_name:currentUser.name,
+    department:dept,
+    urgency,
+    vendor_suggestion:document.getElementById('fVendor').value.trim()||null,
+    description:document.getElementById('fDesc').value.trim()||null,
+    product_link:document.getElementById('fProductLink').value.trim()||null,
+    sourcing:selectedSourcing,
+    qc_criteria:qcCriteria,
+    pm_approval_screenshot:null,
+    parts,
+    attachments:attachedFiles.map(f=>({name:f.name,type:f.type,data:f.data})),
+    created_by:currentUser.id,
+    phase:'procurement_active', // PM self-approves
+    initial_pm_approval:'already_approved',
+    is_modification:isEditMode,
+    parent_request_id:isEditMode?editingParentId:null,
+    modification_note:isEditMode?document.getElementById('fModNote').value.trim():null,
+    phase_timestamps:{submitted:new Date().toISOString(),procurement_active:new Date().toISOString()}
+  };
+  if(!isVI&&!isLP) vals.order_type=orderType;
+  showLoader(true);
+  const{error,data:newPR}=await db.from('procurement_requests').insert(vals).select().single();
+  if(!error&&isEditMode&&editingParentId){
+    await postComment(editingParentId,currentUser.id,`↺ Modified and resubmitted as PR-${String(newPR.request_number).padStart(4,'0')}`);
+  }
+  showLoader(false);
+  if(error){showToast('Submit failed: '+error.message,'error');return;}
+  showToast(isLP?'Local Purchase request sent to Procurement!':isVI?'Vendor Info request sent to Procurement!':'Request submitted and sent to Procurement!','success');
+  if(newPR?.id) notifyPhaseChange(newPR.id,newPR.phase||'procurement_active',currentUser?.id);
+  closeModal('prFormModal');
+  await loadRequests();
+}
+
 init();
 </script>
 </body>
