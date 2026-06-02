@@ -1797,7 +1797,7 @@ function numToWords(n) {
   const intPart=Math.floor(n);
   const decPart=Math.round((n-intPart)*100);
   let result=words(intPart).trim()+' Only';
-  if(decPart){ result = words(intPart).trim()+' and '+words(decPart).trim()+' Paise Only'; }
+  if(decPart){ result = words(intPart).trim()+' rupees and '+words(decPart).trim()+' Paise Only'; }
   return result;
 }
 
