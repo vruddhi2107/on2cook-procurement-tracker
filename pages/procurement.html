@@ -1834,14 +1834,15 @@ async function openPOModal(prId) {
   const logoSrc=savedLogo||'../on2cooklogo-bg.png';
   const sigSrc=savedSig||'../stamp.png';
 
-  const defaultTermsHTML=`- <strong>Terms &amp; Conditions :</strong>
-- <strong>Quality :</strong> Supply of goods under this purchase order should be as per our agreed specifications and approved samples. Any change in supplier production process with respect to change in raw material &amp; additives that can change specification (or other technical parameters not appearing on specifications), should be notified to ON2COOK and prior consent should be taken before supply.
-- <strong>Packing :</strong> Goods must be packed in new containers with clear markings for content, gross weight, tare weight, net weight, and hazard information. We will reject goods that do not meet these packing requirements.
-- <strong>Delivery :</strong> Goods should be delivered at the desired destination between 9 AM to 5 PM. We shall allow the delivery of the vehicle inside our premises at any time, but unloading of goods is as per Instructions.
-- <strong>Payment :</strong> This will be according to the terms mentioned in the Purchase Order.
-- <strong>Weight &amp; Purity :</strong> Both the parameters should be in accordance with the order form. Any difference in weight or purity will be calculated to achieve the real quantity supplied and payment shall be made on this real quantity.
-- <strong>Mandatory Documents Set :</strong> Material supplied should be accompanied with invoice for buyer along with duplicate for transporter. All supplied document/s must clearly indicate our purchase order number &amp; date, else the payment may not be processed.
-- <strong>Jurisdiction :</strong> Subject To Ahmedabad jurisdiction only.`;
+  const defaultTermsHTML = `- <strong>Terms &amp; Conditions :</strong>
+  - <strong>Quality :</strong> Supply of goods under this purchase order should be as per our agreed specifications and approved samples. Any change in supplier production process with respect to change in raw material &amp; additives that can change specification (or other technical parameters not appearing on specifications), should be notified to ON2COOK and prior consent should be taken before supply.
+  - <strong>Packing :</strong> Goods must be packed in new containers with clear markings for content, gross weight, tare weight, net weight, and hazard information. We will reject goods that do not meet these packing requirements.
+  - <strong>Delivery :</strong> Goods should be delivered at the desired destination between 9 AM to 5 PM. We shall allow the delivery of the vehicle inside our premises at any time, but unloading of goods is as per Instructions.
+  - <strong>Payment :</strong> This will be according to the terms mentioned in the Purchase Order.
+  - <strong>Weight &amp; Purity :</strong> Both parameters should be in accordance with the order form. Any difference in weight or purity will be calculated to determine the actual quantity supplied, and payment shall be made based on this actual quantity.
+  - <strong>Mandatory Documents Set :</strong> Material supplied should be accompanied with invoice for buyer along with duplicate for transporter, COA, PDI &amp; MSDS, else the vehicle will not be unloaded. All supplied document(s) must clearly indicate our purchase order number &amp; date, else the payment may not be processed.
+  - <strong>Rejection &amp; Replacement :</strong> In case of rejected material due to quality/specification issues, vendor shall be responsible for replacement/rework of material and shall bear all related transportation, pickup, return, and resupply costs. Rejected material handling shall be solely under vendor responsibility.
+  - <strong>Jurisdiction :</strong> Subject To Ahmedabad jurisdiction only.`;
 
   document.getElementById('poModalSub').textContent=`${poNumber} — ${pr.project_name}`;
 
