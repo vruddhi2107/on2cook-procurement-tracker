@@ -311,6 +311,14 @@ async function loadRequests() {
     .select('*, users!procurement_requests_created_by_fkey(name,email), vendors(name)')
     .order('updated_at',{ascending:false});
   allRequests=data||[];
+  // Also merge deviation_approval requests targeted at this director
+  if(currentUser?.role==='director'||currentUser?.role==='master') {
+    const {data:devData}=await db.from('procurement_requests').select('*, users!procurement_requests_created_by_fkey(name,email)').eq('deviation_target_id',currentUser.id).order('updated_at',{ascending:false});
+    if(devData?.length) {
+      const map=new Map(); for(const r of [...allRequests,...devData]) map.set(r.id,r);
+      allRequests=[...map.values()].sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
+    }
+  }
   updateStats();
   filterRequests();
   if (activeTab === 'analytics') renderAnalytics();
@@ -336,7 +344,7 @@ function updateStats() {
   document.getElementById('sClosed').textContent=allRequests.filter(r=>r.phase==='accepted').length;
   document.getElementById('sRejected').textContent=allRequests.filter(r=>r.phase==='rejected').length;
   // Director badge
-  const directorPending=allRequests.filter(r=>r.phase==='pending_sandy_approval');
+  const directorPending=allRequests.filter(r=>['pending_sandy_approval','deviation_approval','pending_decline_approval'].includes(r.phase));
   const badge=document.getElementById('directorBadge');
   if(badge){badge.textContent=directorPending.length;badge.style.display=directorPending.length?'':'none';}
 }
@@ -451,7 +459,7 @@ const DIRECTOR_OVERRIDABLE_PHASES = [
 ];
 
 async function renderDirectorApprovals() {
-  const pending = allRequests.filter(r => r.phase === 'pending_sandy_approval');
+  const pending = allRequests.filter(r => ['pending_sandy_approval','deviation_approval'].includes(r.phase));
   const overridable = allRequests.filter(r => DIRECTOR_OVERRIDABLE_PHASES.includes(r.phase) && r.phase !== 'pending_sandy_approval');
   const tbody = document.getElementById('directorBody');
 
@@ -507,6 +515,34 @@ async function openDirectorModal(prId, isOverride = false) {
 
   const prLabel = `PR-${String(directorCurrentPR.request_number).padStart(4,'0')}`;
 
+  // Show deviation UI if this is a deviated QC request for the director
+  if (directorCurrentPR.phase === 'deviation_approval' && directorCurrentPR.deviation_target_id === currentUser?.id) {
+    const devReason = directorCurrentPR.qc_criteria?.deviation_reason || 'No reason provided.';
+    const qcInspector = directorCurrentPR.qc_criteria?.qc_inspector || 'QC Inspector';
+    const devAtts = directorCurrentPR.qc_criteria?.qc_attachments || [];
+    document.getElementById('modalTitle').textContent = `QC Deviation Review — PR-${String(directorCurrentPR.request_number).padStart(4,'0')}`;
+    document.getElementById('modalBody').innerHTML = `
+      <div style="margin-bottom:16px">${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {})}</div>
+      <div class="action-section" style="border-color:#7c3aed;background:rgba(124,58,237,0.04)">
+        <div class="action-section-title" style="color:#7c3aed">↗ QC Deviation — Director Review <span class="action-badge" style="background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35">ACTION REQUIRED</span></div>
+        <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:10px">The <strong>QC Inspector (${qcInspector})</strong> has deviated this QC request to you for review.</p>
+        <div style="padding:10px 12px;background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.18);border-radius:var(--radius-sm);margin-bottom:12px;font-size:0.82rem">
+          <strong>Deviation Reason:</strong> ${devReason}
+        </div>
+        ${devAtts.length ? `<div style="margin-bottom:12px"><div style="font-size:0.78rem;font-weight:600;margin-bottom:4px">📎 QC Attachments</div>${devAtts.map(a=>`<div style="font-size:0.75rem;padding:2px 0">${a.type?.includes('image')?'🖼️':'📄'} ${a.name}</div>`).join('')}</div>` : ''}
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Decision Notes *</label>
+          <textarea class="form-control" id="directorDeviationNotes" placeholder="State your acceptance or rejection rationale..."></textarea>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-success" onclick="directorApproveDeviation()" style="flex:1">✓ Accept — Forward to Procurement Manager</button>
+          <button class="btn btn-danger" onclick="directorRejectDeviation()" style="flex:1">✗ Reject — QC Failed</button>
+        </div>
+      </div>`;
+    openModal('mainModal');
+    return;
+  }
+
   const headerLabel = directorIsOverride
     ? `<div class="action-section-title" style="color:#7c3aed">⚡ Director Override — ${prLabel} <span class="action-badge" style="background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35">OVERRIDE MODE</span></div>
        <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">As Director, you can approve or reject this request at any stage, bypassing the standard workflow.</p>`
@@ -536,6 +572,42 @@ async function openDirectorModal(prId, isOverride = false) {
       </div>
     </div>`;
   openModal('mainModal');
+}
+
+async function directorApproveDeviation() {
+  const notes = document.getElementById('directorDeviationNotes')?.value.trim();
+  if (!notes) { showToast('Please add decision notes', 'error'); return; }
+  showLoader(true);
+  const { error } = await db.from('procurement_requests').update({
+    phase: 'qc_passed',
+    qc_result: 'qc_passed',
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(directorCurrentPR, 'qc_passed')
+  }).eq('id', directorCurrentPR.id);
+  notifyPhaseChange(directorCurrentPR.id, 'qc_passed', currentUser?.id);
+  if (!error) await postComment(directorCurrentPR.id, currentUser.id, `✓ Director accepted deviation — forwarding to Procurement Manager for payment. Notes: ${notes}`);
+  showLoader(false);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast('Deviation accepted — forwarded to Procurement Manager.', 'success');
+  closeModal('mainModal'); await loadRequests();
+}
+
+async function directorRejectDeviation() {
+  const notes = document.getElementById('directorDeviationNotes')?.value.trim();
+  if (!notes) { showToast('Please add rejection notes', 'error'); return; }
+  showLoader(true);
+  const { error } = await db.from('procurement_requests').update({
+    phase: 'qc_rejected',
+    qc_result: 'rejected',
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(directorCurrentPR, 'qc_rejected')
+  }).eq('id', directorCurrentPR.id);
+  notifyPhaseChange(directorCurrentPR.id, 'qc_rejected', currentUser?.id);
+  if (!error) await postComment(directorCurrentPR.id, currentUser.id, `✗ Director rejected deviation: ${notes}`);
+  showLoader(false);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast('Deviation rejected — QC failed.', 'error');
+  closeModal('mainModal'); await loadRequests();
 }
 
 function selectQuotation(qId) {

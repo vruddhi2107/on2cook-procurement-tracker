@@ -69,12 +69,12 @@
     </div>
     <div class="modal-body" style="max-height:82vh;overflow-y:auto;padding-right:4px">
 
-      <!-- PM Approval Section (hidden for PM — they self-approve) -->
+      <!-- Project Manager Approval Section (hidden for Project Manager — they self-approve) -->
       <div id="pmApprovalSection" style="display:none">
         <div class="pm-approval-choice">
-          <div class="pm-approval-option selected" id="pmOptYes"><div class="pm-approval-option-icon"></div><div class="pm-approval-option-label">PM Approved</div><div class="pm-approval-option-sub">You are the PM</div></div>
+          <div class="pm-approval-option selected" id="pmOptYes"><div class="pm-approval-option-icon"></div><div class="pm-approval-option-label">Project Manager Approved</div><div class="pm-approval-option-sub">You are the Project Manager</div></div>
         </div>
-        <div id="vendorInfoNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.18);border-radius:var(--radius-sm);font-size:0.78rem;color:#6d28d9">ℹ Vendor Info requests go directly to the Procurement Manager — no PM clearance needed.</div>
+        <div id="vendorInfoNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.18);border-radius:var(--radius-sm);font-size:0.78rem;color:#6d28d9">ℹ Vendor Info requests go directly to the Procurement Manager — no Project Manager clearance needed.</div>
         <div id="localPurchaseNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.28);border-radius:var(--radius-sm);font-size:0.78rem;color:#15803d">🛒 Local Purchase requests go directly to the Procurement Manager for payment processing.</div>
       </div>
       <div id="pmScreenshotSection" style="display:none"></div>
@@ -286,10 +286,14 @@ async function init() {
 
 async function loadRequests() {
   // Load requests assigned to this PM OR created by this PM
-  const[assigned, created]=await Promise.all([
+  const[assigned, deviatedToMe, created]=await Promise.all([
     db.from('procurement_requests')
       .select('*, users!procurement_requests_created_by_fkey(name,email)')
       .eq('assigned_pm_id', currentUser.id)
+      .order('updated_at',{ascending:false}),
+    db.from('procurement_requests')
+      .select('*, users!procurement_requests_created_by_fkey(name,email)')
+      .eq('deviation_target_id', currentUser.id)
       .order('updated_at',{ascending:false}),
     db.from('procurement_requests')
       .select('*, users!procurement_requests_created_by_fkey(name,email)')
@@ -298,13 +302,13 @@ async function loadRequests() {
   ]);
   // Merge and deduplicate by id
   const map=new Map();
-  for(const r of [...(assigned.data||[]),...(created.data||[])]) map.set(r.id,r);
+  for(const r of [...(assigned.data||[]),...(created.data||[]),...(deviatedToMe.data||[])]) map.set(r.id,r);
   allRequests=[...map.values()].sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
   updateStats(); renderBanner(); filterTable();
 }
 
 function updateStats() {
-  document.getElementById('sClearance').textContent=allRequests.filter(r=>r.phase==='pending_initial_pm_approval').length;
+  document.getElementById('sClearance').textContent=allRequests.filter(r=>['pending_initial_pm_approval','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase)).length;
   document.getElementById('sFinal').textContent=allRequests.filter(r=>r.phase==='pending_pm_final_approval').length;
   document.getElementById('sEscalated').textContent=allRequests.filter(r=>r.phase==='pending_sandy_approval').length;
   document.getElementById('sApproved').textContent=allRequests.filter(r=>r.pm_final_approval_status==='approved').length;
@@ -312,7 +316,7 @@ function updateStats() {
 }
 
 function renderBanner() {
-  const clearance=allRequests.filter(r=>r.phase==='pending_initial_pm_approval');
+  const clearance=allRequests.filter(r=>['pending_initial_pm_approval','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase));
   const final=allRequests.filter(r=>r.phase==='pending_pm_final_approval');
   const total=clearance.length+final.length;
   const b=document.getElementById('pendingBanner');
@@ -338,7 +342,7 @@ function switchTab(t) {
 function filterTable() {
   const s=document.getElementById('searchInput').value.toLowerCase();
   let reqs=allRequests;
-  if(activeTab==='clearance') reqs=reqs.filter(r=>r.phase==='pending_initial_pm_approval');
+  if(activeTab==='clearance') reqs=reqs.filter(r=>['pending_initial_pm_approval','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase));
   else if(activeTab==='final') reqs=reqs.filter(r=>r.phase==='pending_pm_final_approval');
   else if(activeTab==='mine') reqs=reqs.filter(r=>r.created_by===currentUser.id);
   if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
@@ -349,8 +353,8 @@ function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
   if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${activeTab==='clearance'?'🔐':activeTab==='mine'?'📝':'✍️'}</div><h3>No requests here</h3><p>${activeTab==='clearance'?'No pending clearance requests.':activeTab==='final'?'No final approvals pending.':activeTab==='mine'?'You haven\'t submitted any requests yet. Click + New Request to get started.':'No requests assigned to you yet.'}</p>${activeTab==='mine'?'<button class="btn btn-primary" style="margin-top:12px" onclick="openNewPR()">+ New Request</button>':''}</div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
-    const needsAction=['pending_initial_pm_approval','pending_pm_final_approval'].includes(r.phase);
-    const isClearance=r.phase==='pending_initial_pm_approval', isFinal=r.phase==='pending_pm_final_approval';
+    const needsAction=['pending_initial_pm_approval','lp_pending_pm_approval','pending_decline_approval','pending_pm_final_approval'].includes(r.phase);
+    const isClearance=['pending_initial_pm_approval','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase), isFinal=r.phase==='pending_pm_final_approval';
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
       <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
       <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div></td>
@@ -389,7 +393,7 @@ async function openPR(id) {
   if(currentPR.phase==='pending_initial_pm_approval') {
     actionSection=`<div class="action-section">
       <div class="action-section-title">🔐 Requirement Clearance <span class="action-badge">ACTION REQUIRED</span></div>
-      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">The engineer indicated they <strong>do not yet have PM approval</strong> for this requirement. Review the request and grant or deny clearance to begin procurement.</p>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">The engineer does not yet have <strong>Project Manager approval</strong> for this requirement. Review and grant or deny clearance to begin procurement.</p>
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Decision Notes *</label>
         <textarea class="form-control" id="clearanceNotes" placeholder="State your rationale, conditions, or reason for denial..."></textarea>
@@ -433,9 +437,65 @@ async function openPR(id) {
     const amt=selQ?.amount?`₹${parseFloat(selQ.amount).toLocaleString('en-IN')}`:'—';
     actionSection=`<div class=\"action-section\" style=\"border-color:#7c3aed33;background:rgba(124,58,237,0.04)\">
       <div class=\"action-section-title\" style=\"color:#7c3aed\">👤 Awaiting Director Approval <span class=\"action-badge\" style=\"background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35\">ESCALATED</span></div>
-      <p style=\"font-size:0.82rem;color:var(--gray-3);margin-bottom:12px\">This request has been escalated to the Director (sandy@on2cook.com) because the selected quotation amount <strong>${amt}</strong> exceeds the PM approval limit of <strong>₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}</strong>.</p>
+      <p style=\"font-size:0.82rem;color:var(--gray-3);margin-bottom:12px\">This request has been escalated to the Director (sandy@on2cook.com) because the selected quotation amount <strong>${amt}</strong> exceeds the Project Manager approval limit of <strong>₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}</strong>.</p>
       <div style=\"background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.18);border-radius:var(--radius-sm);padding:9px 12px;font-size:0.78rem;color:#6d28d9\">
         The Director has been notified by email. No further action required from you.
+      </div>
+    </div>`;
+  }
+
+  // ── PENDING DECLINE APPROVAL — Project Manager must approve/deny the decline ──
+  if(currentPR.phase==='pending_decline_approval') {
+    actionSection=`<div class="action-section" style="border-color:#dc2626;background:rgba(220,38,38,0.04)">
+      <div class="action-section-title" style="color:#dc2626">🚫 Decline Approval Required <span class="action-badge" style="background:#dc2626">ACTION REQUIRED</span></div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:10px">The <strong>Procurement Manager</strong> wants to decline this request. You must confirm or reject this decline decision.</p>
+      ${currentPR.rejection_reason?`<div style="padding:10px 12px;background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);border-radius:var(--radius-sm);margin-bottom:12px;font-size:0.82rem"><strong>Procurement Manager's reason:</strong> ${currentPR.rejection_reason}</div>`:''}
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Your Notes *</label>
+        <textarea class="form-control" id="declineApprovalNotes" placeholder="State your reason for confirming or rejecting this decline..."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-danger" onclick="confirmDecline()" style="flex:1">✓ Confirm Decline</button>
+        <button class="btn btn-success" onclick="rejectDecline()" style="flex:1">↩ Reject Decline — Keep Active</button>
+      </div>
+    </div>`;
+  }
+
+  // ── DEVIATION APPROVAL — Project Manager or Director reviews deviated QC ──
+  if(currentPR.phase==='deviation_approval'&&currentPR.deviation_target_id===currentUser.id) {
+    const devReason=currentPR.qc_criteria?.deviation_reason||'No reason provided.';
+    const qcInspector=currentPR.qc_criteria?.qc_inspector||'QC Inspector';
+    const devAttachments=currentPR.qc_criteria?.qc_attachments||[];
+    actionSection=`<div class="action-section" style="border-color:#7c3aed;background:rgba(124,58,237,0.04)">
+      <div class="action-section-title" style="color:#7c3aed">↗ QC Deviation — Your Review Required <span class="action-badge" style="background:#7c3aed">ACTION REQUIRED</span></div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:10px">The <strong>QC Inspector (${qcInspector})</strong> has deviated this request to you for review.</p>
+      <div style="padding:10px 12px;background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.18);border-radius:var(--radius-sm);margin-bottom:12px;font-size:0.82rem">
+        <strong>Deviation Reason:</strong> ${devReason}
+      </div>
+      ${devAttachments.length?`<div style="margin-bottom:12px"><div style="font-size:0.78rem;font-weight:600;margin-bottom:4px">📎 QC Attachments</div>${devAttachments.map(a=>`<div style="font-size:0.75rem;padding:2px 0">${a.type?.includes('image')?'🖼️':'📄'} ${a.name}</div>`).join('')}</div>`:''}
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Your Decision Notes *</label>
+        <textarea class="form-control" id="deviationApprovalNotes" placeholder="State your decision reason..."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-success" onclick="approveDeviation()" style="flex:1">✓ Accept — Forward to Procurement Manager</button>
+        <button class="btn btn-danger" onclick="rejectDeviation()" style="flex:1">✗ Reject — Return to QC</button>
+      </div>
+    </div>`;
+  }
+
+  // ── LOCAL PURCHASE: lp_pending_pm_approval — Project Manager must approve/reject ──
+  if(currentPR.phase==='lp_pending_pm_approval'&&currentPR.request_category==='local_purchase') {
+    actionSection=`<div class="action-section" style="border-color:#15803d;background:rgba(34,197,94,0.04)">
+      <div class="action-section-title" style="color:#15803d">🛒 Local Purchase — Your Approval Required <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">An engineer/requestor submitted a Local Purchase request that requires your approval before the Procurement Manager can process payment.</p>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Decision Notes *</label>
+        <textarea class="form-control" id="lpApprovalNotes" placeholder="State your approval rationale or reason for rejection..."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-success" onclick="approveLPRequest()" style="flex:1">✓ Approve — Send to Procurement Manager</button>
+        <button class="btn btn-danger" onclick="rejectLPRequest()" style="flex:1">✗ Reject</button>
       </div>
     </div>`;
   }
@@ -482,14 +542,125 @@ async function grantClearance(decision) {
     phase_timestamps:addPhaseTimestamp(currentPR,approved?'procurement_active':'rejected')
   }).eq('id',currentPR.id);
   notifyPhaseChange(currentPR.id,approved?'procurement_active':'rejected',currentUser?.id);
-  if(!error) await postComment(currentPR.id,currentUser.id,`${approved?'':''} PM Clearance ${approved?'Granted':'Denied'}: ${notes}`);
+  if(!error) await postComment(currentPR.id,currentUser.id,`${approved?'✓':'✗'} Project Manager Clearance ${approved?'Granted':'Denied'}: ${notes}`);
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
   showToast(approved?'Clearance granted — procurement can begin.':'Requirement denied.', approved?'success':'error');
   closeModal('prModal'); await loadRequests();
 }
 
-// ── PM QUOTE SELECTION ───────────────────────────────────────
+// ── CONFIRM / REJECT PROCUREMENT MANAGER DECLINE ─────────────
+async function confirmDecline() {
+  const notes=document.getElementById('declineApprovalNotes')?.value.trim();
+  if(!notes){showToast('Please add your notes','error');return;}
+  showLoader(true);
+  const{error}=await db.from('procurement_requests').update({
+    phase:'declined',
+    pm_final_approval_notes: (currentPR.pm_final_approval_notes||'') + ' | Project Manager confirmed: '+notes,
+    updated_at:new Date().toISOString(),
+    phase_timestamps:addPhaseTimestamp(currentPR,'declined')
+  }).eq('id',currentPR.id);
+  notifyPhaseChange(currentPR.id,'declined',currentUser?.id);
+  if(!error) await postComment(currentPR.id,currentUser.id,`✓ Project Manager confirmed decline: ${notes}`);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast('Decline confirmed — request is now formally declined.','success');
+  closeModal('prModal'); await loadRequests();
+}
+
+async function rejectDecline() {
+  const notes=document.getElementById('declineApprovalNotes')?.value.trim();
+  if(!notes){showToast('Please add your notes','error');return;}
+  showLoader(true);
+  const{error}=await db.from('procurement_requests').update({
+    phase:'procurement_active',
+    rejection_reason:null,
+    pm_final_approval_notes:null,
+    updated_at:new Date().toISOString(),
+    phase_timestamps:addPhaseTimestamp(currentPR,'procurement_active')
+  }).eq('id',currentPR.id);
+  notifyPhaseChange(currentPR.id,'procurement_active',currentUser?.id);
+  if(!error) await postComment(currentPR.id,currentUser.id,`↩ Project Manager rejected the decline — request restored to Procurement Active. Notes: ${notes}`);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast('Decline rejected — request restored to Procurement Active.','success');
+  closeModal('prModal'); await loadRequests();
+}
+
+// ── DEVIATION APPROVAL FUNCTIONS ─────────────────────────────
+async function approveDeviation() {
+  const notes=document.getElementById('deviationApprovalNotes')?.value.trim();
+  if(!notes){showToast('Please add decision notes','error');return;}
+  showLoader(true);
+  const{error}=await db.from('procurement_requests').update({
+    phase:'qc_passed',
+    qc_result:'qc_passed',
+    updated_at:new Date().toISOString(),
+    phase_timestamps:addPhaseTimestamp(currentPR,'qc_passed')
+  }).eq('id',currentPR.id);
+  notifyPhaseChange(currentPR.id,'qc_passed',currentUser?.id);
+  if(!error) await postComment(currentPR.id,currentUser.id,`✓ Deviation accepted by ${currentUser.name} — forwarding to Procurement Manager for payment. Notes: ${notes}`);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast('Deviation accepted — forwarded to Procurement Manager.','success');
+  closeModal('prModal'); await loadRequests();
+}
+
+async function rejectDeviation() {
+  const notes=document.getElementById('deviationApprovalNotes')?.value.trim();
+  if(!notes){showToast('Please add rejection notes','error');return;}
+  showLoader(true);
+  const{error}=await db.from('procurement_requests').update({
+    phase:'qc_rejected',
+    qc_result:'rejected',
+    updated_at:new Date().toISOString(),
+    phase_timestamps:addPhaseTimestamp(currentPR,'qc_rejected')
+  }).eq('id',currentPR.id);
+  notifyPhaseChange(currentPR.id,'qc_rejected',currentUser?.id);
+  if(!error) await postComment(currentPR.id,currentUser.id,`✗ Deviation rejected by ${currentUser.name}: ${notes}`);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast('Deviation rejected.','error');
+  closeModal('prModal'); await loadRequests();
+}
+
+// ── LOCAL PURCHASE APPROVAL by Project Manager ────────────────
+async function approveLPRequest() {
+  const notes=document.getElementById('lpApprovalNotes')?.value.trim();
+  if(!notes){showToast('Please add approval notes','error');return;}
+  showLoader(true);
+  const{error}=await db.from('procurement_requests').update({
+    phase:'procurement_active',
+    updated_at:new Date().toISOString(),
+    phase_timestamps:addPhaseTimestamp(currentPR,'procurement_active')
+  }).eq('id',currentPR.id);
+  notifyPhaseChange(currentPR.id,'procurement_active',currentUser?.id);
+  if(!error) await postComment(currentPR.id,currentUser.id,`✓ Project Manager approved Local Purchase — forwarded to Procurement Manager for payment. Notes: ${notes}`);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast('Local Purchase approved — sent to Procurement Manager for payment processing.','success');
+  closeModal('prModal'); await loadRequests();
+}
+
+async function rejectLPRequest() {
+  const notes=document.getElementById('lpApprovalNotes')?.value.trim();
+  if(!notes){showToast('Please add rejection notes','error');return;}
+  showLoader(true);
+  const{error}=await db.from('procurement_requests').update({
+    phase:'rejected',
+    rejection_reason:notes,
+    updated_at:new Date().toISOString(),
+    phase_timestamps:addPhaseTimestamp(currentPR,'rejected')
+  }).eq('id',currentPR.id);
+  notifyPhaseChange(currentPR.id,'rejected',currentUser?.id);
+  if(!error) await postComment(currentPR.id,currentUser.id,`✗ Project Manager rejected Local Purchase: ${notes}`);
+  showLoader(false);
+  if(error){showToast('Error: '+error.message,'error');return;}
+  showToast('Local Purchase rejected.','error');
+  closeModal('prModal'); await loadRequests();
+}
+
+// ── PROJECT MANAGER QUOTE SELECTION ─────────────────────────
 function selectQuotation(qId) {
   pmSelectedQuotationId = qId;
   prQuotations.forEach(q => {
@@ -578,12 +749,12 @@ async function finalDecision(decision) {
     const amtDisplay = selectedQ?.currency && selectedQ.currency !== 'INR'
       ? `${selectedQ.currency} ${selectedAmount.toLocaleString()} ≈ ₹${selectedAmountINR.toLocaleString('en-IN')}`
       : `₹${selectedAmountINR.toLocaleString('en-IN')}`;
-    commentText=`⬆️ Escalated to Director for approval — amount ${amtDisplay} meets/exceeds PM limit of ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}. PM notes: ${notes}`;
+    commentText=`⬆️ Escalated to Director for approval — amount ${amtDisplay} meets/exceeds Project Manager limit of ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}. Project Manager notes: ${notes}`;
   }
   else if(decision==='approved')
-    commentText=`✅ PM Final Approved: ${notes}`;
+    commentText=`✅ Project Manager Final Approved: ${notes}`;
   else
-    commentText=`❌ PM Final Rejected: ${notes}${needsMoreVendors?' — more vendors requested.':''}`;
+    commentText=`❌ Project Manager Final Rejected: ${notes}${needsMoreVendors?' — more vendors requested.':''}`;
 
   if(!error) await postComment(currentPR.id,currentUser.id,commentText);
   showLoader(false);
@@ -637,6 +808,8 @@ function onProjectChange() {
   const phases=project.project_phases||[];
   if(!phases.length){phSel.innerHTML='<option value="">No phases added yet</option>';return;}
   phSel.innerHTML='<option value="">Select Phase...</option>'+phases.map(ph=>`<option value="${ph.name}">${ph.name}</option>`).join('');
+  // Change 2: auto-fill and lock PM if project has a default PM (for PM page this is always themselves)
+  // PM portal self-assigns — no change needed here, PM is always currentUser
   onPhaseChange();
 }
 
@@ -715,7 +888,7 @@ function openNewPR() {
   isEditMode=false; editingParentId=null;
   selectedSourcing=[]; attachedFiles=[];
   document.getElementById('prFormTitle').textContent='New Procurement Request';
-  document.getElementById('prFormSub').textContent='All starred fields are required — you are the assigned PM';
+  document.getElementById('prFormSub').textContent='All starred fields are required — you are the assigned Project Manager';
   document.getElementById('prFormSubmitBtn').textContent='Submit Request →';
   document.getElementById('modificationNoteSection').style.display='none';
   document.getElementById('srcDomestic').classList.remove('selected');

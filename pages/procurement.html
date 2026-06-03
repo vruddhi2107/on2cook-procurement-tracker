@@ -268,7 +268,7 @@
     <div class="card">
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>Urgency</th><th>PM</th><th>Engineer</th><th>Lead Time</th><th>Updated</th><th></th></tr></thead>
+          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>Urgency</th><th>Project Manager</th><th>Engineer</th><th>Lead Time</th><th>Updated</th><th></th></tr></thead>
           <tbody id="requestsBody"></tbody>
         </table>
       </div>
@@ -297,7 +297,7 @@
   <div id="tabParts" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px">
       <input type="text" id="partsSearch" class="form-control" placeholder="Search by part number or name..." style="max-width:340px" oninput="filterPartsTable()"/>
-      <button class="btn btn-primary" onclick="openPartModal()">+ Add Part</button>
+      <button class="btn btn-primary" id="addPartBtn" onclick="openPartModal()" style="display:none">+ Add Part</button>
     </div>
     <div class="card">
       <div class="table-wrap">
@@ -748,7 +748,7 @@ function filterTable(){
   const s=document.getElementById('searchInput').value.toLowerCase();
   const ph=document.getElementById('filterPhase').value;
   const urg=document.getElementById('filterUrgency')?.value||'';
-  const actionPhases=['procurement_active','quotes_revision_requested','approved','advance_requested','grn_initiated','qc_pending','rework_pending','qc_passed','lp_payment_pending'];
+  const actionPhases=['lp_pending_pm_approval','procurement_active','quotes_revision_requested','approved','advance_requested','grn_initiated','qc_pending','rework_pending','rework2_pending','qc_passed','lp_payment_pending','pending_decline_approval'];
   let reqs=allRequests;
   if(activeTab==='active') reqs=reqs.filter(r=>actionPhases.includes(r.phase));
   if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
@@ -761,8 +761,8 @@ function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
   if(!reqs.length){tbody.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>${activeTab==='active'?'All caught up!':'No requests'}</h3></div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
-    const needsAction=['procurement_active','quotes_revision_requested','approved','grn_initiated','qc_pending','rework_pending','qc_passed','lp_payment_pending'].includes(r.phase);
-    const lbl={procurement_active:'Work on it',quotes_revision_requested:'Revise Quotes',approved:'Place Order',advance_requested:'View Advance',grn_initiated:'GRN Sent to Store',qc_pending:'QC In Progress',rework_pending:'Rework Out',qc_passed:'Payment Req',lp_payment_pending:'Mark Paid'}[r.phase]||'View';
+    const needsAction=['lp_pending_pm_approval','procurement_active','quotes_revision_requested','approved','grn_initiated','qc_pending','rework_pending','rework2_pending','qc_passed','lp_payment_pending','pending_decline_approval'].includes(r.phase);
+    const lbl={lp_pending_pm_approval:'LP Awaiting Proj Mgr',procurement_active:'Work on it',quotes_revision_requested:'Revise Quotes',approved:'Place Order',advance_requested:'View Advance',grn_initiated:'GRN Sent to Store',qc_pending:'QC In Progress',rework_pending:'Rework Out',rework2_pending:'2nd Rework Out',qc_passed:'Payment Req',lp_payment_pending:'Mark Paid',pending_decline_approval:'Decline Pending'}[r.phase]||'View';
     const typeLabel=r.request_category==='vendor_info'?'Vendor Info':r.request_category==='local_purchase'?'Local Purchase':'RFQ';
     const typeBg=r.request_category==='local_purchase'?'background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.35);color:#15803d':r.request_category==='vendor_info'?'background:rgba(139,92,246,0.08);border-color:rgba(139,92,246,0.3);color:#6d28d9':'background:var(--off-white);border-color:var(--border)';
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
@@ -1010,10 +1010,19 @@ async function openPR(id) {
   }
 
   // ── LOCAL PURCHASE: procurement_active → mark payment pending ──
+  // ── LOCAL PURCHASE: lp_pending_pm_approval — waiting for Project Manager ──
+  if(currentPR.phase==='lp_pending_pm_approval'&&currentPR.request_category==='local_purchase') {
+    actionSection=`<div style="padding:14px;border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);background:rgba(245,158,11,0.04)">
+      <div style="font-weight:700;color:#b45309;margin-bottom:6px">⏳ Local Purchase — Awaiting Project Manager Approval</div>
+      <p style="font-size:0.78rem;color:var(--gray-3);margin:0">The Project Manager has been notified. Once approved it will appear here for payment processing.</p>
+    </div>`;
+  }
+
+  // ── LOCAL PURCHASE: procurement_active → ready for Procurement Manager payment processing ──
   if(currentPR.phase==='procurement_active'&&currentPR.request_category==='local_purchase') {
     actionSection=`<div class="action-section" style="border:1px solid rgba(34,197,94,0.3);background:rgba(34,197,94,0.03)">
-      <div class="action-section-title" style="color:#15803d">🛒 Local Purchase <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
-      <p style="font-size:0.8rem;color:var(--gray-3);margin-bottom:14px">Review the request below, then mark this as <strong>Payment Pending</strong> once you are ready to make the payment.</p>
+      <div class="action-section-title" style="color:#15803d">🛒 Local Purchase — Approved by Project Manager <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
+      <p style="font-size:0.8rem;color:var(--gray-3);margin-bottom:14px">Project Manager has approved this request. Mark as <strong>Payment Pending</strong> when ready to process.</p>
       <div style="margin-top:4px">
         <button class="btn btn-primary" onclick="lpMarkPaymentPending()" style="background:#15803d;border-color:#15803d">Mark as Payment Pending →</button>
       </div>
@@ -1134,7 +1143,7 @@ async function openPR(id) {
     actionSection = buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO);
   }
 
-  // ── ADVANCE RAISED TO ACCOUNTS: PM marks received ──
+  // ── ADVANCE RAISED TO ACCOUNTS: Procurement Manager marks received ──
   if(currentPR.phase==='advance_raised_to_accounts') {
     const {data:advRec} = await db.from('advance_payment_requests')
       .select('*').eq('pr_id',currentPR.id).order('created_at',{ascending:false}).limit(1).maybeSingle();
@@ -1243,7 +1252,7 @@ async function openPR(id) {
     </div>`;
   }
 
-  // ── PAYMENT RAISED TO ACCOUNTS: PM marks received ──
+  // ── PAYMENT RAISED TO ACCOUNTS: Procurement Manager marks received ──
   if(currentPR.phase==='payment_raised_to_accounts'||currentPR.phase==='payment_requested') {
     const {data:payRec} = await db.from('payment_requests')
       .select('*').eq('pr_id',currentPR.id).order('request_date',{ascending:false}).limit(1).maybeSingle();
@@ -1281,11 +1290,21 @@ async function openPR(id) {
     </div>`;
   }
 
-  // ── DECLINED ──
+  // ── PENDING DECLINE APPROVAL (Procurement declined → waiting for Project Manager) ──
+  if(currentPR.phase==='pending_decline_approval') {
+    actionSection=`<div style="margin-top:14px;padding:16px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius)">
+      <div style="font-size:0.95rem;font-weight:700;color:#b45309;margin-bottom:6px">⏳ Decline Pending — Awaiting Project Manager Approval</div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:8px">You have sent a decline request. The Project Manager has been notified and must confirm before this is finalised.</p>
+      ${currentPR.rejection_reason?`<div style="padding:8px 12px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius-sm);font-size:0.82rem;margin-bottom:8px"><strong>Decline reason sent:</strong> ${currentPR.rejection_reason}</div>`:''}
+      <div style="font-size:0.78rem;color:var(--gray-4)">No further action from Procurement Manager required at this stage.</div>
+    </div>`;
+  }
+
+  // ── DECLINED (confirmed by Project Manager) ──
   if(currentPR.phase==='declined') {
     actionSection=`<div style="margin-top:14px;padding:16px;background:rgba(214,43,43,0.05);border:1px solid rgba(214,43,43,0.2);border-radius:var(--radius);text-align:center">
       <div style="font-size:2rem;margin-bottom:8px">🚫</div>
-      <div style="font-size:0.95rem;font-weight:700;color:var(--red);margin-bottom:4px">Request Declined by Procurement</div>
+      <div style="font-size:0.95rem;font-weight:700;color:var(--red);margin-bottom:4px">Request Declined — Confirmed by Project Manager</div>
       ${currentPR.rejection_reason?`<div style="display:inline-block;margin:8px 0;padding:6px 14px;background:rgba(214,43,43,0.08);border:1px solid rgba(214,43,43,0.2);border-radius:var(--radius-sm);font-size:0.82rem;font-weight:600;color:var(--red)">${currentPR.rejection_reason}</div>`:''}
       ${currentPR.pm_final_approval_notes?`<p style="font-size:0.8rem;color:var(--gray-3);margin:6px 0 0">${currentPR.pm_final_approval_notes}</p>`:''}
     </div>`;
@@ -1370,18 +1389,20 @@ async function declinePR() {
   const reason = document.getElementById('declineReasonSelect')?.value;
   const notes  = document.getElementById('declineNotesInput')?.value?.trim();
   if(!reason) { showToast('Please select a reason for declining.','error'); return; }
-  if(!confirm(`Decline this request?\n\nReason: ${reason}\n\nThis will notify the engineer.`)) return;
+  if(!confirm(`Send decline to Project Manager for approval?\n\nReason: ${reason}\n\nThe Project Manager must confirm before the request is formally declined.`)) return;
   showLoader(true);
+  // Change 1: Decline now routes to Project Manager for confirmation first
   const { error } = await db.from('procurement_requests').update({
-    phase: 'declined',
+    phase: 'pending_decline_approval',
     rejection_reason: reason,
     pm_final_approval_notes: notes || null,
     updated_at: new Date().toISOString(),
-    phase_timestamps: addPhaseTimestamp(currentPR, 'declined')
+    phase_timestamps: addPhaseTimestamp(currentPR, 'pending_decline_approval')
   }).eq('id', currentPR.id);
   showLoader(false);
-  if(error) { showToast('Error declining request: ' + error.message, 'error'); return; }
-  showToast('Request declined.', 'success');
+  if(error) { showToast('Error: ' + error.message, 'error'); return; }
+  notifyPhaseChange(currentPR.id, 'pending_decline_approval', currentUser?.id);
+  showToast('Decline request sent to Project Manager for approval.', 'warning');
   closeModal('prModal');
   await loadRequests();
 }
@@ -2668,7 +2689,7 @@ function previewGenericScreenshot(input, labelId, previewId) {
   }
 }
 
-// ── PM: MARK ADVANCE PAYMENT RECEIVED ────────────────────────
+// ── PROCUREMENT MANAGER: MARK ADVANCE PAYMENT RECEIVED ────────
 async function markAdvanceReceived(prId, advId) {
   const fileEl = document.getElementById('advReceivedFile');
   const note = document.getElementById('advReceivedNote')?.value?.trim() || null;
@@ -2705,7 +2726,7 @@ async function markAdvanceReceived(prId, advId) {
   closeModal('prModal'); await loadRequests();
 }
 
-// ── PM: MARK FULL PAYMENT RECEIVED & CLOSE PR ────────────────
+// ── PROCUREMENT MANAGER: MARK FULL PAYMENT RECEIVED & CLOSE PR ─
 async function markFullPaymentReceived(prId, payId) {
   const fileEl = document.getElementById('payReceivedFile');
   const note = document.getElementById('payReceivedNote')?.value?.trim() || null;
@@ -3020,6 +3041,10 @@ async function loadPartsTab() {
 
   allParts = parts || [];
   renderPartsTable(allParts);
+  // Change 5: show/hide edit controls based on role
+  const canEdit = ['procurement_manager','master','director'].includes(currentUser?.role);
+  const addBtn = document.getElementById('addPartBtn');
+  if (addBtn) addBtn.style.display = canEdit ? '' : 'none';
 }
 
 function renderPartsTable(parts) {
@@ -3051,8 +3076,10 @@ function renderPartsTable(parts) {
       </td>
       <td style="white-space:nowrap">
         <button class="btn btn-secondary btn-sm" onclick="openPartVendorsModal('${p.id}')">🏢 Vendors</button>
-        <button class="btn btn-ghost btn-sm" onclick="openPartModal('${p.id}')">Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="deletePart('${p.id}',${JSON.stringify(p.part_number)})">✕</button>
+        ${['procurement_manager','master','director'].includes(currentUser?.role)
+          ? `<button class="btn btn-ghost btn-sm" onclick="openPartModal('${p.id}')">Edit</button>
+             <button class="btn btn-danger btn-sm" onclick="deletePart('${p.id}',${JSON.stringify(p.part_number)})">✕</button>`
+          : '<span style="font-size:0.72rem;color:var(--gray-4)">View only</span>'}
       </td>
     </tr>`;
   }).join('');

@@ -5,6 +5,9 @@ var myRequests   = [];
 var currentPR    = null;
 var activeTab    = 'action';
 var qcSelection  = null;
+var deviationTargetId = null;
+var allPMsAndDirector = []; // loaded for deviation dropdown
+var qcAttachments = []; // attachments added during QC inspection
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function addPhaseTimestamp(pr, phaseName) {
@@ -38,6 +41,9 @@ async function init() {
   document.getElementById('navbarMount').innerHTML = buildNavbar(currentUser);
   document.getElementById('footerMount').innerHTML = buildFooter();
   initNavbar(currentUser);
+  // Load PMs + Director for the deviation dropdown
+  var usersRes = await db.from('users').select('id,name,role').in('role',['project_manager','director']).order('name');
+  allPMsAndDirector = usersRes.data || [];
   await loadRequests();
 }
 
@@ -64,7 +70,7 @@ async function loadRequests() {
 }
 
 function updateStats() {
-  document.getElementById('sQcPending').textContent = allRequests.filter(function(r){ return r.phase === 'qc_pending' || r.phase === 'rework_returned'; }).length;
+  document.getElementById('sQcPending').textContent = allRequests.filter(function(r){ return ['qc_pending','rework_returned','rework2_pending','rework2_returned'].indexOf(r.phase) !== -1; }).length;
   document.getElementById('sQcPassed').textContent  = allRequests.filter(function(r){ return r.phase === 'qc_passed' || r.phase === 'accepted'; }).length;
   document.getElementById('sRework').textContent    = allRequests.filter(function(r){ return r.phase === 'rework_pending'; }).length;
 
@@ -75,10 +81,10 @@ function updateStats() {
 
 // ─── Tables ───────────────────────────────────────────────────────────────────
 function renderTable() {
-  var actionPhases = ['qc_pending', 'rework_returned'];
+  var actionPhases = ['qc_pending', 'rework_returned', 'rework2_returned'];
   var rows = activeTab === 'action'
     ? allRequests.filter(function(r){ return actionPhases.indexOf(r.phase) !== -1; })
-    : allRequests.filter(function(r){ return ['qc_pending','qc_passed','rework_pending','rework_returned','accepted','qc_rejected'].indexOf(r.phase) !== -1; });
+    : allRequests.filter(function(r){ return ['qc_pending','qc_passed','rework_pending','rework_returned','rework2_pending','rework2_returned','qc_deviated','deviation_approval','accepted','qc_rejected'].indexOf(r.phase) !== -1; });
 
   var tbody = document.getElementById('mainTbody');
   if (!rows.length) {
@@ -90,7 +96,7 @@ function renderTable() {
     var grn      = (r.qc_criteria && r.qc_criteria.grn) ? r.qc_criteria.grn : {};
     var parts    = r.parts || [];
     var isAction = actionPhases.indexOf(r.phase) !== -1;
-    var btnLabel = r.phase === 'rework_returned' ? '\uD83D\uDD04 Post-Rework QC \u2192' : (isAction ? 'Inspect \u2192' : 'View');
+    var btnLabel = r.phase === 'rework2_returned' ? '\uD83D\uDD04 Final Re-QC \u2192' : r.phase === 'rework_returned' ? '\uD83D\uDD04 Post-Rework QC \u2192' : (isAction ? 'Inspect \u2192' : 'View');
     return '<tr' + (isAction ? ' class="row-action"' : '') + '>'
       + '<td><span class="pr-num">PR-' + String(r.request_number).padStart(4,'0') + '</span></td>'
       + '<td><span class="fw-600">' + r.project_name + '</span>'
@@ -205,7 +211,7 @@ function renderModal() {
       + '<div class="action-section-title">🔍 Quality Check <span class="action-badge">ACTION REQUIRED</span></div>'
       + grnSummary
       + qcCriteriaHTML
-      + '<div class="qc-result-row">'
+      + '<div class="qc-result-row" style="grid-template-columns:1fr 1fr 1fr 1fr">'
         + '<div class="qc-option pass" id="optPass" onclick="selectQC(\'pass\')">'
           + '<div class="qc-icon">✅</div><div class="qc-label">QC Passed</div>'
           + '<div class="qc-desc">All goods meet quality specs</div></div>'
@@ -215,6 +221,24 @@ function renderModal() {
         + '<div class="qc-option reject" id="optReject" onclick="selectQC(\'reject\')">'
           + '<div class="qc-icon">🚫</div><div class="qc-label">QC Rejected</div>'
           + '<div class="qc-desc">Outright rejection — no rework</div></div>'
+        + '<div class="qc-option" id="optDeviate" onclick="selectQC(\'deviate\')" style="border-color:rgba(124,58,237,0.3)">'
+          + '<div class="qc-icon">↗</div><div class="qc-label" style="color:#7c3aed">Deviate</div>'
+          + '<div class="qc-desc">Escalate to Project Manager / Director</div></div>'
+      + '</div>'
+
+      + '<div id="deviationSection" style="display:none;margin:10px 0;padding:14px;background:rgba(124,58,237,0.05);border:1px solid rgba(124,58,237,0.2);border-radius:var(--radius)">'
+        + '<div style="font-size:0.84rem;font-weight:700;color:#7c3aed;margin-bottom:8px">↗ Deviation — Select Recipient</div>'
+        + '<p style="font-size:0.78rem;color:var(--gray-3);margin-bottom:10px">Select who to send this deviation to. They will review and accept or reject it.</p>'
+        + '<div class="form-group" style="margin-bottom:10px"><label class="form-label" style="font-size:0.75rem">Send deviation to *</label>'
+        + ('<select class="form-control" id="deviationTargetSelect" style="font-size:0.82rem" onchange="onDeviationTargetChange()"><option value="">— Select Project Manager or Director —</option>'          + allPMsAndDirector.map(function(u){ return '<option value="' + u.id + '">' + u.name + ' (' + (u.role==='director'?'Director':'Project Manager') + ')</option>'; }).join('')          + '</select>')        + '</div>'
+        + '<div class="form-group"><label class="form-label" style="font-size:0.75rem">Deviation reason *</label>'
+        + '<textarea class="form-control" id="deviationReason" rows="2" placeholder="Describe why this is being deviated..." style="font-size:0.82rem"></textarea></div>'
+      + '</div>'
+      + '<div style="margin:10px 0"><label class="form-label">QC Attachments <span style="font-size:0.72rem;color:var(--gray-4);font-weight:400">(photos, reports — optional)</span></label>'
+        + '<div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer;background:rgba(99,102,241,0.02)" id="qcAttachZone" onclick="document.getElementById(\'qcAttachFile\').click()">'
+        + '<input type="file" id="qcAttachFile" accept="image/*,.pdf" multiple style="display:none" onchange="handleQCAttach(event)"/>'
+        + '<div style="font-size:0.78rem;font-weight:600">📎 Click to attach QC photos / reports</div>'
+        + '</div><div id="qcAttachList" style="margin-top:6px;display:flex;flex-direction:column;gap:3px"></div>'
       + '</div>'
       + '<div id="samplesSection" style="display:none" class="samples-section">'
         + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px">📦 Sample Rejection Quantities</div>'
@@ -257,6 +281,20 @@ function renderModal() {
       + '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'
         + '<button class="btn btn-primary" id="btnSubmitQC" onclick="submitQC()">Submit QC Result →</button>'
       + '</div>'
+      + '</div>';
+
+  } else if (pr.phase === 'rework2_returned') {
+    var jwcRework2Data = (pr.qc_criteria && pr.qc_criteria.jwc2) ? pr.qc_criteria.jwc2 : (pr.qc_criteria && pr.qc_criteria.jwc ? pr.qc_criteria.jwc : {});
+    actionSection = '<div class="action-section">'      + '<div class="action-section-title">🔄 Final Post-Rework QC Inspection <span class="action-badge">ACTION REQUIRED</span></div>'      + grnSummary      + (jwcRework2Data.jwc_number          ? '<div style="margin-bottom:14px;padding:10px 12px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);font-size:0.82rem">'            + '<div style="font-weight:700;color:#dc2626;margin-bottom:4px">📄 2nd Rework History — JWC ' + jwcRework2Data.jwc_number + '</div>'            + '<div>Rework Vendor: <strong>' + (jwcRework2Data.rework_vendor || '—') + '</strong></div>'            + (jwcRework2Data.notes ? '<div>Notes: ' + jwcRework2Data.notes + '</div>' : '')            + '</div>'          : '')      + '<div style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;font-size:0.82rem">'        + '<strong>⚠️ This is the final rework cycle.</strong> If goods still fail QC, they will be outright rejected.'      + '</div>'      + '<div style="margin-bottom:12px"><label class="form-label">Re-QC Attachments <span style="font-size:0.72rem;color:var(--gray-4);font-weight:400">(optional)</span></label>'        + '<div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center;cursor:pointer" onclick="document.getElementById(\'finalReQcAttachFile\').click()">'        + '<input type="file" id="finalReQcAttachFile" accept="image/*,.pdf" multiple style="display:none" onchange="handleFinalReQCAttach(event)"/>'        + '<div style="font-size:0.78rem;font-weight:600">📎 Click to attach photos / reports</div>'        + '</div><div id="finalReQcAttachList" style="margin-top:6px"></div></div>'      + '<div class="qc-result-row" style="grid-template-columns:1fr 1fr;max-width:480px">'        + '<div class="qc-option pass" id="rw2OptPass" onclick="selectRework2QC(\'pass\')">'          + '<div class="qc-icon">✅</div><div class="qc-label">QC Passed</div>'          + '<div class="qc-desc">Final rework accepted</div></div>'        + '<div class="qc-option reject" id="rw2OptReject" onclick="selectRework2QC(\'reject\')">'          + '<div class="qc-icon">🚫</div><div class="qc-label">QC Rejected</div>'          + '<div class="qc-desc">Still defective — outright rejection</div></div>'      + '</div>'      + '<div id="rw2SamplesSection" style="display:none" class="samples-section">'        + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px">📦 Final Rejection Quantities</div>'        + '<table class="samples-table"><thead><tr><th>#</th><th style="text-align:left">Item</th><th>Received</th><th>Rejected Qty</th><th>Accepted (auto)</th></tr></thead>'        + '<tbody id="rw2SamplesBody"></tbody></table>'      + '</div>'      + '<div><label class="form-label">Final Post-Rework Inspection Notes *</label>'        + '<textarea class="form-control" id="qcNotesRework2" rows="3" placeholder="Describe final rework quality findings..."></textarea></div>'      + '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'        + '<button class="btn btn-primary" onclick="submitFinalReworkQC()">Submit Final Re-QC Result →</button>'      + '</div>'      + '</div>';
+
+  } else if (pr.phase === 'deviation_approval') {
+    var devTarget = allPMsAndDirector.find(function(u){ return u.id === pr.deviation_target_id; });
+    var devTargetName = devTarget ? devTarget.name + ' (' + (devTarget.role === 'director' ? 'Director' : 'Project Manager') + ')' : 'Recipient';
+    var devReason = (pr.qc_criteria && pr.qc_criteria.deviation_reason) ? pr.qc_criteria.deviation_reason : 'No reason recorded.';
+    actionSection = '<div style="padding:14px;border:1px solid rgba(124,58,237,0.25);border-radius:var(--radius);background:rgba(124,58,237,0.04)">'
+      + '<div style="font-weight:700;color:#7c3aed;margin-bottom:6px">↗ Request Deviated — Pending Review by ' + devTargetName + '</div>'
+      + '<div style="padding:8px 12px;background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.15);border-radius:var(--radius-sm);font-size:0.82rem;margin-bottom:8px"><strong>Deviation reason:</strong> ' + devReason + '</div>'
+      + '<p style="font-size:0.78rem;color:var(--gray-4);margin:0">Awaiting the recipient\'s decision. No further action required from QC at this stage.</p>'
       + '</div>';
 
   } else if (pr.phase === 'qc_passed' || pr.phase === 'accepted') {
@@ -336,6 +374,7 @@ function renderModal() {
           + '<tbody id="rwSamplesBody"></tbody>'
         + '</table></div>'
       + '</div>'
+      + '<div style="margin:10px 0"><label class="form-label">Re-QC Attachments <span style="font-size:0.72rem;color:var(--gray-4);font-weight:400">(photos, reports — optional)</span></label>'        + '<div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer;background:rgba(99,102,241,0.02)" onclick="document.getElementById(\'reQcAttachFile\').click()">'        + '<input type="file" id="reQcAttachFile" accept="image/*,.pdf" multiple style="display:none" onchange="handleReQCAttach(event)"/>'        + '<div style="font-size:0.78rem;font-weight:600">📎 Click to attach Re-QC photos / reports</div>'        + '</div><div id="reQcAttachList" style="margin-top:6px"></div></div>'
       + '<div><label class="form-label">Post-Rework Inspection Notes *</label>'
         + '<textarea class="form-control" id="qcNotesRework" rows="3" placeholder="Describe rework quality findings — measurements checked, defects resolved, overall condition…"></textarea></div>'
       + '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'
@@ -368,19 +407,32 @@ function renderModal() {
 // ─── QC option selection ──────────────────────────────────────────────────────
 window.selectQC = function selectQC(choice) {
   qcSelection = choice;
-  var opts = { pass: 'optPass', fail: 'optFail', reject: 'optReject' };
+  var opts = { pass: 'optPass', fail: 'optFail', reject: 'optReject', deviate: 'optDeviate' };
   Object.keys(opts).forEach(function(k) {
     var el = document.getElementById(opts[k]);
-    if (el) el.classList.toggle('selected', k === choice);
+    if (el) {
+      el.classList.toggle('selected', k === choice);
+      // Style deviate option distinctly when selected
+      if (k === 'deviate') {
+        el.style.borderColor = choice === 'deviate' ? '#7c3aed' : '';
+        el.style.background  = choice === 'deviate' ? 'rgba(124,58,237,0.06)' : '';
+      }
+    }
   });
   var samplesSection = document.getElementById('samplesSection');
   var jwcSec         = document.getElementById('jwcFormSection');
+  var deviationSec   = document.getElementById('deviationSection');
   if (samplesSection) {
     samplesSection.style.display = (choice === 'fail' || choice === 'reject') ? 'block' : 'none';
     if (choice === 'fail' || choice === 'reject') populateSamplesTable();
   }
   if (jwcSec) jwcSec.style.display = choice === 'fail' ? 'block' : 'none';
+  if (deviationSec) deviationSec.style.display = choice === 'deviate' ? 'block' : 'none';
   if (choice === 'fail') syncJWCFromSamples();
+};
+
+window.onDeviationTargetChange = function onDeviationTargetChange() {
+  deviationTargetId = document.getElementById('deviationTargetSelect')?.value || null;
 };
 
 // ─── Populate sample rejection table ─────────────────────────────────────────
@@ -490,7 +542,39 @@ window.calcJWCRow = function calcJWCRow(i) {
 
 // ─── Submit QC ────────────────────────────────────────────────────────────────
 window.submitQC = async function submitQC() {
-  if (!qcSelection) { showToast('Please select Pass, Fail, or Reject', 'error'); return; }
+  if (!qcSelection) { showToast('Please select Pass, Fail, Reject, or Deviate', 'error'); return; }
+
+  // Handle deviation separately
+  if (qcSelection === 'deviate') {
+    var devTarget = document.getElementById('deviationTargetSelect')?.value;
+    var devReason = document.getElementById('deviationReason')?.value?.trim();
+    if (!devTarget) { showToast('Please select who to deviate to', 'error'); return; }
+    if (!devReason) { showToast('Please provide a deviation reason', 'error'); return; }
+    showLoader(true);
+    var devAttachments = qcAttachments.slice();
+    var updatedCriteriaDev = Object.assign({}, currentPR.qc_criteria || {}, {
+      qc_inspector: currentUser.name,
+      qc_date: new Date().toISOString(),
+      deviation_target_id: devTarget,
+      deviation_reason: devReason,
+      qc_attachments: devAttachments
+    });
+    var devResult = await db.from('procurement_requests').update({
+      phase: 'deviation_approval',
+      deviation_target_id: devTarget,
+      qc_criteria: updatedCriteriaDev,
+      updated_at: new Date().toISOString(),
+      phase_timestamps: addPhaseTimestamp(currentPR, 'deviation_approval')
+    }).eq('id', currentPR.id);
+    showLoader(false);
+    if (devResult.error) { showToast('Error: ' + devResult.error.message, 'error'); return; }
+    notifyPhaseChange(currentPR.id, 'deviation_approval', currentUser.id);
+    var devTargetUser = allPMsAndDirector.find(function(u){ return u.id === devTarget; });
+    await window.postComment(currentPR.id, currentUser.id, '↗ QC Inspector deviated this request to ' + (devTargetUser ? devTargetUser.name : 'recipient') + '. Reason: ' + devReason);
+    showToast('Request deviated successfully. Recipient has been notified.', 'success');
+    closeModal('prModal'); await loadRequests();
+    return;
+  }
 
   var notesEl = document.getElementById('qcNotes');
   var notes   = notesEl ? notesEl.value.trim() : '';
@@ -557,7 +641,8 @@ window.submitQC = async function submitQC() {
 
   var updatedCriteria = Object.assign({}, currentPR.qc_criteria || {}, {
     qc_inspector: currentUser.name,
-    qc_date:      new Date().toISOString()
+    qc_date:      new Date().toISOString(),
+    qc_attachments: qcAttachments.slice()  // Change 7: save QC attachments
   });
   if (jwcData)               updatedCriteria.jwc               = jwcData;
   if (rejectionDetails.length) updatedCriteria.rejection_details = rejectionDetails;
@@ -597,6 +682,7 @@ window.submitQC = async function submitQC() {
     setTimeout(function(){ previewJWC(); }, 400);
   }
 
+  qcAttachments = [];
   closeModal('prModal');
   await loadRequests();
 };
@@ -685,16 +771,38 @@ window.submitPostReworkQC = async function submitPostReworkQC() {
     }
   }
 
+  // Change 7: After 1st rework fails QC, go to rework2_pending (2nd rework cycle) instead of qc_rejected
   showLoader(true);
-  var newPhase = isPassed ? 'qc_passed' : 'qc_rejected';
-  var qcResult = isPassed ? 'qc_passed' : 'rejected';
+  var newPhase;
+  var qcResult;
+  if (isPassed) {
+    newPhase = 'qc_passed';
+    qcResult = 'qc_passed';
+  } else {
+    // First rework failed — allow one more rework cycle
+    newPhase = 'rework2_pending';
+    qcResult = 'rejected';
+  }
+
+  var reQcAttachments = [];
+  var reQcInput = document.getElementById('reQcAttachFile');
+  // attachments already collected in reQcAttachFiles array (global)
+  reQcAttachments = window._reQcAttachFiles || [];
 
   var updatedCriteria = Object.assign({}, currentPR.qc_criteria || {}, {
     post_rework_qc_inspector: currentUser.name,
     post_rework_qc_date:      new Date().toISOString(),
-    post_rework_notes:        notes
+    post_rework_notes:        notes,
+    re_qc_attachments:        reQcAttachments
   });
   if (rejectionDetails.length) updatedCriteria.post_rework_rejection_details = rejectionDetails;
+
+  // If heading to rework2, generate a new JWC slot
+  if (!isPassed) {
+    // JWC for 2nd rework will be raised by QC inspector via rework2_pending flow
+    // Copy original JWC data as jwc1 for history
+    if (updatedCriteria.jwc) updatedCriteria.jwc1 = updatedCriteria.jwc;
+  }
 
   var updateResult = await db.from('procurement_requests').update({
     phase:            newPhase,
@@ -708,15 +816,16 @@ window.submitPostReworkQC = async function submitPostReworkQC() {
   showLoader(false);
   if (updateResult.error) { showToast('Error: ' + updateResult.error.message, 'error'); return; }
 
+  window._reQcAttachFiles = [];
   notifyPhaseChange(currentPR.id, newPhase, currentUser.id);
   var commentText = isPassed
     ? '✅ Post-Rework QC Passed — ' + notes
-    : '🚫 Post-Rework QC Rejected — ' + notes;
+    : '🔄 Post-Rework QC Failed — sending for 2nd rework cycle. ' + notes;
   await window.postComment(currentPR.id, currentUser.id, commentText);
   showToast(
     isPassed
-      ? '✅ Post-Rework QC Passed — Procurement notified!'
-      : '🚫 Post-Rework QC Rejected — Procurement & Requestor notified!',
+      ? '✅ Post-Rework QC Passed — Procurement Manager notified!'
+      : '🔄 2nd Rework cycle initiated — Store Manager notified!',
     'success'
   );
   closeModal('prModal');
@@ -890,6 +999,149 @@ window.logout = function logout() {
   Session.clear();
   window.location.href = '../index.html';
 };
+
+// ─── QC Attachment handlers ───────────────────────────────────────────────────
+window._reQcAttachFiles = [];
+window._finalReQcAttachFiles = [];
+
+window.handleQCAttach = async function handleQCAttach(e) {
+  for (var i = 0; i < e.target.files.length; i++) {
+    var file = e.target.files[i];
+    if (file.size > 5*1024*1024) { showToast(file.name + ' too large (max 5MB)', 'error'); continue; }
+    var b64 = await fileToBase64(file);
+    qcAttachments.push({ name: file.name, type: file.type, data: b64 });
+  }
+  e.target.value = '';
+  renderQCAttachList();
+};
+
+function renderQCAttachList() {
+  var el = document.getElementById('qcAttachList');
+  if (!el) return;
+  el.innerHTML = qcAttachments.map(function(f, i) {
+    return '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.75rem">'
+      + (f.type.includes('image') ? '🖼️' : '📄') + ' <span style="flex:1">' + f.name + '</span>'
+      + '<button onclick="removeQCAttach(' + i + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.75rem">✕</button></div>';
+  }).join('');
+}
+
+window.removeQCAttach = function(i) { qcAttachments.splice(i, 1); renderQCAttachList(); };
+
+window.handleReQCAttach = async function handleReQCAttach(e) {
+  for (var i = 0; i < e.target.files.length; i++) {
+    var file = e.target.files[i];
+    if (file.size > 5*1024*1024) { showToast(file.name + ' too large', 'error'); continue; }
+    var b64 = await fileToBase64(file);
+    window._reQcAttachFiles.push({ name: file.name, type: file.type, data: b64 });
+  }
+  e.target.value = '';
+  var el = document.getElementById('reQcAttachList');
+  if (el) el.innerHTML = window._reQcAttachFiles.map(function(f, i) {
+    return '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.75rem">'
+      + (f.type.includes('image') ? '🖼️' : '📄') + ' <span style="flex:1">' + f.name + '</span></div>';
+  }).join('');
+};
+
+window.handleFinalReQCAttach = async function handleFinalReQCAttach(e) {
+  for (var i = 0; i < e.target.files.length; i++) {
+    var file = e.target.files[i];
+    if (file.size > 5*1024*1024) { showToast(file.name + ' too large', 'error'); continue; }
+    var b64 = await fileToBase64(file);
+    window._finalReQcAttachFiles.push({ name: file.name, type: file.type, data: b64 });
+  }
+  e.target.value = '';
+  var el = document.getElementById('finalReQcAttachList');
+  if (el) el.innerHTML = window._finalReQcAttachFiles.map(function(f) {
+    return '<div style="font-size:0.75rem;padding:2px 0">' + (f.type.includes('image') ? '🖼️' : '📄') + ' ' + f.name + '</div>';
+  }).join('');
+};
+
+// ─── Rework2 QC option selection ──────────────────────────────────────────────
+var rework2QCSelection = null;
+
+window.selectRework2QC = function selectRework2QC(choice) {
+  rework2QCSelection = choice;
+  var passEl    = document.getElementById('rw2OptPass');
+  var rejectEl  = document.getElementById('rw2OptReject');
+  var samplesEl = document.getElementById('rw2SamplesSection');
+  if (passEl)   passEl.classList.toggle('selected',   choice === 'pass');
+  if (rejectEl) rejectEl.classList.toggle('selected', choice === 'reject');
+  if (samplesEl) {
+    samplesEl.style.display = choice === 'reject' ? 'block' : 'none';
+    if (choice === 'reject') populateRework2SamplesTable();
+  }
+};
+
+function populateRework2SamplesTable() {
+  var grn      = (currentPR && currentPR.qc_criteria && currentPR.qc_criteria.grn) ? currentPR.qc_criteria.grn : {};
+  var lines    = grn.lines || [];
+  var hasGRN   = lines.length > 0;
+  var srcLines = hasGRN ? lines : (currentPR.parts || []);
+  var tbody    = document.getElementById('rw2SamplesBody');
+  if (!tbody) return;
+  tbody.innerHTML = srcLines.map(function(l, i) {
+    var name     = l.item_name || l.name || '—';
+    var received = hasGRN ? (l.received || l.qty || 0) : (l.qty || 0);
+    return '<tr><td style="text-align:center">' + (i + 1) + '</td><td>' + name + '</td>'
+      + '<td style="text-align:center">' + received + '</td>'
+      + '<td style="text-align:center"><input class="form-control" type="number" id="rw2Rej_' + i + '"'
+      + ' value="0" min="0" max="' + received + '" style="width:70px;font-size:0.8rem;text-align:center"'
+      + ' oninput="onRw2SampleChange(' + i + ',' + received + ')"/></td>'
+      + '<td id="rw2Acc_' + i + '" style="text-align:center;font-weight:600;color:#16a34a">' + received + '</td></tr>';
+  }).join('');
+}
+
+window.onRw2SampleChange = function(i, received) {
+  var rejEl = document.getElementById('rw2Rej_' + i);
+  var accEl = document.getElementById('rw2Acc_' + i);
+  if (!rejEl || !accEl) return;
+  var rej = Math.min(Math.max(parseInt(rejEl.value||'0',10)||0, 0), received);
+  rejEl.value = rej;
+  accEl.textContent = received - rej;
+  accEl.style.color = (received - rej) > 0 ? '#16a34a' : '#dc2626';
+};
+
+// ─── Submit Final Post-Rework QC (rework2_returned) ──────────────────────────
+window.submitFinalReworkQC = async function submitFinalReworkQC() {
+  if (!rework2QCSelection) { showToast('Please select Pass or Reject', 'error'); return; }
+  var notes = document.getElementById('qcNotesRework2')?.value.trim();
+  if (!notes) { showToast('Please add inspection notes', 'error'); return; }
+
+  var isPassed = rework2QCSelection === 'pass';
+
+  var finalAttachments = window._finalReQcAttachFiles || [];
+  var updatedCriteria = Object.assign({}, currentPR.qc_criteria || {}, {
+    final_rework_qc_inspector: currentUser.name,
+    final_rework_qc_date:      new Date().toISOString(),
+    final_rework_notes:        notes,
+    final_rework_attachments:  finalAttachments
+  });
+
+  var newPhase = isPassed ? 'qc_passed' : 'qc_rejected';
+  showLoader(true);
+  var result = await db.from('procurement_requests').update({
+    phase:            newPhase,
+    qc_result:        isPassed ? 'qc_passed' : 'rejected',
+    qc_notes:         notes,
+    qc_criteria:      updatedCriteria,
+    updated_at:       new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR, newPhase)
+  }).eq('id', currentPR.id);
+  showLoader(false);
+  if (result.error) { showToast('Error: ' + result.error.message, 'error'); return; }
+  window._finalReQcAttachFiles = [];
+  rework2QCSelection = null;
+  notifyPhaseChange(currentPR.id, newPhase, currentUser.id);
+  await window.postComment(currentPR.id, currentUser.id,
+    isPassed ? '✅ Final Post-Rework QC Passed — ' + notes : '🚫 Final Post-Rework QC Rejected (2nd rework cycle). ' + notes);
+  showToast(isPassed ? '✅ Final QC Passed — Procurement Manager notified!' : '🚫 QC Rejected after 2nd rework.', 'success');
+  closeModal('prModal');
+  await loadRequests();
+};
+
+// ─── Deviation approval handling (for Project Manager / Director in deviation_approval phase) ──
+// Note: This is handled in pm.html for Project Manager and master.html/director views.
+// The QC page shows read-only status for deviation_approval phase.
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 init();

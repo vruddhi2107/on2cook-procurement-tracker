@@ -134,12 +134,14 @@ const PHASE_LEGACY_MAP = {
 function getPhaseBadge(phase){
   const map={
     submitted:['Submitted','badge-gray'],
-    pending_initial_pm_approval:['PM Clearance','badge-orange'],
-    procurement_active:['Procurement','badge-blue'],
+    pending_initial_pm_approval:['Project Manager Clearance','badge-orange'],
+    lp_pending_pm_approval:['LP — Awaiting Project Manager','badge-orange'],
+    pending_decline_approval:['Decline — Awaiting Project Manager','badge-red'],
+    procurement_active:['Procurement Active','badge-blue'],
     vendor_info_shared:['Vendor Info Shared','badge-purple'],
     quotations_shared:['Engineer Verification','badge-purple'],
     quotes_revision_requested:['Quote Revision Requested','badge-orange'],
-    pending_pm_final_approval:['PM Approval','badge-orange'],
+    pending_pm_final_approval:['Project Manager Final Approval','badge-orange'],
     pending_sandy_approval:['Director Approval','badge-purple'],
     approved:['Approved','badge-green'],
     order_placed:['Order Placed','badge-blue'],
@@ -148,17 +150,21 @@ function getPhaseBadge(phase){
     qc_pending:['QC Inspection','badge-orange'],
     rework_pending:['Rework / JWC','badge-orange'],
     rework_returned:['Rework Returned — Re-QC','badge-yellow'],
+    rework2_pending:['2nd Rework / JWC','badge-orange'],
+    rework2_returned:['2nd Rework Returned — Re-QC','badge-yellow'],
+    qc_deviated:['QC Deviated','badge-purple'],
+    deviation_approval:['Deviation — Pending Review','badge-purple'],
     qc_passed:['QC Passed','badge-green'],
     qc_rejected:['QC Rejected','badge-red'],
-    accepted:['Accepted & Closed','badge-green'],
+    accepted:['Closed','badge-green'],
     rejected:['Rejected','badge-red'],
     payment_requested:['Payment Requested','badge-purple'],
     advance_requested:['Advance Requested','badge-orange'],
     advance_approved:['Advance Approved','badge-green'],
     advance_rejected:['Advance Rejected','badge-red'],
-    declined:['Declined','badge-red'],
-    lp_payment_pending:['Payment Pending','badge-orange'],
-    lp_payment_done:['Payment Done','badge-green'],
+    declined:['Declined by Procurement Manager','badge-red'],
+    lp_payment_pending:['LP — Payment Pending','badge-orange'],
+    lp_payment_done:['LP — Payment Done','badge-green'],
   };
   const[label,cls]=map[phase]||[phase,'badge-gray'];
   return `<span class="badge ${cls}">${label}</span>`;
@@ -193,7 +199,7 @@ function initNavbar(user) {
     }
   });
 }
-function roleLabel(r){return{master:'Master Admin',procurement_manager:'Procurement',engineer:'Engineer',project_manager:'Project Manager',accounts:'Accounts',director:'Director'}[r]||r;}
+function roleLabel(r){return{master:'Master Admin',procurement_manager:'Procurement Manager',engineer:'Engineer',project_manager:'Project Manager',accounts:'Accounts',director:'Director',store_manager:'Store Manager',qc_inspector:'QC Inspector'}[r]||r;}
 function logout(){Session.clear();window.location.href='../index.html';}
 
 window.toggleUserMenu = function toggleUserMenu(e) {
@@ -367,11 +373,13 @@ window.submitPasswordChange = async function submitPasswordChange() {
 // ── WORKFLOW TRACK ──────────────────────────────────────────
 const WF_STEPS = [
   {key:'submitted',label:'Submitted'},
-  {key:'pending_initial_pm_approval',label:'PM Clearance'},
+  {key:'pending_initial_pm_approval',label:'Project Mgr Clearance'},
+  {key:'lp_pending_pm_approval',label:'LP → Project Mgr',optional:true},
   {key:'procurement_active',label:'Procurement'},
   {key:'quotations_shared',label:'Quotations'},
   {key:'quotes_revision_requested',label:'Quote Revision',optional:true},
-  {key:'pending_pm_final_approval',label:'PM Approval'},
+  {key:'pending_pm_final_approval',label:'Project Mgr Approval'},
+  {key:'pending_decline_approval',label:'Decline Pending Project Mgr',optional:true},
   {key:'pending_sandy_approval',label:'Director Approval'},
   {key:'approved',label:'Approved'},
   {key:'advance_raised_to_accounts',label:'Adv. Raised',optional:true},
@@ -380,6 +388,11 @@ const WF_STEPS = [
   {key:'grn_initiated',label:'GRN→Store'},
   {key:'qc_pending',label:'QC Check'},
   {key:'rework_pending',label:'Rework',optional:true},
+  {key:'rework_returned',label:'Rework Returned',optional:true},
+  {key:'rework2_pending',label:'2nd Rework',optional:true},
+  {key:'rework2_returned',label:'2nd Rework Returned',optional:true},
+  {key:'qc_deviated',label:'Deviated',optional:true},
+  {key:'deviation_approval',label:'Deviation Review',optional:true},
   {key:'qc_passed',label:'QC Passed'},
   {key:'payment_raised_to_accounts',label:'Pay. Raised'},
   {key:'payment_received',label:'Pay. Received'},
@@ -549,7 +562,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
     </div>`:''}
 
     ${pr.pm_final_approval_notes?`<div style="margin-top:14px;padding:12px;background:${pr.pm_final_approval_status==='approved'?'rgba(22,163,74,0.06)':'rgba(214,43,43,0.06)'};border:1px solid ${pr.pm_final_approval_status==='approved'?'rgba(22,163,74,0.2)':'rgba(214,43,43,0.2)'};border-radius:var(--radius)">
-      <div class="detail-key" style="color:${pr.pm_final_approval_status==='approved'?'#16a34a':'var(--red)'};margin-bottom:4px">PM ${pr.pm_final_approval_status==='approved'?'Approved':'Rejected'}</div>
+      <div class="detail-key" style="color:${pr.pm_final_approval_status==='approved'?'#16a34a':'var(--red)'};margin-bottom:4px">Project Manager ${pr.pm_final_approval_status==='approved'?'Approved':'Rejected'}</div>
       <p style="font-size:0.83rem">${pr.pm_final_approval_notes}</p>
     </div>`:''}
 

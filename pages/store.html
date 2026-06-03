@@ -139,17 +139,17 @@ async function loadRequests() {
 
 function updateStats() {
   document.getElementById('sGrnPending').textContent = allRequests.filter(r=>r.phase==='grn_initiated').length;
-  document.getElementById('sRework').textContent = allRequests.filter(r=>r.phase==='rework_pending').length;
+  document.getElementById('sRework').textContent = allRequests.filter(r=>['rework_pending','rework2_pending'].includes(r.phase)).length;
   document.getElementById('sDone').textContent = allRequests.filter(r=>['qc_passed','accepted'].includes(r.phase)).length;
 }
 
 
 
 function renderTable() {
-  const actionPhases = ['grn_initiated','rework_pending'];
+  const actionPhases = ['grn_initiated','rework_pending','rework2_pending'];
   const rows = activeTab==='action'
     ? allRequests.filter(r=>actionPhases.includes(r.phase))
-    : allRequests.filter(r=>['grn_initiated','qc_pending','rework_pending','rework_returned','qc_passed','accepted'].includes(r.phase));
+    : allRequests.filter(r=>['grn_initiated','qc_pending','rework_pending','rework_returned','rework2_pending','rework2_returned','qc_deviated','deviation_approval','qc_passed','accepted'].includes(r.phase));
 
   const tbody = document.getElementById('mainTbody');
   if (!rows.length) { tbody.innerHTML=`<tr><td colspan="7" class="empty-state">No requests</td></tr>`; return; }
@@ -157,7 +157,7 @@ function renderTable() {
   tbody.innerHTML = rows.map(r=>{
     const parts = r.parts||[];
     const isAction = actionPhases.includes(r.phase);
-    const lbl = {grn_initiated:'Complete GRN',rework_pending:'Mark Rework Returned'}[r.phase]||'View';
+    const lbl = {grn_initiated:'Complete GRN',rework_pending:'Mark Rework Returned',rework2_pending:'Mark 2nd Rework Returned'}[r.phase]||'View';
     return `<tr${isAction?' class="row-action"':''}>
       <td><span class="pr-num">PR-${String(r.request_number).padStart(4,'0')}</span></td>
       <td><span class="fw-600">${r.project_name}</span>${r.project_phase?`<br><span class="text-muted" style="font-size:0.75rem">${r.project_phase}</span>`:''}</td>
@@ -194,10 +194,8 @@ function renderModal() {
       <td style="text-align:center;color:var(--gray-4)">${i+1}</td>
       <td><input class="form-control" style="font-size:0.78rem" placeholder="Item code" id="grnCode_${i}"/></td>
       <td style="font-size:0.82rem;font-weight:500">${p.name||'—'}</td>
-      <td style="text-align:center">${p.qty||1}</td>
-      <td><input class="form-control" type="number" min="0" style="font-size:0.82rem" placeholder="0" id="grnRcvd_${i}" oninput="calcGRNRow(${i})"/></td>
-      <td><input class="form-control" type="number" min="0" style="font-size:0.82rem" placeholder="0" id="grnAccpt_${i}" oninput="calcGRNRow(${i})"/></td>
-      <td><input class="form-control" type="number" min="0" style="background:rgba(239,68,68,0.05);font-size:0.82rem" placeholder="0" id="grnRejct_${i}" readonly/></td>
+      <td style="text-align:center;font-family:var(--font-mono);font-weight:700;color:#6366f1">${p.qty||1}</td>
+      <td><input class="form-control" type="number" min="0" style="font-size:0.82rem" placeholder="0" id="grnRcvd_${i}"/></td>
       <td><input class="form-control" style="font-size:0.78rem" placeholder="Notes" id="grnNote_${i}"/></td>
     </tr>`).join('');
 
@@ -222,10 +220,9 @@ function renderModal() {
       <div class="table-wrap" style="overflow-x:auto">
         <table class="grn-table">
           <thead><tr>
-            <th>Sr.</th><th>Item Code</th><th>Description</th><th>PO Qty</th>
-            <th>Received</th><th>Accepted</th><th>Rejected</th><th>Remarks</th>
+            <th>Sr.</th><th>Item Code</th><th>Description</th><th>PO Qty</th><th>Qty Received</th><th>Remarks</th>
           </tr></thead>
-          <tbody>${parts.length?grnRows:`<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--gray-4)">No parts on this PR</td></tr>`}</tbody>
+          <tbody>${parts.length?grnRows:`<tr><td colspan="6" style="padding:16px;text-align:center;color:var(--gray-4)">No parts on this PR</td></tr>`}</tbody>
         </table>
       </div>
 
@@ -258,28 +255,58 @@ function renderModal() {
     </div>`;
   }
 
+  // ── REWORK2 PENDING: 2nd rework — same flow ──
+  if (pr.phase==='rework2_pending') {
+    const jwcData2 = pr.qc_criteria?.jwc2 || pr.qc_criteria?.jwc || {};
+    actionSection = `<div class="action-section" style="background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius);padding:14px">
+      <div class="action-section-title" style="color:#dc2626">🔄 2nd Rework Out — Awaiting Return <span class="rework-badge">2ND REWORK JWC</span></div>
+      ${jwcData2.jwc_number?`<div style="margin:10px 0;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.82rem">
+        <div style="font-weight:600;margin-bottom:4px">2nd Rework JWC Details</div>
+        <div>JWC No: <strong>${jwcData2.jwc_number}</strong></div>
+        <div>Vendor: <strong>${jwcData2.rework_vendor||'—'}</strong></div>
+        <div>Expected Duration: <strong>${jwcData2.expected_days||'—'} days</strong></div>
+        ${jwcData2.notes?`<div>Notes: ${jwcData2.notes}</div>`:''}
+      </div>`:''}
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Once reworked goods are returned, mark them received for final QC re-inspection.</p>
+      <textarea class="form-control" id="rework2ReturnNotes" rows="2" placeholder="2nd rework return notes / condition..." style="font-size:0.82rem;margin-bottom:10px"></textarea>
+      <button class="btn btn-primary" onclick="markRework2Returned()">📦 2nd Rework Goods Returned — Send for Re-QC →</button>
+    </div>`;
+  }
+
   // ── QC PENDING / PASSED / REWORK RETURNED: read-only ──
-  if (['qc_pending','qc_passed','accepted','rework_returned'].includes(pr.phase)) {
+  if (['qc_pending','qc_passed','accepted','rework_returned','rework2_returned','qc_deviated','deviation_approval'].includes(pr.phase)) {
     const msgs = {
-      qc_passed:       '✅ QC Passed',
-      accepted:        '✅ QC Passed & Accepted',
-      qc_pending:      '🔍 QC Inspection in Progress',
-      rework_returned: '🔄 Reworked Goods Returned — Awaiting QC Re-inspection'
+      qc_passed:        '✅ QC Passed',
+      accepted:         '✅ Closed',
+      qc_pending:       '🔍 QC Inspection in Progress',
+      rework_returned:  '🔄 Reworked Goods Returned — Awaiting QC Re-inspection',
+      rework2_returned: '🔄 2nd Rework Returned — Awaiting Final QC',
+      qc_deviated:      '↗ QC Deviated — Pending Review',
+      deviation_approval:'↗ Deviation Under Review'
     };
     const colors = {
-      qc_passed:       '#16a34a',
-      accepted:        '#16a34a',
-      rework_returned: '#d97706'
+      qc_passed:        '#16a34a',
+      accepted:         '#16a34a',
+      rework_returned:  '#d97706',
+      rework2_returned: '#d97706',
+      qc_deviated:      '#7c3aed',
+      deviation_approval:'#7c3aed'
     };
     const bgColors = {
-      qc_passed:       'rgba(22,163,74,0.04)',
-      accepted:        'rgba(22,163,74,0.04)',
-      rework_returned: 'rgba(251,191,36,0.06)'
+      qc_passed:        'rgba(22,163,74,0.04)',
+      accepted:         'rgba(22,163,74,0.04)',
+      rework_returned:  'rgba(251,191,36,0.06)',
+      rework2_returned: 'rgba(251,191,36,0.06)',
+      qc_deviated:      'rgba(124,58,237,0.04)',
+      deviation_approval:'rgba(124,58,237,0.04)'
     };
     const borderColors = {
-      qc_passed:       'rgba(22,163,74,0.2)',
-      accepted:        'rgba(22,163,74,0.2)',
-      rework_returned: 'rgba(251,191,36,0.3)'
+      qc_passed:        'rgba(22,163,74,0.2)',
+      accepted:         'rgba(22,163,74,0.2)',
+      rework_returned:  'rgba(251,191,36,0.3)',
+      rework2_returned: 'rgba(251,191,36,0.3)',
+      qc_deviated:      'rgba(124,58,237,0.25)',
+      deviation_approval:'rgba(124,58,237,0.25)'
     };
     const titleColor = colors[pr.phase] ? `color:${colors[pr.phase]}` : '';
     const bg = bgColors[pr.phase] || 'transparent';
@@ -287,7 +314,7 @@ function renderModal() {
     actionSection = `<div class="action-section" style="background:${bg};${border};border-radius:var(--radius);padding:14px">
       <div class="action-section-title" style="${titleColor}">${msgs[pr.phase] || '🔍 QC In Progress'}</div>
       ${pr.phase === 'rework_returned'
-        ? '<p style="font-size:0.82rem;color:var(--gray-3)">Goods have been returned from rework. The QC Inspector will now perform re-inspection and confirm pass.</p>'
+        ? '<p style="font-size:0.82rem;color:var(--gray-3)">Goods have been returned from rework. The QC Inspector will perform re-inspection.</p>'
         : '<p style="font-size:0.82rem;color:var(--gray-3)">GRN submitted. QC Inspector is performing quality check.</p>'
       }
     </div>`;
@@ -309,10 +336,7 @@ function renderModal() {
 }
 
 function calcGRNRow(i) {
-  const rcvd = parseInt(document.getElementById('grnRcvd_'+i)?.value||'0')||0;
-  const acpt = parseInt(document.getElementById('grnAccpt_'+i)?.value||'0')||0;
-  const rjEl = document.getElementById('grnRejct_'+i);
-  if (rjEl) rjEl.value = Math.max(0, rcvd - acpt);
+  // Change 6: Accepted/rejected columns removed from store GRN — no-op kept for compatibility
 }
 
 async function submitGRN() {
@@ -334,8 +358,7 @@ async function submitGRN() {
     item_name: p.name,
     po_qty: p.qty||1,
     received: parseInt(document.getElementById('grnRcvd_'+i)?.value||'0')||0,
-    accepted: parseInt(document.getElementById('grnAccpt_'+i)?.value||'0')||0,
-    rejected: parseInt(document.getElementById('grnRejct_'+i)?.value||'0')||0,
+    // Change 6: Store GRN only captures PO qty & received qty — QC inspector handles accept/reject
     notes: document.getElementById('grnNote_'+i)?.value.trim()||''
   }));
 
@@ -377,6 +400,23 @@ async function markReworkReturned() {
   notifyPhaseChange(currentPR.id,'rework_returned',currentUser?.id);
   await window.postComment(currentPR.id, currentUser?.id, `🔄 Reworked goods returned to store — QC Inspector notified for re-inspection. ${notes}`);
   showToast('Rework returned — QC Inspector notified for re-inspection!','success');
+  closeModal('prModal'); await loadRequests();
+}
+
+async function markRework2Returned() {
+  const notes = document.getElementById('rework2ReturnNotes')?.value.trim()||'';
+  showLoader(true);
+  const {error} = await db.from('procurement_requests').update({
+    phase:'rework2_returned',
+    qc_notes: `2nd rework goods returned. ${notes}`,
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR,'rework2_returned')
+  }).eq('id',currentPR.id);
+  showLoader(false);
+  if (error) { showToast('Error: '+error.message,'error'); return; }
+  notifyPhaseChange(currentPR.id,'rework2_returned',currentUser?.id);
+  await window.postComment(currentPR.id, currentUser?.id, `🔄 2nd rework goods returned to store — QC Inspector notified for final re-inspection. ${notes}`);
+  showToast('2nd Rework returned — QC Inspector notified!','success');
   closeModal('prModal'); await loadRequests();
 }
 

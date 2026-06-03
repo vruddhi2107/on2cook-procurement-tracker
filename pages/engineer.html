@@ -66,10 +66,10 @@
 <input type="text" id="searchInput" placeholder="Search by project or PR #..." oninput="filterTable()" autocomplete="off"/>      <select id="filterPhase" onchange="filterTable()">
         <option value="">All Phases</option>
         <option value="submitted">Submitted</option>
-        <option value="pending_initial_pm_approval">Awaiting PM Clearance</option>
+        <option value="pending_initial_pm_approval">Awaiting Project Manager Clearance</option>
         <option value="procurement_active">Procurement Active</option>
         <option value="quotations_shared">Quotations Shared</option>
-        <option value="pending_pm_final_approval">Pending PM Approval</option>
+        <option value="pending_pm_final_approval">Pending Project Manager Final Approval</option>
         <option value="approved">Approved</option>
         <option value="order_placed">Order Placed</option>
         <option value="grn_pending">GRN / QC Pending</option>
@@ -90,7 +90,7 @@
     <div class="card">
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>Urgency</th><th>PM</th><th>Updated</th><th></th></tr></thead>
+          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>Urgency</th><th>Project Manager</th><th>Updated</th><th></th></tr></thead>
           <tbody id="requestsBody"></tbody>
         </table>
       </div>
@@ -138,33 +138,33 @@
     </div>
     <div class="modal-body" style="max-height:82vh;overflow-y:auto;padding-right:4px">
 
-      <!-- ── PM Approval Status ── -->
+      <!-- ── Project Manager Approval Status ── -->
       <div id="pmApprovalSection" style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius);padding:14px;margin-bottom:18px">
         <div style="font-size:0.82rem;font-weight:600;margin-bottom:10px">Do you already have Project Manager approval for this requirement?</div>
         <div class="pm-approval-choice">
           <div class="pm-approval-option" id="pmOptYes" onclick="selectPMApproval('already_approved')">
             <div class="pm-approval-option-icon"></div>
-            <div class="pm-approval-option-label">Yes — I have PM approval</div>
+            <div class="pm-approval-option-label">Yes — I have Project Manager approval</div>
             <div class="pm-approval-option-sub">Procurement starts immediately</div>
           </div>
           <div class="pm-approval-option" id="pmOptNo" onclick="selectPMApproval('needs_approval')">
             <div class="pm-approval-option-icon">📋</div>
-            <div class="pm-approval-option-label">No — Need PM approval first</div>
-            <div class="pm-approval-option-sub">PM will be notified to approve</div>
+            <div class="pm-approval-option-label">No — Need Project Manager approval first</div>
+            <div class="pm-approval-option-sub">Project Manager will be notified to approve</div>
           </div>
         </div>
         <div id="vendorInfoNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.18);border-radius:var(--radius-sm);font-size:0.78rem;color:#6d28d9">
-          ℹ Vendor Info requests go directly to the Procurement Manager — no PM clearance needed.
+          ℹ Vendor Info requests go directly to the Procurement Manager — no Project Manager clearance needed.
         </div>
         <div id="localPurchaseNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.28);border-radius:var(--radius-sm);font-size:0.78rem;color:#15803d">
-          🛒 Local Purchase requests go directly to the Procurement Manager for payment processing — no PM clearance needed.
+          🛒 Local Purchase requests go directly to the Procurement Manager for payment processing — no Project Manager clearance needed.
         </div>
       </div>
 
-      <!-- ── Screenshot if PM Already Approved ── -->
+      <!-- ── Screenshot if Project Manager Already Approved ── -->
       <div id="pmScreenshotSection" style="display:none;padding:14px;border:1.5px solid rgba(99,102,241,0.25);border-radius:var(--radius);margin-bottom:18px;background:rgba(99,102,241,0.03)">
-        <div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;color:#6366f1">📎 Upload PM Approval Screenshot <span style="color:var(--red)">*</span></div>
-        <p style="font-size:0.76rem;color:var(--gray-3);margin-bottom:10px">Please attach the screenshot or proof of PM approval (WhatsApp message, email, etc.)</p>
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;color:#6366f1">📎 Upload Project Manager Approval Screenshot <span style="color:var(--red)">*</span></div>
+        <p style="font-size:0.76rem;color:var(--gray-3);margin-bottom:10px">Please attach the screenshot or proof of Project Manager approval (WhatsApp message, email, etc.)</p>
         <div class="screenshot-zone" id="pmSsZone">
           <input type="file" id="pmSsFile" accept="image/png,image/jpeg,image/jpg" onchange="handlePMScreenshot(event)"/>
           <div style="font-size:1.4rem;margin-bottom:4px">📷</div>
@@ -223,7 +223,11 @@
 
         <div class="form-group">
           <label class="form-label">Project Manager *</label>
-          <select class="form-control" id="fPMSelect">
+          <div id="pmLockedDisplay" style="display:none;padding:8px 12px;background:var(--off-white);border:1.5px solid rgba(99,102,241,0.3);border-radius:var(--radius-sm);font-size:0.85rem;font-weight:600;color:#4338ca">
+            🔒 <span id="pmLockedName"></span><br>
+            <span style="font-size:0.71rem;font-weight:400;color:var(--gray-4)">Auto-assigned from project — cannot be changed</span>
+          </div>
+          <select class="form-control" id="fPMSelect" style="display:block">
             <option value="">Loading PMs...</option>
           </select>
         </div>
@@ -445,12 +449,30 @@ function onProjectChange() {
   const pid=document.getElementById('fProjectSelect').value;
   const project=allProjects.find(p=>p.id===pid);
   const phSel=document.getElementById('fPhaseSelect');
-  if(!project){phSel.innerHTML='<option value="">Select project first...</option>';return;}
+  const pmSelect=document.getElementById('fPMSelect');
+  const pmLockedDisplay=document.getElementById('pmLockedDisplay');
+  const pmLockedName=document.getElementById('pmLockedName');
+  if(!project){
+    phSel.innerHTML='<option value="">Select project first...</option>';
+    // Clear PM lock
+    if(pmLockedDisplay){pmLockedDisplay.style.display='none';}
+    if(pmSelect){pmSelect.style.display='block'; pmSelect.disabled=false;}
+    return;
+  }
   const phases=project.project_phases||[];
-  if(!phases.length){phSel.innerHTML='<option value="">No phases added yet</option>';return;}
-  phSel.innerHTML='<option value="">Select Phase...</option>'+phases.map(ph=>`<option value="${ph.name}">${ph.name}</option>`).join('');
-  // Auto-fill PM if project has a default PM
-  if(project.default_pm_id) document.getElementById('fPMSelect').value=project.default_pm_id;
+  if(!phases.length){phSel.innerHTML='<option value="">No phases added yet</option>';}
+  else {phSel.innerHTML='<option value="">Select Phase...</option>'+phases.map(ph=>`<option value="${ph.name}">${ph.name}</option>`).join('');}
+  // Change 2: Auto-fill AND LOCK PM when project has a default_pm_id
+  if(project.default_pm_id) {
+    if(pmSelect){ pmSelect.value=project.default_pm_id; pmSelect.style.display='none'; pmSelect.disabled=false; }
+    const pmUser=allPMs.find(pm=>pm.id===project.default_pm_id);
+    if(pmLockedDisplay){ pmLockedDisplay.style.display='block'; }
+    if(pmLockedName){ pmLockedName.textContent=pmUser?.name||'Assigned Project Manager'; }
+  } else {
+    // No default PM — show dropdown normally
+    if(pmLockedDisplay){pmLockedDisplay.style.display='none';}
+    if(pmSelect){pmSelect.style.display='block'; pmSelect.value='';}
+  }
   // Trigger phase-change check in case a phase is already selected
   onPhaseChange();
 }
@@ -767,8 +789,8 @@ async function submitPR() {
   const cat=document.getElementById('fCategory').value;
   const isVI=cat==='vendor_info';
   const isLP=cat==='local_purchase';
-  if(!isEditMode&&!isVI&&!isLP&&!selectedPMApproval){showToast('Please indicate PM approval status','error');return;}
-  if(!isEditMode&&!isVI&&!isLP&&selectedPMApproval==='already_approved'&&!pmScreenshotBase64){showToast('Please upload PM approval screenshot','error');return;}
+  if(!isEditMode&&!isVI&&!isLP&&!selectedPMApproval){showToast('Please indicate Project Manager approval status','error');return;}
+  if(!isEditMode&&!isVI&&!isLP&&selectedPMApproval==='already_approved'&&!pmScreenshotBase64){showToast('Please upload Project Manager approval screenshot','error');return;}
   const pmId=document.getElementById('fPMSelect').value;
   if(!pmId){showToast('Please select a Project Manager','error');return;}
   const projectId=document.getElementById('fProjectSelect').value;
@@ -815,12 +837,12 @@ async function submitPR() {
     parts,
     attachments:attachedFiles.map(f=>({name:f.name,type:f.type,data:f.data})),
     created_by:currentUser.id,
-    phase:(isVI||isLP)?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval',
-    initial_pm_approval:isEditMode?'already_approved':((isVI||isLP)?null:selectedPMApproval),
+    phase:isLP?'lp_pending_pm_approval':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval',
+    initial_pm_approval:isEditMode?'already_approved':(isLP?'needs_approval':isVI?null:selectedPMApproval),
     is_modification:isEditMode,
     parent_request_id:isEditMode?editingParentId:null,
     modification_note:isEditMode?document.getElementById('fModNote').value.trim():null,
-    phase_timestamps:(function(){var ts={'submitted':new Date().toISOString()};var ph=(isVI||isLP)?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval';if(ph!=='submitted')ts[ph]=new Date().toISOString();return ts;})()
+    phase_timestamps:(function(){var ts={'submitted':new Date().toISOString()};var ph=isLP?'lp_pending_pm_approval':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval';if(ph!=='submitted')ts[ph]=new Date().toISOString();return ts;})()
   };
   if(!isVI&&!isLP) vals.order_type=orderType;
   showLoader(true);
@@ -830,7 +852,7 @@ async function submitPR() {
   }
   showLoader(false);
   if(error){showToast('Submit failed: '+error.message,'error');return;}
-  showToast(isEditMode?'↺ Resubmitted as a new modified request!':isLP?'Local Purchase request sent to Procurement!':isVI?'Vendor Info request sent to Procurement!':'Request submitted!','success');
+  showToast(isEditMode?'↺ Resubmitted as a new modified request!':isLP?'Local Purchase request sent to Project Manager for approval!':isVI?'Vendor Info request sent to Procurement Manager!':'Request submitted!','success');
   if(newPR?.id) notifyPhaseChange(newPR.id, newPR.phase||'submitted', currentUser?.id);
   closeModal('prFormModal');
   await loadRequests();
@@ -872,10 +894,15 @@ async function openPR(id) {
 
   // ── LOCAL PURCHASE STATUS VIEW (engineer read-only) ──
   if(currentPR.request_category==='local_purchase') {
-    if(currentPR.phase==='procurement_active') {
+    if(currentPR.phase==='lp_pending_pm_approval') {
+      actionSection=`<div style="padding:12px 14px;border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);background:rgba(245,158,11,0.04)">
+        <div style="font-weight:700;color:#b45309;margin-bottom:4px">⏳ Local Purchase — Awaiting Project Manager Approval</div>
+        <p style="font-size:0.78rem;color:var(--gray-3);margin:0">Your request is pending approval by the assigned Project Manager.</p>
+      </div>`;
+    } else if(currentPR.phase==='procurement_active') {
       actionSection=`<div style="padding:12px 14px;border:1px solid rgba(34,197,94,0.25);border-radius:var(--radius);background:rgba(34,197,94,0.04)">
-        <div style="font-weight:700;color:#15803d;margin-bottom:4px">🛒 Local Purchase — Sent to Procurement</div>
-        <p style="font-size:0.78rem;color:var(--gray-3);margin:0">The Procurement Manager is reviewing this request and will process the payment.</p>
+        <div style="font-weight:700;color:#15803d;margin-bottom:4px">🛒 Local Purchase — Approved, Sent to Procurement Manager</div>
+        <p style="font-size:0.78rem;color:var(--gray-3);margin:0">Project Manager approved. The Procurement Manager will process the payment.</p>
       </div>`;
     } else if(currentPR.phase==='lp_payment_pending') {
       actionSection=`<div style="padding:12px 14px;border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);background:rgba(245,158,11,0.04)">
