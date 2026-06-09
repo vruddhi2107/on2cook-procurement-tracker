@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ProcureX — Admin Control Panel</title>
+  <link rel="icon" type="image/x-icon" href="../on2cook no bg.png">
+  <link rel="stylesheet" href="../css/styles.css"/>
+  <style>
+    .admin-grid{display:grid;grid-template-columns:260px 1fr;gap:0;min-height:calc(100vh - var(--nav-h) - 60px)}
+    .admin-sidebar{border-right:1px solid var(--border);padding:20px 0;background:white}
+    .admin-sidebar-title{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--gray-4);padding:0 18px;margin-bottom:8px;margin-top:16px}
+    .admin-sidebar-title:first-child{margin-top:0}
+    .admin-nav-item{display:flex;align-items:center;gap:10px;padding:9px 18px;font-size:0.82rem;cursor:pointer;transition:background 0.12s;border-left:2px solid transparent;color:var(--gray-2)}
+    .admin-nav-item:hover{background:var(--off-white)}
+    .admin-nav-item.active{background:rgba(224,32,32,0.05);border-left-color:var(--red);color:var(--red);font-weight:600}
+    .admin-nav-item .nav-badge{margin-left:auto;background:var(--red);color:white;font-size:0.6rem;padding:1px 6px;border-radius:999px;font-family:var(--font-mono)}
+    .admin-content{padding:28px 32px;background:var(--off-white)}
+    .admin-panel{display:none}.admin-panel.active{display:block}
+    .panel-title{font-family:var(--font-display);font-size:1.3rem;font-weight:700;margin-bottom:4px}
+    .panel-sub{font-size:0.82rem;color:var(--gray-3);margin-bottom:24px}
+    /* Pipeline editor */
+    .pipeline-card{background:white;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+    .pipeline-card-header{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);cursor:pointer}
+    .pipeline-card-title{font-weight:700;font-size:0.9rem;display:flex;align-items:center;gap:8px}
+    .pipeline-dot{width:10px;height:10px;border-radius:50%}
+    .pipeline-card-body{padding:16px 18px;display:none}
+    .pipeline-card-body.open{display:block}
+    .phase-list{list-style:none;display:flex;flex-direction:column;gap:6px}
+    .phase-row{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--off-white);border:1px solid var(--border);border-radius:6px}
+    .phase-row.terminal{border-left:3px solid var(--red)}
+    .phase-row .phase-label{font-size:0.8rem;flex:1}
+    .phase-row .phase-key{font-family:var(--font-mono);font-size:0.68rem;color:var(--gray-4)}
+    .phase-row .phase-tag{font-size:0.62rem;padding:1px 6px;border-radius:4px;font-family:var(--font-mono);font-weight:700}
+    .phase-tag.terminal{background:rgba(224,32,32,0.1);color:var(--red)}
+    .phase-tag.optional{background:rgba(245,158,11,0.1);color:#b45309}
+    /* Phase override */
+    .override-form{background:white;border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:18px}
+    .override-warning{background:rgba(224,32,32,0.06);border:1px solid rgba(224,32,32,0.2);border-radius:6px;padding:10px 14px;font-size:0.8rem;color:var(--red);margin-bottom:16px}
+    /* Closed requests */
+    .closed-table{width:100%;border-collapse:collapse;font-size:0.8rem}
+    .closed-table th{background:var(--off-white);padding:8px 10px;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1.5px solid var(--border);text-align:left}
+    .closed-table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+    .closed-table tr:last-child td{border-bottom:none}
+    /* Stats row */
+    .admin-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+    .admin-stat{background:white;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+    .admin-stat-val{font-family:var(--font-mono);font-size:1.5rem;font-weight:700;margin-bottom:2px}
+    .admin-stat-label{font-size:0.72rem;color:var(--gray-3);text-transform:uppercase;letter-spacing:0.05em}
+    /* pipeline phase badge */
+    .p-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-family:var(--font-mono);font-weight:600;border:1px solid}
+  </style>
+</head>
+<body>
+<div id="navbarMount"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<main style="flex:1">
+  <div class="page-header">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px">
+      <div>
+        <h1 class="page-title">Admin <span>Control Panel</span></h1>
+        <p class="page-sub">Pipeline management, phase overrides, closed requests, and system configuration</p>
+      </div>
+      <span style="font-size:0.72rem;font-family:var(--font-mono);background:rgba(224,32,32,0.08);color:var(--red);border:1px solid rgba(224,32,32,0.2);padding:4px 10px;border-radius:4px;font-weight:700">MASTER ADMIN ONLY</span>
+    </div>
+  </div>
+
+  <div class="admin-grid">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+      <div class="admin-sidebar-title">Overview</div>
+      <div class="admin-nav-item active" onclick="switchPanel('overview')">📊 Dashboard</div>
+      <div class="admin-nav-item" onclick="switchPanel('closed')">🔒 Closed Requests</div>
+
+      <div class="admin-sidebar-title">Pipeline Config</div>
+      <div class="admin-nav-item" onclick="switchPanel('pipelines')">🔧 Pipeline Editor</div>
+      <div class="admin-nav-item" onclick="switchPanel('override')">⚡ Force Phase Override</div>
+
+      <div class="admin-sidebar-title">Local Purchase</div>
+      <div class="admin-nav-item" onclick="switchPanel('lp_queue')">🛒 LP Approval Queue <span class="nav-badge" id="lpBadge">0</span></div>
+
+      <div class="admin-sidebar-title">System</div>
+      <div class="admin-nav-item" onclick="window.location.href='master.html'">← Back to Dashboard</div>
+    </div>
+
+    <!-- Content -->
+    <div class="admin-content">
+
+      <!-- OVERVIEW PANEL -->
+      <div id="panel-overview" class="admin-panel active">
+        <div class="panel-title">System Overview</div>
+        <div class="panel-sub">Live counts across all pipelines and request types.</div>
+        <div class="admin-stats">
+          <div class="admin-stat"><div class="admin-stat-val" id="statTotal">—</div><div class="admin-stat-label">Total Requests</div></div>
+          <div class="admin-stat"><div class="admin-stat-val" id="statActive">—</div><div class="admin-stat-label">Active (Open)</div></div>
+          <div class="admin-stat"><div class="admin-stat-val" id="statClosed">—</div><div class="admin-stat-label">Closed</div></div>
+          <div class="admin-stat"><div class="admin-stat-val" id="statLP">—</div><div class="admin-stat-label">LP Pending Approval</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+          <div style="background:white;border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#6366f1">📋 RFQ Pipeline</div>
+            <div id="rfqBreakdown" style="font-size:0.78rem;color:var(--gray-3)">Loading...</div>
+          </div>
+          <div style="background:white;border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#22c55e">🛒 Local Purchase Pipeline</div>
+            <div id="lpBreakdown" style="font-size:0.78rem;color:var(--gray-3)">Loading...</div>
+          </div>
+          <div style="background:white;border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#8b5cf6">🏢 Vendor Info Pipeline</div>
+            <div id="viBreakdown" style="font-size:0.78rem;color:var(--gray-3)">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PIPELINE EDITOR PANEL -->
+      <div id="panel-pipelines" class="admin-panel">
+        <div class="panel-title">Pipeline Editor</div>
+        <div class="panel-sub">View and understand each pipeline's phase sequence. Green phases are active; red-bordered phases are terminal (auto-close the request). Toggle optional phases on/off per pipeline.</div>
+
+        <div id="pipelineEditorMount"></div>
+
+        <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius);padding:14px 16px;margin-top:18px;font-size:0.8rem">
+          <strong>ℹ How to add a new phase:</strong> Phase changes require a code + database update. Use the form below to document the new phase, then apply via a Supabase migration. The system will enforce it in the workflow track automatically once PIPELINE_WF_STEPS is updated in <code>js/supabase-config.js</code>.
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <select id="newPhasePipeline" class="form-control" style="flex:1;min-width:160px">
+                <option value="RFQ">RFQ Pipeline</option>
+                <option value="local_purchase">Local Purchase</option>
+                <option value="vendor_info">Vendor Info</option>
+              </select>
+              <input class="form-control" id="newPhaseKey" placeholder="phase_key (snake_case)" style="flex:1;min-width:160px;font-family:var(--font-mono);font-size:0.8rem"/>
+              <input class="form-control" id="newPhaseLabel" placeholder="Display label" style="flex:1;min-width:160px"/>
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;white-space:nowrap"><input type="checkbox" id="newPhaseOptional"/> Optional</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;white-space:nowrap"><input type="checkbox" id="newPhaseTerminal"/> Terminal (closes request)</label>
+              <button class="btn btn-primary btn-sm" onclick="addPhaseToConfig()">+ Add to Config</button>
+            </div>
+            <div id="newPhaseResult" style="font-size:0.78rem;font-family:var(--font-mono);color:var(--gray-3)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FORCE PHASE OVERRIDE PANEL -->
+      <div id="panel-override" class="admin-panel">
+        <div class="panel-title">Force Phase Override</div>
+        <div class="panel-sub">Move any request to any phase — bypasses the normal workflow. Use only when a request is stuck or data needs correction.</div>
+
+        <div class="override-warning">⚠️ This directly modifies the database. Use sparingly. All overrides are logged as comments on the request.</div>
+
+        <div class="override-form">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+            <div>
+              <label class="form-label">Search Request (PR # or project name)</label>
+              <input class="form-control" id="overrideSearch" placeholder="PR-0042 or project name" oninput="searchForOverride()"/>
+            </div>
+            <div>
+              <label class="form-label">Or paste Request ID directly</label>
+              <input class="form-control" id="overrideId" placeholder="UUID" style="font-family:var(--font-mono);font-size:0.78rem"/>
+            </div>
+          </div>
+          <div id="overrideSearchResults" style="margin-bottom:14px"></div>
+          <div id="overrideSelectedPR" style="display:none;padding:12px 14px;background:var(--off-white);border:1px solid var(--border);border-radius:6px;margin-bottom:14px;font-size:0.82rem">
+            <strong id="overridePRLabel">—</strong> <span id="overridePRCurrent" style="margin-left:8px"></span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+            <div>
+              <label class="form-label">Force to Phase</label>
+              <select class="form-control" id="overrideNewPhase">
+                <option value="">— Select target phase —</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Reason / Notes *</label>
+              <input class="form-control" id="overrideReason" placeholder="Why is this override needed?"/>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button class="btn btn-danger" onclick="executeOverride()" style="min-width:180px">⚡ Execute Override</button>
+            <span style="font-size:0.75rem;color:var(--gray-4)">A comment will be posted on the request with your name, timestamp, and reason.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLOSED REQUESTS PANEL -->
+      <div id="panel-closed" class="admin-panel">
+        <div class="panel-title">Closed Requests</div>
+        <div class="panel-sub">All terminal requests — accepted, rejected, declined, QC rejected, LP done, LP rejected. Lead time is frozen at the close date.</div>
+        <div class="filter-bar" style="margin-bottom:14px">
+          <input type="text" id="closedSearch" placeholder="Search project, PR #..." oninput="filterClosed()"/>
+          <select id="closedType" onchange="filterClosed()">
+            <option value="">All Types</option>
+            <option value="RFQ">RFQ</option>
+            <option value="local_purchase">Local Purchase</option>
+            <option value="vendor_info">Vendor Info</option>
+          </select>
+          <select id="closedPhase" onchange="filterClosed()">
+            <option value="">All Close Reasons</option>
+            <option value="accepted">Accepted</option>
+            <option value="rejected">Rejected</option>
+            <option value="declined">Declined</option>
+            <option value="qc_rejected">QC Rejected</option>
+            <option value="lp_payment_done">LP Payment Done</option>
+            <option value="lp_rejected">LP Rejected</option>
+          </select>
+        </div>
+        <div style="background:white;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <div style="overflow-x:auto">
+            <table class="closed-table">
+              <thead><tr>
+                <th>PR #</th><th>Type</th><th>Project</th><th>Dept</th>
+                <th>Close Reason</th><th>Lead Time</th><th>Created</th><th>Closed</th>
+              </tr></thead>
+              <tbody id="closedBody"><tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-4)">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="closedCount" style="font-size:0.75rem;color:var(--gray-4);margin-top:8px;font-family:var(--font-mono)"></div>
+      </div>
+
+      <!-- LP QUEUE PANEL -->
+      <div id="panel-lp_queue" class="admin-panel">
+        <div class="panel-title">LP Approval Queue</div>
+        <div class="panel-sub">Local Purchase requests pending Project Manager (or your) approval. As Master Admin you can approve or reject any LP request directly.</div>
+        <div id="lpQueueMount">
+          <div style="text-align:center;padding:32px;color:var(--gray-4)">Loading...</div>
+        </div>
+      </div>
+
+    </div><!-- /admin-content -->
+  </div><!-- /admin-grid -->
+</main>
+
+<!-- LP MODAL -->
+<div class="modal-overlay" id="lpModal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div><div class="modal-title" id="lpModalTitle">LP Request Review</div><div class="modal-title-sub" id="lpModalSub"></div></div>
+      <button class="modal-close" onclick="closeModal('lpModal')">✕</button>
+    </div>
+    <div class="modal-body" id="lpModalBody" style="max-height:70vh;overflow-y:auto"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('lpModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="footerMount"></div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../js/supabase-config.js"></script>
+<script src="../js/shared.js"></script>
+<script>
+let currentUser, allRequests=[], closedRequests=[], currentLPPR=null, overrideTargetPR=null;
+
+// ── Runtime pipeline config — starts from PIPELINES defined in supabase-config.js
+// Admin can add phases; stored in localStorage for persistence without a server round-trip
+let runtimePipelines = JSON.parse(localStorage.getItem('procurex_pipeline_config') || 'null') || JSON.parse(JSON.stringify(PIPELINES));
+
+function savePipelineConfig() {
+  localStorage.setItem('procurex_pipeline_config', JSON.stringify(runtimePipelines));
+}
+
+function addPhaseTimestamp(pr, phaseName) {
+  const existing = pr.phase_timestamps || {};
+  return { ...existing, [phaseName]: new Date().toISOString() };
+}
+
+async function init() {
+  currentUser = Session.require(['master']); if (!currentUser) return;
+  document.getElementById('navbarMount').innerHTML = buildNavbar(currentUser);
+  document.getElementById('footerMount').innerHTML = buildFooter();
+  initNavbar(currentUser);
+  showLoader(true);
+  await loadAllRequests();
+  showLoader(false);
+  renderOverridePhaseOptions();
+}
+
+async function loadAllRequests() {
+  const { data } = await db.from('procurement_requests')
+    .select('*, users!procurement_requests_created_by_fkey(name)')
+    .order('updated_at', { ascending: false });
+  allRequests = data || [];
+  closedRequests = allRequests.filter(r => CLOSED_PHASES.has(r.phase) || r.is_closed);
+
+  // Stats
+  const lpPending = allRequests.filter(r => ['lp_submitted','lp_pending_pm_approval'].includes(r.phase));
+  document.getElementById('statTotal').textContent = allRequests.length;
+  document.getElementById('statActive').textContent = allRequests.filter(r => !r.is_closed && !CLOSED_PHASES.has(r.phase)).length;
+  document.getElementById('statClosed').textContent = closedRequests.length;
+  document.getElementById('statLP').textContent = lpPending.length;
+  document.getElementById('lpBadge').textContent = lpPending.length;
+
+  renderOverviewBreakdowns();
+  renderClosedTable(closedRequests);
+  renderLPQueue();
+  renderPipelineEditor();
+}
+
+function renderOverviewBreakdowns() {
+  const rfqPhases = ['submitted','pending_initial_pm_approval','procurement_active','quotations_shared','pending_pm_final_approval','pending_sandy_approval','approved','order_placed','grn_initiated','qc_pending','qc_passed','payment_raised_to_accounts'];
+  const lpPhases = ['lp_submitted','lp_pending_pm_approval','lp_procurement_processing','lp_payment_pending'];
+
+  const rfq = allRequests.filter(r => r.request_category === 'RFQ');
+  const lp  = allRequests.filter(r => r.request_category === 'local_purchase');
+  const vi  = allRequests.filter(r => r.request_category === 'vendor_info');
+
+  function breakdownHtml(reqs) {
+    if (!reqs.length) return '<div style="color:var(--gray-4)">No requests</div>';
+    const counts = {};
+    reqs.forEach(r => { counts[r.phase] = (counts[r.phase]||0)+1; });
+    return Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([phase,cnt]) =>
+      `<div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span>${PHASES[phase]?.label || phase}</span>
+        <strong style="font-family:var(--font-mono)">${cnt}</strong>
+      </div>`
+    ).join('');
+  }
+
+  document.getElementById('rfqBreakdown').innerHTML = breakdownHtml(rfq);
+  document.getElementById('lpBreakdown').innerHTML  = breakdownHtml(lp);
+  document.getElementById('viBreakdown').innerHTML  = breakdownHtml(vi);
+}
+
+function renderClosedTable(reqs) {
+  const tbody = document.getElementById('closedBody');
+  document.getElementById('closedCount').textContent = reqs.length + ' closed requests';
+  if (!reqs.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-4)">No closed requests found.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = reqs.map(r => {
+    const leadDays = calcLeadTimeDays(r.created_at, r.closed_at);
+    const typeLabel = r.request_category === 'local_purchase' ? 'LP' : r.request_category === 'vendor_info' ? 'VI' : 'RFQ';
+    const typeColor = r.request_category === 'local_purchase' ? '#22c55e' : r.request_category === 'vendor_info' ? '#8b5cf6' : '#6366f1';
+    return `<tr>
+      <td><span style="font-family:var(--font-mono);font-size:0.75rem;font-weight:700">PR-${String(r.request_number).padStart(4,'0')}</span></td>
+      <td><span class="p-badge" style="background:${typeColor}14;color:${typeColor};border-color:${typeColor}35">${typeLabel}</span></td>
+      <td><strong style="font-size:0.82rem">${r.project_name}</strong><br><span style="font-size:0.7rem;color:var(--gray-4)">${r.project_phase||''}</span></td>
+      <td style="font-size:0.78rem">${DEPARTMENTS[r.department]||r.department}</td>
+      <td>${getPhaseBadge(r.phase)}</td>
+      <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--gray-3)">${leadDays !== null ? leadDays+'d ✓' : '—'}</td>
+      <td style="font-family:var(--font-mono);font-size:0.72rem">${fmtDate(r.created_at)}</td>
+      <td style="font-family:var(--font-mono);font-size:0.72rem">${r.closed_at ? fmtDate(r.closed_at) : '<span style="color:var(--gray-4)">—</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterClosed() {
+  const s = document.getElementById('closedSearch').value.toLowerCase();
+  const type = document.getElementById('closedType').value;
+  const phase = document.getElementById('closedPhase').value;
+  let reqs = closedRequests;
+  if (s) reqs = reqs.filter(r => r.project_name.toLowerCase().includes(s) || String(r.request_number).includes(s));
+  if (type) {
+    if (type === 'RFQ') reqs = reqs.filter(r => r.request_category === 'RFQ');
+    else reqs = reqs.filter(r => r.request_category === type);
+  }
+  if (phase) reqs = reqs.filter(r => r.phase === phase);
+  renderClosedTable(reqs);
+}
+
+// ── PIPELINE EDITOR ───────────────────────────────────────────
+function renderPipelineEditor() {
+  const mount = document.getElementById('pipelineEditorMount');
+  mount.innerHTML = Object.entries(runtimePipelines).map(([key, pipeline]) => {
+    const phases = pipeline.phases || [];
+    const terminals = pipeline.terminal || [];
+    const rows = phases.map(phase => {
+      const phaseMeta = PHASES[phase] || { label: phase, color: '#6b7280' };
+      const isTerminal = terminals.includes(phase);
+      const isOptional = (PIPELINE_WF_STEPS[key] || []).find(s => s.key === phase)?.optional;
+      return `<li class="phase-row${isTerminal ? ' terminal' : ''}">
+        <span class="phase-key">${phase}</span>
+        <span class="phase-label">${phaseMeta.label || phase}</span>
+        <span class="phase-tag${isTerminal ? ' terminal' : (isOptional ? ' optional' : '')}">${isTerminal ? 'TERMINAL' : isOptional ? 'OPTIONAL' : ''}</span>
+        ${isTerminal ? '' : `<button onclick="removePhaseFromPipeline('${key}','${phase}')" title="Remove from pipeline" style="background:none;border:none;cursor:pointer;color:var(--gray-4);font-size:0.8rem;padding:0 4px">✕</button>`}
+      </li>`;
+    }).join('');
+    return `<div class="pipeline-card">
+      <div class="pipeline-card-header" onclick="togglePipelineCard('${key}')">
+        <div class="pipeline-card-title">
+          <div class="pipeline-dot" style="background:${pipeline.color}"></div>
+          ${pipeline.label}
+          <span style="font-size:0.7rem;font-family:var(--font-mono);color:var(--gray-4)">${phases.length} phases</span>
+        </div>
+        <span style="font-size:0.75rem;color:var(--gray-4)">▼</span>
+      </div>
+      <div class="pipeline-card-body" id="pipeline-body-${key}">
+        <ul class="phase-list">${rows}</ul>
+        <div style="margin-top:12px;font-size:0.75rem;color:var(--gray-4)">
+          Red border = terminal phase (auto-closes request and freezes lead time). Click ✕ to remove a phase from this pipeline view (does not delete data).
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function togglePipelineCard(key) {
+  const body = document.getElementById('pipeline-body-' + key);
+  if (body) body.classList.toggle('open');
+}
+
+function removePhaseFromPipeline(pipelineKey, phaseKey) {
+  if (!confirm(`Remove "${phaseKey}" from the ${pipelineKey} pipeline view? This only affects the UI — existing requests in this phase are not affected.`)) return;
+  runtimePipelines[pipelineKey].phases = runtimePipelines[pipelineKey].phases.filter(p => p !== phaseKey);
+  savePipelineConfig();
+  renderPipelineEditor();
+  showToast('Phase removed from pipeline view.', 'success');
+}
+
+function addPhaseToConfig() {
+  const pipelineKey = document.getElementById('newPhasePipeline').value;
+  const key = document.getElementById('newPhaseKey').value.trim().replace(/\s+/g,'_');
+  const label = document.getElementById('newPhaseLabel').value.trim();
+  const isOptional = document.getElementById('newPhaseOptional').checked;
+  const isTerminal = document.getElementById('newPhaseTerminal').checked;
+  if (!key || !label) { showToast('Phase key and label are required.', 'error'); return; }
+  if (!/^[a-z_0-9]+$/.test(key)) { showToast('Phase key must be lowercase snake_case.', 'error'); return; }
+  if (runtimePipelines[pipelineKey].phases.includes(key)) { showToast('Phase already exists in this pipeline.', 'error'); return; }
+
+  runtimePipelines[pipelineKey].phases.push(key);
+  if (isTerminal) runtimePipelines[pipelineKey].terminal.push(key);
+  // Also register in PHASES for badge rendering
+  if (!PHASES[key]) {
+    PHASES[key] = { label: label, color: '#6b7280', icon: '📌' };
+  }
+  savePipelineConfig();
+  renderPipelineEditor();
+  document.getElementById('newPhaseKey').value = '';
+  document.getElementById('newPhaseLabel').value = '';
+  const sqlSnippet = `-- Add to PIPELINE_WF_STEPS.${pipelineKey} in supabase-config.js:\n{key:'${key}',label:'${label}'${isOptional?',optional:true':''}},\n\n-- No schema change needed; phase is stored as text in procurement_requests.phase`;
+  document.getElementById('newPhaseResult').textContent = sqlSnippet;
+  showToast(`Phase "${key}" added to ${pipelineKey} pipeline.`, 'success');
+}
+
+// ── FORCE OVERRIDE ────────────────────────────────────────────
+function renderOverridePhaseOptions() {
+  const sel = document.getElementById('overrideNewPhase');
+  const allPhases = [...new Set(Object.values(PIPELINES).flatMap(p => [...p.phases, ...(p.terminal||[])]))]
+    .sort();
+  sel.innerHTML = '<option value="">— Select target phase —</option>' +
+    allPhases.map(phase => {
+      const meta = PHASES[phase] || { label: phase };
+      return `<option value="${phase}">${phase} — ${meta.label}</option>`;
+    }).join('');
+}
+
+function searchForOverride() {
+  const s = document.getElementById('overrideSearch').value.toLowerCase();
+  if (s.length < 2) { document.getElementById('overrideSearchResults').innerHTML = ''; return; }
+  const matches = allRequests.filter(r =>
+    String(r.request_number).includes(s) ||
+    r.project_name.toLowerCase().includes(s)
+  ).slice(0, 8);
+  document.getElementById('overrideSearchResults').innerHTML = matches.length
+    ? `<div style="background:var(--off-white);border:1px solid var(--border);border-radius:6px;overflow:hidden">${
+        matches.map(r =>
+          `<div onclick="selectOverridePR('${r.id}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.8rem;display:flex;align-items:center;gap:10px" onmouseover="this.style.background='white'" onmouseout="this.style.background=''">
+            <span style="font-family:var(--font-mono);font-size:0.72rem;font-weight:700;color:var(--gray-3)">PR-${String(r.request_number).padStart(4,'0')}</span>
+            <span style="flex:1">${r.project_name}</span>
+            ${getPhaseBadge(r.phase)}
+          </div>`
+        ).join('')
+      }</div>`
+    : '<div style="font-size:0.78rem;color:var(--gray-4);padding:8px">No matching requests</div>';
+}
+
+function selectOverridePR(id) {
+  overrideTargetPR = allRequests.find(r => r.id === id);
+  if (!overrideTargetPR) return;
+  document.getElementById('overrideSelectedPR').style.display = 'block';
+  document.getElementById('overridePRLabel').textContent = `PR-${String(overrideTargetPR.request_number).padStart(4,'0')} — ${overrideTargetPR.project_name}`;
+  document.getElementById('overridePRCurrent').innerHTML = `Current phase: ${getPhaseBadge(overrideTargetPR.phase)}`;
+  document.getElementById('overrideSearchResults').innerHTML = '';
+  document.getElementById('overrideSearch').value = '';
+  document.getElementById('overrideId').value = overrideTargetPR.id;
+}
+
+async function executeOverride() {
+  const prId = document.getElementById('overrideId').value.trim() || overrideTargetPR?.id;
+  const newPhase = document.getElementById('overrideNewPhase').value;
+  const reason = document.getElementById('overrideReason').value.trim();
+  if (!prId) { showToast('Select or enter a request first.', 'error'); return; }
+  if (!newPhase) { showToast('Select a target phase.', 'error'); return; }
+  if (!reason) { showToast('Reason is required for overrides.', 'error'); return; }
+  if (!confirm(`Force PR to phase "${newPhase}"?\n\nReason: ${reason}\n\nThis will be logged permanently.`)) return;
+
+  const pr = overrideTargetPR || allRequests.find(r => r.id === prId);
+  const isTerminal = Object.values(PIPELINES).some(p => (p.terminal||[]).includes(newPhase));
+  const now = new Date().toISOString();
+
+  showLoader(true);
+  const { error } = await db.from('procurement_requests').update({
+    phase: newPhase,
+    is_closed: isTerminal,
+    closed_at: isTerminal ? now : null,
+    updated_at: now,
+    phase_timestamps: pr ? addPhaseTimestamp(pr, newPhase) : {}
+  }).eq('id', prId);
+
+  if (!error) {
+    await db.from('pr_comments').insert({
+      pr_id: prId,
+      user_id: currentUser.id,
+      comment: `⚡ [MASTER ADMIN OVERRIDE] Phase forced to "${newPhase}" by ${currentUser.name}. Reason: ${reason}`
+    });
+  }
+  showLoader(false);
+  if (error) { showToast('Override failed: ' + error.message, 'error'); return; }
+  showToast(`Phase forced to "${newPhase}" successfully.`, 'success');
+  overrideTargetPR = null;
+  document.getElementById('overrideSelectedPR').style.display = 'none';
+  document.getElementById('overrideId').value = '';
+  document.getElementById('overrideReason').value = '';
+  await loadAllRequests();
+}
+
+// ── LP QUEUE ─────────────────────────────────────────────────
+function renderLPQueue() {
+  const pending = allRequests.filter(r => ['lp_submitted','lp_pending_pm_approval'].includes(r.phase));
+  const mount = document.getElementById('lpQueueMount');
+  if (!pending.length) {
+    mount.innerHTML = `<div style="text-align:center;padding:40px;color:var(--gray-4)">✅ No LP requests pending approval.</div>`;
+    return;
+  }
+  mount.innerHTML = `<div style="background:white;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+      <thead><tr style="background:var(--off-white)">
+        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em">PR #</th>
+        <th style="padding:10px 12px;text-align:left">Project</th>
+        <th style="padding:10px 12px">Dept</th>
+        <th style="padding:10px 12px">Submitted By</th>
+        <th style="padding:10px 12px">Created</th>
+        <th style="padding:10px 12px">Actions</th>
+      </tr></thead>
+      <tbody>${pending.map(r => `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:10px 12px"><strong style="font-family:var(--font-mono);font-size:0.75rem">PR-${String(r.request_number).padStart(4,'0')}</strong></td>
+        <td style="padding:10px 12px"><strong>${r.project_name}</strong>${r.project_phase ? `<br><span style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</span>` : ''}</td>
+        <td style="padding:10px 12px;font-size:0.78rem">${DEPARTMENTS[r.department]||r.department}</td>
+        <td style="padding:10px 12px;font-size:0.78rem">${r.team_member_name||'—'}</td>
+        <td style="padding:10px 12px;font-family:var(--font-mono);font-size:0.72rem">${fmtDate(r.created_at)}</td>
+        <td style="padding:10px 12px;white-space:nowrap;display:flex;gap:6px">
+          <button class="btn btn-primary btn-sm" onclick='openLPModal("${r.id}")'>Review</button>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+async function openLPModal(id) {
+  currentLPPR = allRequests.find(r => r.id === id);
+  if (!currentLPPR) return;
+  document.getElementById('lpModalTitle').textContent = `LP PR-${String(currentLPPR.request_number).padStart(4,'0')} — ${currentLPPR.project_name}`;
+  document.getElementById('lpModalSub').textContent = `${DEPARTMENTS[currentLPPR.department]||''} · Submitted by ${currentLPPR.team_member_name}`;
+  showLoader(true);
+  const { data: quotations } = await db.from('pr_quotations').select('*').eq('pr_id', id);
+  showLoader(false);
+  document.getElementById('lpModalBody').innerHTML =
+    buildPRDetailHTML(currentLPPR, quotations||[], '', currentLPPR.project_manager_name||'', {}) +
+    `<div class="action-section" style="border-color:#15803d;background:rgba(34,197,94,0.04);margin-top:16px">
+      <div class="action-section-title" style="color:#15803d">🔑 Master Admin — LP Decision <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">You are acting as Master Admin, overriding the Project Manager approval step.</p>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Decision Notes (optional for approval)</label>
+        <textarea class="form-control" id="adminLPNotes" rows="2" placeholder="Approval rationale or rejection reason..."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-success" onclick="adminApproveLPRequest()" style="flex:1">✓ Approve — Send to Procurement</button>
+        <button class="btn btn-danger" onclick="adminRejectLPRequest()" style="flex:1">✗ Reject & Close</button>
+      </div>
+    </div>`;
+  openModal('lpModal');
+}
+
+async function adminApproveLPRequest() {
+  const notes = document.getElementById('adminLPNotes')?.value.trim() || 'Approved by Master Admin';
+  showLoader(true);
+  const now = new Date().toISOString();
+  const { error } = await db.from('procurement_requests').update({
+    phase: 'lp_procurement_processing',
+    updated_at: now,
+    phase_timestamps: addPhaseTimestamp(currentLPPR, 'lp_procurement_processing')
+  }).eq('id', currentLPPR.id);
+  if (!error) {
+    await db.from('pr_comments').insert({ pr_id: currentLPPR.id, user_id: currentUser.id, comment: `✓ [Master Admin] LP approved: ${notes}` });
+    notifyPhaseChange(currentLPPR.id, 'lp_procurement_processing', currentUser.id);
+  }
+  showLoader(false);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast('LP approved — sent to Procurement.', 'success');
+  closeModal('lpModal');
+  await loadAllRequests();
+}
+
+async function adminRejectLPRequest() {
+  const notes = document.getElementById('adminLPNotes')?.value.trim();
+  if (!notes) { showToast('Please add a rejection reason.', 'error'); return; }
+  if (!confirm(`Reject and close this LP request?\n\nReason: ${notes}`)) return;
+  showLoader(true);
+  const now = new Date().toISOString();
+  const { error } = await db.from('procurement_requests').update({
+    phase: 'lp_rejected',
+    is_closed: true,
+    closed_at: now,
+    rejection_reason: notes,
+    updated_at: now,
+    phase_timestamps: addPhaseTimestamp(currentLPPR, 'lp_rejected')
+  }).eq('id', currentLPPR.id);
+  if (!error) {
+    await db.from('pr_comments').insert({ pr_id: currentLPPR.id, user_id: currentUser.id, comment: `✗ [Master Admin] LP rejected & closed: ${notes}` });
+    notifyPhaseChange(currentLPPR.id, 'lp_rejected', currentUser.id);
+  }
+  showLoader(false);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast('LP rejected & closed.', 'error');
+  closeModal('lpModal');
+  await loadAllRequests();
+}
+
+function switchPanel(name) {
+  document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.admin-nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name)?.classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+init();
+</script>
+</body>
+</html>

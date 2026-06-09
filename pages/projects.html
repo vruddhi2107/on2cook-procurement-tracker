@@ -323,11 +323,11 @@ async function loadProjects() {
 }
 
 async function loadPMs() {
-  const { data } = await db.from('users').select('id,name').eq('role', 'project_manager').order('name');
+  const { data } = await db.from('users').select('id,name,role').in('role',['project_manager','master','director']).order('name');
   allPMs = data || [];
   const sel = document.getElementById('pDefaultPM');
   sel.innerHTML = '<option value="">Select PM (optional)</option>' +
-    allPMs.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    allPMs.map(p => `<option value="${p.id}">${p.name}${p.role!=='project_manager'?' ('+({'master':'Master Admin','director':'Director'}[p.role]||p.role)+')':''}</option>`).join('');
 }
 
 function filterProjects() {

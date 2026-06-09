@@ -216,7 +216,7 @@ function renderModal() {
           + '<div class="qc-icon">✅</div><div class="qc-label">QC Passed</div>'
           + '<div class="qc-desc">All goods meet quality specs</div></div>'
         + '<div class="qc-option fail" id="optFail" onclick="selectQC(\'fail\')">'
-          + '<div class="qc-icon">🔄</div><div class="qc-label">QC Failed — Rework</div>'
+          + '<div class="qc-icon">🔄</div><div class="qc-label">QC Failed — Jobwork</div>'
           + '<div class="qc-desc">Raise JWC — send for rework</div></div>'
         + '<div class="qc-option reject" id="optReject" onclick="selectQC(\'reject\')">'
           + '<div class="qc-icon">🚫</div><div class="qc-label">QC Rejected</div>'
@@ -649,6 +649,7 @@ window.submitQC = async function submitQC() {
 
   var updateResult = await db.from('procurement_requests').update({
     phase:            newPhase,
+    is_closed:        newPhase === 'qc_rejected',
     qc_result:        qcResult,
     qc_notes:         notes,
     qc_criteria:      updatedCriteria,
@@ -806,6 +807,7 @@ window.submitPostReworkQC = async function submitPostReworkQC() {
 
   var updateResult = await db.from('procurement_requests').update({
     phase:            newPhase,
+    is_closed:        newPhase === 'qc_rejected',
     qc_result:        qcResult,
     qc_notes:         notes,
     qc_criteria:      updatedCriteria,
@@ -1121,6 +1123,7 @@ window.submitFinalReworkQC = async function submitFinalReworkQC() {
   showLoader(true);
   var result = await db.from('procurement_requests').update({
     phase:            newPhase,
+    is_closed:        !isPassed,
     qc_result:        isPassed ? 'qc_passed' : 'rejected',
     qc_notes:         notes,
     qc_criteria:      updatedCriteria,

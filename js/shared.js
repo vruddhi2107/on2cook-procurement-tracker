@@ -214,7 +214,9 @@ function buildNavbar(user) {
     master: [
       {href:'master.html',label:'Dashboard'},
       {href:'projects.html',label:'Projects'},
-      {href:'accounts.html',label:'Accounts'}
+      {href:'pm.html',label:'PM Portal'},
+      {href:'accounts.html',label:'Accounts'},
+      {href:'admin.html',label:'⚙ Admin'}
     ],
     project_manager: [
       {href:'pm.html',label:'My Requests'},
@@ -228,7 +230,12 @@ function buildNavbar(user) {
     ],
     engineer: [
       {href:'engineer.html',label:'My Requests'},
-    ]
+    ],
+    director: [
+      {href:'master.html',label:'Dashboard'},
+      {href:'projects.html',label:'Projects'},
+      {href:'pm.html',label:'PM Portal'},
+    ],
   };
   const links = navLinks[user.role]||[];
   return `<nav class="navbar">
@@ -371,35 +378,12 @@ window.submitPasswordChange = async function submitPasswordChange() {
 }
 
 // ── WORKFLOW TRACK ──────────────────────────────────────────
-const WF_STEPS = [
-  {key:'submitted',label:'Submitted'},
-  {key:'pending_initial_pm_approval',label:'Project Mgr Clearance'},
-  {key:'lp_pending_pm_approval',label:'LP → Project Mgr',optional:true},
-  {key:'procurement_active',label:'Procurement'},
-  {key:'quotations_shared',label:'Quotations'},
-  {key:'quotes_revision_requested',label:'Quote Revision',optional:true},
-  {key:'pending_pm_final_approval',label:'Project Mgr Approval'},
-  {key:'pending_decline_approval',label:'Decline Pending Project Mgr',optional:true},
-  {key:'pending_sandy_approval',label:'Director Approval'},
-  {key:'approved',label:'Approved'},
-  {key:'advance_raised_to_accounts',label:'Adv. Raised',optional:true},
-  {key:'advance_payment_received',label:'Adv. Received',optional:true},
-  {key:'order_placed',label:'Ordered'},
-  {key:'grn_initiated',label:'GRN→Store'},
-  {key:'qc_pending',label:'QC Check'},
-  {key:'rework_pending',label:'Rework',optional:true},
-  {key:'rework_returned',label:'Rework Returned',optional:true},
-  {key:'rework2_pending',label:'2nd Rework',optional:true},
-  {key:'rework2_returned',label:'2nd Rework Returned',optional:true},
-  {key:'qc_deviated',label:'Deviated',optional:true},
-  {key:'deviation_approval',label:'Deviation Review',optional:true},
-  {key:'qc_passed',label:'QC Passed'},
-  {key:'payment_raised_to_accounts',label:'Pay. Raised'},
-  {key:'payment_received',label:'Pay. Received'},
-  {key:'accepted',label:'Complete'}
-];
+// PIPELINE_WF_STEPS is defined in supabase-config.js so it's
+// available to both shared.js and pages that don't load shared.js (e.g. admin.html)
+// Legacy flat alias kept for backward compat
+const WF_STEPS = PIPELINE_WF_STEPS.RFQ;
 
-function renderWorkflowTrack(phase, phaseTimestamps, createdAt) {
+function renderWorkflowTrack(phase, phaseTimestamps, createdAt, requestCategory) {
   var ts = Object.assign({}, phaseTimestamps || {});
   // Fall back to created_at for submitted timestamp
   if (!ts.submitted && createdAt) ts.submitted = createdAt;
@@ -410,8 +394,17 @@ function renderWorkflowTrack(phase, phaseTimestamps, createdAt) {
     'advance_requested': 'advance_raised_to_accounts',
     'payment_requested': 'payment_raised_to_accounts'
   };
+  // Pick the right step set for this pipeline — MUST come before indexOf usage
+  var pipelineKey = requestCategory === 'local_purchase' ? 'local_purchase'
+                  : requestCategory === 'vendor_info'    ? 'vendor_info'
+                  : 'RFQ';
+  var _pwf = typeof PIPELINE_WF_STEPS !== 'undefined' ? PIPELINE_WF_STEPS : null;
+  var steps = (_pwf && _pwf[pipelineKey]) || (_pwf && _pwf.RFQ) || WF_STEPS || [];
+  var pipelinePhaseOrder = steps.map(function(s){ return s.key; });
+
   var effectivePhase = phaseToStep[phase] || phase;
-  var idx = PHASE_ORDER.indexOf(effectivePhase);
+  var idx = pipelinePhaseOrder.indexOf(effectivePhase);
+  if (idx === -1) idx = PHASE_ORDER.indexOf(effectivePhase); // fallback
   var isRej = phase === 'rejected';
 
   function shortDate(iso) {
@@ -425,8 +418,9 @@ function renderWorkflowTrack(phase, phaseTimestamps, createdAt) {
     return d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
   }
 
-  return '<div class="workflow-track">' + WF_STEPS.map(function(s, i) {
-    var si = PHASE_ORDER.indexOf(s.key);
+  return '<div class="workflow-track">' + steps.map(function(s, i) {
+    var si = pipelinePhaseOrder.indexOf(s.key);
+    if (si === -1) si = PHASE_ORDER.indexOf(s.key);
     var isCurrent = effectivePhase === s.key;
     var isDone = si < idx;
     var hasTs = !!ts[s.key];
@@ -460,15 +454,18 @@ function renderWorkflowTrack(phase, phaseTimestamps, createdAt) {
 }
 
 // ── LEAD TIME HELPERS ────────────────────────────────────────
-function calcLeadTimeDays(createdAt) {
+function calcLeadTimeDays(createdAt, closedAt) {
   if (!createdAt) return null;
-  return Math.floor((Date.now() - new Date(createdAt)) / 86400000);
+  var endTime = closedAt ? new Date(closedAt) : Date.now();
+  return Math.floor((endTime - new Date(createdAt)) / 86400000);
 }
-function leadTimeBadge(createdAt) {
-  var days = calcLeadTimeDays(createdAt);
+function leadTimeBadge(createdAt, closedAt) {
+  var days = calcLeadTimeDays(createdAt, closedAt);
   if (days === null) return '';
-  var color = days <= 7 ? '#22c55e' : days <= 21 ? '#f59e0b' : '#ef4444';
-  return '<span style="font-family:var(--font-mono);font-size:0.7rem;padding:1px 7px;border-radius:10px;background:'+color+'15;color:'+color+';border:1px solid '+color+'35">'+days+'d</span>';
+  var isClosed = !!closedAt;
+  var color = isClosed ? '#6b7280' : (days <= 7 ? '#22c55e' : days <= 21 ? '#f59e0b' : '#ef4444');
+  var suffix = isClosed ? 'd ✓' : 'd';
+  return '<span style="font-family:var(--font-mono);font-size:0.7rem;padding:1px 7px;border-radius:10px;background:'+color+'15;color:'+color+';border:1px solid '+color+'35">'+days+suffix+'</span>';
 }
 
 
@@ -531,10 +528,10 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
     ${renderPartsTable(parts)}
     <div style="margin-top:12px;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius)">
       <span style="font-size:0.8rem;color:var(--gray-3)">Total Lead Time:</span>
-      <strong style="font-family:var(--font-mono);font-size:0.88rem">${calcLeadTimeDays(pr.created_at)} days</strong>
-      <span style="font-size:0.75rem;color:var(--gray-4)">(from ${fmtDate(pr.created_at)} to today)</span>
+      <strong style="font-family:var(--font-mono);font-size:0.88rem">${calcLeadTimeDays(pr.created_at, pr.closed_at)} days${pr.closed_at ? ' (final)' : ''}</strong>
+      <span style="font-size:0.75rem;color:var(--gray-4)">(from ${fmtDate(pr.created_at)}${pr.closed_at ? ' to ' + fmtDate(pr.closed_at) : ' to today'})</span>
     </div>
-    <div style="margin-top:16px">${renderWorkflowTrack(pr.phase, pr.phase_timestamps, pr.created_at)}</div>
+    <div style="margin-top:16px">${renderWorkflowTrack(pr.phase, pr.phase_timestamps, pr.created_at, pr.request_category)}</div>
 
     ${(pr.phase==='advance_requested'||pr.phase==='advance_approved'||pr.phase==='advance_rejected')?`<div style="margin-top:14px;padding:12px 14px;background:${pr.phase==='advance_approved'?'rgba(22,163,74,0.06)':pr.phase==='advance_rejected'?'rgba(214,43,43,0.06)':'rgba(245,158,11,0.06)'};border:1px solid ${pr.phase==='advance_approved'?'rgba(22,163,74,0.25)':pr.phase==='advance_rejected'?'rgba(214,43,43,0.25)':'rgba(245,158,11,0.25)'};border-radius:var(--radius)">
       <div class="detail-key" style="color:${pr.phase==='advance_approved'?'#16a34a':pr.phase==='advance_rejected'?'var(--red)':'#b45309'};margin-bottom:6px">

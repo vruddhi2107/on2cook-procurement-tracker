@@ -726,7 +726,7 @@ async function loadVendors() {
 }
 
 function updateStats() {
-  document.getElementById('sActive').textContent=allRequests.filter(r=>r.phase==='procurement_active').length;
+  document.getElementById('sActive').textContent=allRequests.filter(r=>r.phase==='procurement_active'||r.phase==='lp_procurement_processing').length;
   document.getElementById('sOrders').textContent=allRequests.filter(r=>r.phase==='approved').length;
   document.getElementById('sGRN').textContent=allRequests.filter(r=>['grn_initiated','qc_pending','rework_pending'].includes(r.phase)).length;
 }
@@ -748,7 +748,7 @@ function filterTable(){
   const s=document.getElementById('searchInput').value.toLowerCase();
   const ph=document.getElementById('filterPhase').value;
   const urg=document.getElementById('filterUrgency')?.value||'';
-  const actionPhases=['lp_pending_pm_approval','procurement_active','quotes_revision_requested','approved','advance_requested','grn_initiated','qc_pending','rework_pending','rework2_pending','qc_passed','lp_payment_pending','pending_decline_approval'];
+  const actionPhases=['lp_procurement_processing','lp_payment_pending','procurement_active','quotes_revision_requested','approved','advance_requested','grn_initiated','qc_pending','rework_pending','rework2_pending','qc_passed','pending_decline_approval'];
   let reqs=allRequests;
   if(activeTab==='active') reqs=reqs.filter(r=>actionPhases.includes(r.phase));
   if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
@@ -761,8 +761,8 @@ function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
   if(!reqs.length){tbody.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>${activeTab==='active'?'All caught up!':'No requests'}</h3></div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
-    const needsAction=['lp_pending_pm_approval','procurement_active','quotes_revision_requested','approved','grn_initiated','qc_pending','rework_pending','rework2_pending','qc_passed','lp_payment_pending','pending_decline_approval'].includes(r.phase);
-    const lbl={lp_pending_pm_approval:'LP Awaiting Proj Mgr',procurement_active:'Work on it',quotes_revision_requested:'Revise Quotes',approved:'Place Order',advance_requested:'View Advance',grn_initiated:'GRN Sent to Store',qc_pending:'QC In Progress',rework_pending:'Rework Out',rework2_pending:'2nd Rework Out',qc_passed:'Payment Req',lp_payment_pending:'Mark Paid',pending_decline_approval:'Decline Pending'}[r.phase]||'View';
+    const needsAction=['lp_procurement_processing','lp_payment_pending','procurement_active','quotes_revision_requested','approved','grn_initiated','qc_pending','rework_pending','rework2_pending','qc_passed','pending_decline_approval'].includes(r.phase);
+    const lbl={lp_procurement_processing:'Process LP Payment',lp_payment_pending:'Mark LP Paid',procurement_active:'Work on it',quotes_revision_requested:'Revise Quotes',approved:'Place Order',advance_requested:'View Advance',grn_initiated:'GRN Sent to Store',qc_pending:'QC In Progress',rework_pending:'Rework Out',rework2_pending:'2nd Rework Out',qc_passed:'Payment Req',lp_payment_pending:'Mark Paid',pending_decline_approval:'Decline Pending'}[r.phase]||'View';
     const typeLabel=r.request_category==='vendor_info'?'Vendor Info':r.request_category==='local_purchase'?'Local Purchase':'RFQ';
     const typeBg=r.request_category==='local_purchase'?'background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.35);color:#15803d':r.request_category==='vendor_info'?'background:rgba(139,92,246,0.08);border-color:rgba(139,92,246,0.3);color:#6d28d9':'background:var(--off-white);border-color:var(--border)';
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
@@ -773,7 +773,7 @@ function renderTable(reqs) {
       <td>${getUrgencyBadge(r.urgency)}</td>
       <td style="font-size:0.78rem">${r.project_manager_name||'—'}</td>
       <td style="font-size:0.78rem">${r.users?.name||'—'}</td>
-      <td>${leadTimeBadge(r.created_at)}</td>
+      <td>${leadTimeBadge(r.created_at, r.closed_at)}</td>
       <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gray-4)">${fmtDate(r.updated_at||r.created_at)}</td>
       <td><button class="btn ${needsAction?'btn-primary':'btn-ghost'} btn-sm" onclick='openPR("${r.id}")'>${lbl}</button></td>
     </tr>`;
@@ -1018,11 +1018,15 @@ async function openPR(id) {
     </div>`;
   }
 
-  // ── LOCAL PURCHASE: procurement_active → ready for Procurement Manager payment processing ──
-  if(currentPR.phase==='procurement_active'&&currentPR.request_category==='local_purchase') {
+  // ── LOCAL PURCHASE: lp_procurement_processing → Procurement Manager marks payment pending ──
+  if(currentPR.phase==='lp_procurement_processing'&&currentPR.request_category==='local_purchase') {
     actionSection=`<div class="action-section" style="border:1px solid rgba(34,197,94,0.3);background:rgba(34,197,94,0.03)">
-      <div class="action-section-title" style="color:#15803d">🛒 Local Purchase — Approved by Project Manager <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
-      <p style="font-size:0.8rem;color:var(--gray-3);margin-bottom:14px">Project Manager has approved this request. Mark as <strong>Payment Pending</strong> when ready to process.</p>
+      <div class="action-section-title" style="color:#15803d">🛒 Local Purchase — Approved by PM · Your Action Required <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
+      <p style="font-size:0.8rem;color:var(--gray-3);margin-bottom:14px">Project Manager has approved this Local Purchase. Once you have arranged the payment, mark it as <strong>Payment Pending</strong>.</p>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Processing Notes (optional)</label>
+        <input class="form-control" id="lpProcNotes" placeholder="e.g. sourcing from local market, expected today"/>
+      </div>
       <div style="margin-top:4px">
         <button class="btn btn-primary" onclick="lpMarkPaymentPending()" style="background:#15803d;border-color:#15803d">Mark as Payment Pending →</button>
       </div>
@@ -1610,9 +1614,11 @@ async function submitVendorInfo() {
 // ── LOCAL PURCHASE ACTIONS ────────────────────────────────────
 async function lpMarkPaymentPending() {
   if (!currentPR) return;
+  const procNotes = document.getElementById('lpProcNotes')?.value?.trim() || '';
   showLoader(true);
   const { error } = await db.from('procurement_requests').update({
     phase: 'lp_payment_pending',
+    order_notes: procNotes || currentPR.order_notes || null,
     updated_at: new Date().toISOString(),
     phase_timestamps: addPhaseTimestamp(currentPR, 'lp_payment_pending')
   }).eq('id', currentPR.id);
@@ -1656,6 +1662,8 @@ async function lpMarkPaymentDone() {
   showLoader(true);
   const { error } = await db.from('procurement_requests').update({
     phase: 'lp_payment_done',
+      closed_at: new Date().toISOString(),
+    is_closed: true,
     lp_bill_url: lpBillData,
     lp_bill_name: lpBillFileName || 'bill',
     order_notes: note || null,
@@ -2751,6 +2759,8 @@ async function markFullPaymentReceived(prId, payId) {
   const ts2 = Object.assign({}, ts1, { accepted: now });
   const { error } = await db.from('procurement_requests').update({
     phase: 'accepted',
+      closed_at: new Date().toISOString(),
+    is_closed: true,
     updated_at: now,
     phase_timestamps: ts2
   }).eq('id', prId);

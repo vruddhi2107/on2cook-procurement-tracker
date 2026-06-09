@@ -275,7 +275,7 @@ function handleAttachmentDownload(e, url, fileName) {
 }
 
 async function init() {
-  currentUser=Session.require(['project_manager']); if(!currentUser) return;
+  currentUser=Session.require(['project_manager','master','director']); if(!currentUser) return;
   document.getElementById('navbarMount').innerHTML=buildNavbar(currentUser);
   document.getElementById('footerMount').innerHTML=buildFooter();
   initNavbar(currentUser);
@@ -308,7 +308,7 @@ async function loadRequests() {
 }
 
 function updateStats() {
-  document.getElementById('sClearance').textContent=allRequests.filter(r=>['pending_initial_pm_approval','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase)).length;
+  document.getElementById('sClearance').textContent=allRequests.filter(r=>['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase)).length;
   document.getElementById('sFinal').textContent=allRequests.filter(r=>r.phase==='pending_pm_final_approval').length;
   document.getElementById('sEscalated').textContent=allRequests.filter(r=>r.phase==='pending_sandy_approval').length;
   document.getElementById('sApproved').textContent=allRequests.filter(r=>r.pm_final_approval_status==='approved').length;
@@ -316,7 +316,7 @@ function updateStats() {
 }
 
 function renderBanner() {
-  const clearance=allRequests.filter(r=>['pending_initial_pm_approval','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase));
+  const clearance=allRequests.filter(r=>['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase));
   const final=allRequests.filter(r=>r.phase==='pending_pm_final_approval');
   const total=clearance.length+final.length;
   const b=document.getElementById('pendingBanner');
@@ -342,7 +342,7 @@ function switchTab(t) {
 function filterTable() {
   const s=document.getElementById('searchInput').value.toLowerCase();
   let reqs=allRequests;
-  if(activeTab==='clearance') reqs=reqs.filter(r=>['pending_initial_pm_approval','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase));
+  if(activeTab==='clearance') reqs=reqs.filter(r=>['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase));
   else if(activeTab==='final') reqs=reqs.filter(r=>r.phase==='pending_pm_final_approval');
   else if(activeTab==='mine') reqs=reqs.filter(r=>r.created_by===currentUser.id);
   if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
@@ -353,8 +353,8 @@ function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
   if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${activeTab==='clearance'?'🔐':activeTab==='mine'?'📝':'✍️'}</div><h3>No requests here</h3><p>${activeTab==='clearance'?'No pending clearance requests.':activeTab==='final'?'No final approvals pending.':activeTab==='mine'?'You haven\'t submitted any requests yet. Click + New Request to get started.':'No requests assigned to you yet.'}</p>${activeTab==='mine'?'<button class="btn btn-primary" style="margin-top:12px" onclick="openNewPR()">+ New Request</button>':''}</div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
-    const needsAction=['pending_initial_pm_approval','lp_pending_pm_approval','pending_decline_approval','pending_pm_final_approval'].includes(r.phase);
-    const isClearance=['pending_initial_pm_approval','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase), isFinal=r.phase==='pending_pm_final_approval';
+    const needsAction=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval','pending_pm_final_approval'].includes(r.phase);
+    const isClearance=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase), isFinal=r.phase==='pending_pm_final_approval';
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
       <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
       <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div></td>
@@ -484,19 +484,35 @@ async function openPR(id) {
     </div>`;
   }
 
-  // ── LOCAL PURCHASE: lp_pending_pm_approval — Project Manager must approve/reject ──
-  if(currentPR.phase==='lp_pending_pm_approval'&&currentPR.request_category==='local_purchase') {
+  // ── LOCAL PURCHASE: lp_submitted / lp_pending_pm_approval — PM or Master can approve/reject ──
+  var canActOnLP = (currentPR.phase==='lp_submitted'||currentPR.phase==='lp_pending_pm_approval') && currentPR.request_category==='local_purchase';
+  var isMasterActingOnLP = canActOnLP && currentUser.role === 'master';
+  if(canActOnLP) {
+    var lpLabel = isMasterActingOnLP
+      ? '🔑 Master Admin — LP Approval Override'
+      : '🛒 Local Purchase — Your Approval Required';
+    var lpDesc = isMasterActingOnLP
+      ? 'You are acting as Master Admin. You can approve or reject this LP request on behalf of the Project Manager.'
+      : 'An engineer submitted a Local Purchase request. Review the details and approve to forward to the Procurement Manager, or reject.';
     actionSection=`<div class="action-section" style="border-color:#15803d;background:rgba(34,197,94,0.04)">
-      <div class="action-section-title" style="color:#15803d">🛒 Local Purchase — Your Approval Required <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
-      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">An engineer/requestor submitted a Local Purchase request that requires your approval before the Procurement Manager can process payment.</p>
+      <div class="action-section-title" style="color:#15803d">${lpLabel} <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">${lpDesc}</p>
       <div class="form-group" style="margin-bottom:12px">
-        <label class="form-label">Decision Notes *</label>
+        <label class="form-label">Decision Notes${isMasterActingOnLP ? ' (optional for Master)' : ' *'}</label>
         <textarea class="form-control" id="lpApprovalNotes" placeholder="State your approval rationale or reason for rejection..."></textarea>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-success" onclick="approveLPRequest()" style="flex:1">✓ Approve — Send to Procurement Manager</button>
+        <button class="btn btn-success" onclick="approveLPRequest()" style="flex:1">✓ Approve — Send to Procurement</button>
         <button class="btn btn-danger" onclick="rejectLPRequest()" style="flex:1">✗ Reject</button>
       </div>
+    </div>`;
+  }
+
+  // ── LOCAL PURCHASE: lp_procurement_processing — PM info (read-only in PM view) ──
+  if(currentPR.phase==='lp_procurement_processing'&&currentPR.request_category==='local_purchase') {
+    actionSection=`<div style="padding:12px 14px;border:1px solid rgba(59,130,246,0.25);border-radius:var(--radius);background:rgba(59,130,246,0.04)">
+      <div style="font-weight:700;color:#1d4ed8;margin-bottom:4px">🛒 Local Purchase — With Procurement Team</div>
+      <p style="font-size:0.78rem;color:var(--gray-3);margin:0">You approved this request. The Procurement Manager is handling payment processing.</p>
     </div>`;
   }
 
@@ -534,14 +550,16 @@ async function grantClearance(decision) {
   const notes=document.getElementById('clearanceNotes')?.value.trim();
   if(!notes){showToast('Please add decision notes','error');return;}
   const approved=decision==='approved';
+  const newPhase=approved?'procurement_active':'rejected';
   showLoader(true);
   const{error}=await db.from('procurement_requests').update({
-    phase:approved?'procurement_active':'rejected',
+    phase:newPhase,
+    is_closed:CLOSED_PHASES.has(newPhase),
     rejection_reason:approved?null:notes,
     updated_at:new Date().toISOString(),
-    phase_timestamps:addPhaseTimestamp(currentPR,approved?'procurement_active':'rejected')
+    phase_timestamps:addPhaseTimestamp(currentPR,newPhase)
   }).eq('id',currentPR.id);
-  notifyPhaseChange(currentPR.id,approved?'procurement_active':'rejected',currentUser?.id);
+  notifyPhaseChange(currentPR.id,newPhase,currentUser?.id);
   if(!error) await postComment(currentPR.id,currentUser.id,`${approved?'✓':'✗'} Project Manager Clearance ${approved?'Granted':'Denied'}: ${notes}`);
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
@@ -556,6 +574,7 @@ async function confirmDecline() {
   showLoader(true);
   const{error}=await db.from('procurement_requests').update({
     phase:'declined',
+    is_closed:true,
     pm_final_approval_notes: (currentPR.pm_final_approval_notes||'') + ' | Project Manager confirmed: '+notes,
     updated_at:new Date().toISOString(),
     phase_timestamps:addPhaseTimestamp(currentPR,'declined')
@@ -612,6 +631,7 @@ async function rejectDeviation() {
   showLoader(true);
   const{error}=await db.from('procurement_requests').update({
     phase:'qc_rejected',
+    is_closed:true,
     qc_result:'rejected',
     updated_at:new Date().toISOString(),
     phase_timestamps:addPhaseTimestamp(currentPR,'qc_rejected')
@@ -626,37 +646,41 @@ async function rejectDeviation() {
 
 // ── LOCAL PURCHASE APPROVAL by Project Manager ────────────────
 async function approveLPRequest() {
-  const notes=document.getElementById('lpApprovalNotes')?.value.trim();
-  if(!notes){showToast('Please add approval notes','error');return;}
+  const notes=document.getElementById('lpApprovalNotes')?.value.trim()||'Approved';
   showLoader(true);
   const{error}=await db.from('procurement_requests').update({
-    phase:'procurement_active',
+    phase:'lp_procurement_processing',
     updated_at:new Date().toISOString(),
-    phase_timestamps:addPhaseTimestamp(currentPR,'procurement_active')
+    phase_timestamps:addPhaseTimestamp(currentPR,'lp_procurement_processing')
   }).eq('id',currentPR.id);
-  notifyPhaseChange(currentPR.id,'procurement_active',currentUser?.id);
-  if(!error) await postComment(currentPR.id,currentUser.id,`✓ Project Manager approved Local Purchase — forwarded to Procurement Manager for payment. Notes: ${notes}`);
+  notifyPhaseChange(currentPR.id,'lp_procurement_processing',currentUser?.id);
+  if(!error) await postComment(currentPR.id,currentUser.id,`✓ Project Manager approved Local Purchase — forwarded to Procurement Manager for payment processing. Notes: ${notes}`);
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
-  showToast('Local Purchase approved — sent to Procurement Manager for payment processing.','success');
+  showToast('Local Purchase approved — sent to Procurement Manager.','success');
   closeModal('prModal'); await loadRequests();
 }
 
 async function rejectLPRequest() {
   const notes=document.getElementById('lpApprovalNotes')?.value.trim();
-  if(!notes){showToast('Please add rejection notes','error');return;}
+  const isMaster = currentUser?.role === 'master';
+  if(!notes && !isMaster){showToast('Please add rejection notes','error');return;}
   showLoader(true);
+  const now = new Date().toISOString();
   const{error}=await db.from('procurement_requests').update({
-    phase:'rejected',
-    rejection_reason:notes,
-    updated_at:new Date().toISOString(),
-    phase_timestamps:addPhaseTimestamp(currentPR,'rejected')
+    phase:'lp_rejected',
+    is_closed:true,
+    closed_at: now,
+    rejection_reason:notes||'Rejected',
+    updated_at:now,
+    phase_timestamps:addPhaseTimestamp(currentPR,'lp_rejected')
   }).eq('id',currentPR.id);
-  notifyPhaseChange(currentPR.id,'rejected',currentUser?.id);
-  if(!error) await postComment(currentPR.id,currentUser.id,`✗ Project Manager rejected Local Purchase: ${notes}`);
+  notifyPhaseChange(currentPR.id,'lp_rejected',currentUser?.id);
+  const actor = isMaster ? 'Master Admin' : 'Project Manager';
+  if(!error) await postComment(currentPR.id,currentUser.id,`✗ ${actor} rejected Local Purchase${notes?': '+notes:''}.`);
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
-  showToast('Local Purchase rejected.','error');
+  showToast('Local Purchase rejected & closed.','error');
   closeModal('prModal'); await loadRequests();
 }
 
@@ -733,6 +757,7 @@ async function finalDecision(decision) {
   }
   const{error}=await db.from('procurement_requests').update({
     phase:newPhase,
+    is_closed:CLOSED_PHASES.has(newPhase),
     pm_final_approval_status:needsDirectorApproval?'pending':decision,
     pm_final_approval_notes:notes,
     selected_quotation_id:decision==='approved'?(pmSelectedQuotationId||currentPR.selected_quotation_id):currentPR.selected_quotation_id,
@@ -784,7 +809,7 @@ let isEditMode=false, editingParentId=null;
 let selectedSourcing=[], attachedFiles=[], pmSelectedForNewPR=null;
 
 async function loadPMs() {
-  const{data}=await db.from('users').select('id,name').eq('role','project_manager').order('name');
+  const{data}=await db.from('users').select('id,name,role').in('role',['project_manager','master','director']).order('name');
   allPMs=data||[];
 }
 

@@ -88,7 +88,143 @@ const PHASES = {
   payment_raised_to_accounts:   { label: 'Payment Raised',           color: '#8b5cf6', icon: '📤' },
   payment_received:             { label: 'Payment Received',         color: '#22c55e', icon: '✅' },
   accepted:                     { label: 'Accepted & Closed',        color: '#22c55e', icon: '✔️'  },
-  rejected:                     { label: 'Rejected & Closed',        color: '#ef4444', icon: '✖️' }
+  rejected:                     { label: 'Rejected & Closed',        color: '#ef4444', icon: '✖️'  },
+  declined:                     { label: 'Declined & Closed',        color: '#6b7280', icon: '🚫' },
+  lp_submitted:                 { label: 'LP Submitted',             color: '#6366f1', icon: '📋' },
+  lp_pending_pm_approval:       { label: 'LP — Awaiting PM Approval',  color: '#f59e0b', icon: '⏳' },
+  lp_procurement_processing:    { label: 'LP — With Procurement',      color: '#3b82f6', icon: '🛒' },
+  lp_payment_pending:           { label: 'LP — Payment Pending',       color: '#f97316', icon: '💳' },
+  lp_rejected:                  { label: 'LP Rejected & Closed',    color: '#ef4444', icon: '✖️'  },
+  lp_payment_done:              { label: 'LP — Payment Done',          color: '#22c55e', icon: '✅' },
+  qc_rejected:                  { label: 'QC Rejected & Closed',     color: '#ef4444', icon: '✖️'  },
+  payment_received:             { label: 'Payment Received & Closed',color: '#22c55e', icon: '✅' }
+};
+
+// Phases that represent a fully closed/terminal request — no further actions possible
+const CLOSED_PHASES = new Set([
+  'declined',
+  'rejected',
+  'lp_payment_done',
+  'accepted',
+  'qc_rejected',
+  'payment_received',
+  'lp_rejected',
+]);
+
+// ── PIPELINE DEFINITIONS ─────────────────────────────────────
+// Each pipeline lists only the phases relevant to that request type.
+// Used by the workflow track renderer and the Admin Pipeline Editor.
+const PIPELINES = {
+  RFQ: {
+    label: 'RFQ (Request for Quotation)',
+    color: '#6366f1',
+    phases: [
+      'submitted',
+      'pending_initial_pm_approval',
+      'procurement_active',
+      'quotations_shared',
+      'quotes_revision_requested',
+      'pending_pm_final_approval',
+      'pending_sandy_approval',
+      'approved',
+      'advance_raised_to_accounts',
+      'advance_payment_received',
+      'order_placed',
+      'grn_initiated',
+      'qc_pending',
+      'rework_pending',
+      'rework_returned',
+      'rework2_pending',
+      'rework2_returned',
+      'qc_deviated',
+      'deviation_approval',
+      'qc_passed',
+      'payment_raised_to_accounts',
+      'accepted',
+    ],
+    terminal: ['accepted', 'rejected', 'declined', 'qc_rejected'],
+  },
+  local_purchase: {
+    label: 'Local Purchase',
+    color: '#22c55e',
+    phases: [
+      'lp_submitted',
+      'lp_pending_pm_approval',
+      'lp_procurement_processing',
+      'lp_payment_pending',
+      'lp_payment_done',
+    ],
+    terminal: ['lp_payment_done', 'lp_rejected'],
+  },
+  vendor_info: {
+    label: 'Vendor Info Request',
+    color: '#8b5cf6',
+    phases: [
+      'submitted',
+      'pending_initial_pm_approval',
+      'procurement_active',
+      'vendor_info_shared',
+    ],
+    terminal: ['vendor_info_shared', 'rejected', 'declined'],
+  },
+};
+
+// Returns which pipeline a PR belongs to
+function getPRPipeline(pr) {
+  if (pr.request_category === 'local_purchase') return PIPELINES.local_purchase;
+  if (pr.request_category === 'vendor_info') return PIPELINES.vendor_info;
+  return PIPELINES.RFQ;
+}
+
+// Resolve pipeline phases for a given request category string
+function getPipelinePhases(requestCategory) {
+  const key = requestCategory === 'local_purchase' ? 'local_purchase'
+             : requestCategory === 'vendor_info'    ? 'vendor_info'
+             : 'RFQ';
+  return PIPELINES[key]?.phases || PIPELINES.RFQ.phases;
+}
+
+// ── WORKFLOW STEP DEFINITIONS (used by renderWorkflowTrack + admin pipeline editor) ──
+// Defined here so admin.html (which doesn't load shared.js) can access it too.
+const PIPELINE_WF_STEPS = {
+  RFQ: [
+    {key:'submitted',label:'Submitted'},
+    {key:'pending_initial_pm_approval',label:'PM Clearance',optional:true},
+    {key:'procurement_active',label:'Procurement'},
+    {key:'quotations_shared',label:'Quotations'},
+    {key:'quotes_revision_requested',label:'Quote Revision',optional:true},
+    {key:'pending_pm_final_approval',label:'PM Approval'},
+    {key:'pending_decline_approval',label:'Decline → PM',optional:true},
+    {key:'pending_sandy_approval',label:'Director Approval',optional:true},
+    {key:'approved',label:'Approved'},
+    {key:'advance_raised_to_accounts',label:'Adv. Raised',optional:true},
+    {key:'advance_payment_received',label:'Adv. Received',optional:true},
+    {key:'order_placed',label:'Ordered'},
+    {key:'grn_initiated',label:'GRN → Store'},
+    {key:'qc_pending',label:'QC Check'},
+    {key:'rework_pending',label:'Rework',optional:true},
+    {key:'rework_returned',label:'Rework Return',optional:true},
+    {key:'rework2_pending',label:'2nd Rework',optional:true},
+    {key:'rework2_returned',label:'2nd Return',optional:true},
+    {key:'qc_deviated',label:'Deviated',optional:true},
+    {key:'deviation_approval',label:'Deviation Review',optional:true},
+    {key:'qc_passed',label:'QC Passed'},
+    {key:'payment_raised_to_accounts',label:'Pay. Raised'},
+    {key:'accepted',label:'Complete'}
+  ],
+  local_purchase: [
+    {key:'lp_submitted',label:'Submitted'},
+    {key:'lp_pending_pm_approval',label:'PM Approval'},
+    {key:'lp_procurement_processing',label:'Processing'},
+    {key:'lp_payment_pending',label:'Payment Pending'},
+    {key:'lp_payment_done',label:'Done'}
+  ],
+  vendor_info: [
+    {key:'submitted',label:'Submitted'},
+    {key:'pending_initial_pm_approval',label:'PM Clearance',optional:true},
+    {key:'procurement_active',label:'Procurement'},
+    {key:'vendor_info_shared',label:'Info Shared'}
+  ]
 };
 
 const ORDER_TYPES = {
@@ -130,7 +266,12 @@ const PHASE_ORDER = [
   'qc_passed',
   'payment_raised_to_accounts',
   'payment_received',
-  'accepted'
+  'accepted',
+  'lp_submitted',
+  'lp_pending_pm_approval',
+  'lp_procurement_processing',
+  'lp_payment_pending',
+  'lp_payment_done'
 ];
 
 function formatDate(d) {
@@ -149,7 +290,10 @@ const fmtDateTime = formatDateTime;
 
 function getPhaseBadge(phase) {
   const p = PHASES[phase] || { label: phase, color: '#6b7280', icon: '•' };
-  return `<span class="phase-badge" style="background:${p.color}18;color:${p.color};border:1px solid ${p.color}35">${p.icon} ${p.label}</span>`;
+  const closedPill = CLOSED_PHASES.has(phase)
+    ? `<span style="background:#6b728018;color:#6b7280;border:1px solid #6b728035;border-radius:3px;font-size:0.6rem;font-family:var(--font-mono);font-weight:700;padding:1px 5px;margin-left:4px;vertical-align:middle">CLOSED</span>`
+    : '';
+  return `<span class="phase-badge" style="background:${p.color}18;color:${p.color};border:1px solid ${p.color}35">${p.icon} ${p.label}</span>${closedPill}`;
 }
 
 function starRating(rating, count) {

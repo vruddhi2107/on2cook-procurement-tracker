@@ -18,7 +18,8 @@
         <p class="page-sub">Full system oversight — all requests, users, vendors, and analytics</p></div>
       <div style="display:flex;gap:10px">
         <button class="btn btn-secondary" onclick="exportCSV()">⬇ Export CSV</button>
-        <button class="btn btn-primary" onclick="openAddUser()">+ Add User</button>
+        <button class="btn btn-secondary" onclick="openAddUser()">+ Add User</button>
+        <button class="btn btn-primary" onclick="window.location.href='admin.html'" style="background:var(--red);border-color:var(--red)">⚙ Admin Panel</button>
       </div>
     </div>
   </div>
@@ -41,6 +42,7 @@
     <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendors</button>
     <button class="tab-btn" onclick="switchTab('analytics')">📊 Analytics</button>
     <button class="tab-btn" onclick="goToProjects()">📋 Projects</button>
+    <button class="tab-btn" onclick="window.location.href='admin.html'" style="background:rgba(224,32,32,0.08);color:var(--red);border:1px solid rgba(224,32,32,0.2);font-weight:600">⚙ Admin Panel</button>
   </div>
 
   <!-- REQUESTS TAB -->
@@ -66,6 +68,7 @@
         <option value="payment_requested">💰 Payment Requested</option>
         <option value="accepted">✔️ Accepted &amp; Closed</option>
         <option value="rejected">✖️ Rejected</option>
+        <option value="lp_rejected">✖️ LP Rejected</option>
       </select>
       <select id="filterDept" onchange="filterRequests()">
         <option value="">All Departments</option>
@@ -341,8 +344,8 @@ async function loadVendors() {
 function updateStats() {
   document.getElementById('sTotal').textContent=allRequests.length;
   document.getElementById('sActive').textContent=allRequests.filter(r=>!['accepted','rejected'].includes(r.phase)).length;
-  document.getElementById('sClosed').textContent=allRequests.filter(r=>r.phase==='accepted').length;
-  document.getElementById('sRejected').textContent=allRequests.filter(r=>r.phase==='rejected').length;
+  document.getElementById('sClosed').textContent=allRequests.filter(r=>r.is_closed||CLOSED_PHASES.has(r.phase)).length;
+  document.getElementById('sRejected').textContent=allRequests.filter(r=>['rejected','declined','qc_rejected','lp_rejected'].includes(r.phase)).length;
   // Director badge
   const directorPending=allRequests.filter(r=>['pending_sandy_approval','deviation_approval','pending_decline_approval'].includes(r.phase));
   const badge=document.getElementById('directorBadge');
@@ -390,7 +393,7 @@ function renderTable(reqs) {
     <td style="font-size:0.82rem">${DEPARTMENTS[r.department]||r.department}</td>
     <td style="font-size:0.8rem;max-width:110px;overflow:hidden;text-overflow:ellipsis">${r.vendors?.name||'—'}</td>
     <td>${getPhaseBadge(r.phase)}</td>
-    <td>${leadTimeBadge(r.created_at)}</td>
+    <td>${leadTimeBadge(r.created_at, r.closed_at)}</td>
     <td class="mono" style="font-size:0.75rem">${formatDate(r.updated_at||r.created_at)}</td>
     <td style="font-size:0.82rem">${r.users?.name||'—'}</td>
     <td style="white-space:nowrap">
@@ -598,6 +601,8 @@ async function directorRejectDeviation() {
   showLoader(true);
   const { error } = await db.from('procurement_requests').update({
     phase: 'qc_rejected',
+      closed_at: new Date().toISOString(),
+    is_closed: true,
     qc_result: 'rejected',
     updated_at: new Date().toISOString(),
     phase_timestamps: addPhaseTimestamp(directorCurrentPR, 'qc_rejected')
@@ -646,6 +651,7 @@ async function directorDecision(decision) {
   const overrideTag = directorIsOverride ? ' [Director Override]' : '';
   const { error } = await db.from('procurement_requests').update({
     phase: newPhase,
+    is_closed: newPhase === 'rejected',
     pm_final_approval_status: decision,
     pm_final_approval_notes: ((directorCurrentPR.pm_final_approval_notes||'') + ` | Director${overrideTag}: ${notes}`).trim(),
     rejection_reason: decision === 'rejected' ? notes : null,

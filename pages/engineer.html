@@ -76,6 +76,9 @@
         <option value="qc_passed">QC Passed</option>
         <option value="accepted">Accepted</option>
         <option value="rejected">Rejected</option>
+        <option value="lp_submitted">LP — Submitted</option>
+        <option value="lp_pending_pm_approval">LP — Awaiting PM Approval</option>
+        <option value="lp_procurement_processing">LP — With Procurement</option>
         <option value="lp_payment_pending">LP — Payment Pending</option>
         <option value="lp_payment_done">LP — Payment Done</option>
       </select>
@@ -485,7 +488,7 @@ function onPhaseChange() {
 
 // ── STATS / BANNER ───────────────────────────────────────────
 function updateStats() {
-  const closed=['qc_passed','accepted','rejected','payment_requested'], action=['quotations_shared','grn_pending','vendor_info_shared'];
+  const closed=['qc_passed','accepted','rejected','qc_rejected','declined','payment_requested','payment_received','lp_payment_done'], action=['quotations_shared','grn_pending','vendor_info_shared','lp_submitted'];
   document.getElementById('sTotal').textContent=myRequests.length;
   document.getElementById('sActive').textContent=myRequests.filter(r=>!closed.includes(r.phase)).length;
   document.getElementById('sAction').textContent=myRequests.filter(r=>action.includes(r.phase)).length;
@@ -577,7 +580,7 @@ function clearFilters(){document.getElementById('searchInput').value='';document
 function filterTable() {
   const s=document.getElementById('searchInput').value.toLowerCase(), ph=document.getElementById('filterPhase').value;
   const urg=document.getElementById('filterUrgency')?.value||'';
-  const closed=['qc_passed','accepted','rejected','payment_requested','lp_payment_done'], action=['quotations_shared','grn_pending','vendor_info_shared'];
+  const closed=['qc_passed','accepted','rejected','qc_rejected','declined','payment_requested','payment_received','lp_payment_done'], action=['quotations_shared','grn_pending','vendor_info_shared','lp_submitted'];
   let reqs=myRequests;
   if(activeTab==='action') reqs=reqs.filter(r=>action.includes(r.phase));
   if(activeTab==='closed') reqs=reqs.filter(r=>closed.includes(r.phase));
@@ -837,12 +840,12 @@ async function submitPR() {
     parts,
     attachments:attachedFiles.map(f=>({name:f.name,type:f.type,data:f.data})),
     created_by:currentUser.id,
-    phase:isLP?'lp_pending_pm_approval':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval',
+    phase:isLP?'lp_submitted':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval',
     initial_pm_approval:isEditMode?'already_approved':(isLP?'needs_approval':isVI?null:selectedPMApproval),
     is_modification:isEditMode,
     parent_request_id:isEditMode?editingParentId:null,
     modification_note:isEditMode?document.getElementById('fModNote').value.trim():null,
-    phase_timestamps:(function(){var ts={'submitted':new Date().toISOString()};var ph=isLP?'lp_pending_pm_approval':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval';if(ph!=='submitted')ts[ph]=new Date().toISOString();return ts;})()
+    phase_timestamps:(function(){var ts={'submitted':new Date().toISOString()};var ph=isLP?'lp_submitted':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval';if(ph!=='submitted')ts[ph]=new Date().toISOString();return ts;})()
   };
   if(!isVI&&!isLP) vals.order_type=orderType;
   showLoader(true);
@@ -852,7 +855,7 @@ async function submitPR() {
   }
   showLoader(false);
   if(error){showToast('Submit failed: '+error.message,'error');return;}
-  showToast(isEditMode?'↺ Resubmitted as a new modified request!':isLP?'Local Purchase request sent to Project Manager for approval!':isVI?'Vendor Info request sent to Procurement Manager!':'Request submitted!','success');
+  showToast(isEditMode?'↺ Resubmitted as a new modified request!':isLP?'Local Purchase request submitted!':isVI?'Vendor Info request sent to Procurement Manager!':'Request submitted!','success');
   if(newPR?.id) notifyPhaseChange(newPR.id, newPR.phase||'submitted', currentUser?.id);
   closeModal('prFormModal');
   await loadRequests();
@@ -894,25 +897,23 @@ async function openPR(id) {
 
   // ── LOCAL PURCHASE STATUS VIEW (engineer read-only) ──
   if(currentPR.request_category==='local_purchase') {
-    if(currentPR.phase==='lp_pending_pm_approval') {
-      actionSection=`<div style="padding:12px 14px;border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);background:rgba(245,158,11,0.04)">
-        <div style="font-weight:700;color:#b45309;margin-bottom:4px">⏳ Local Purchase — Awaiting Project Manager Approval</div>
-        <p style="font-size:0.78rem;color:var(--gray-3);margin:0">Your request is pending approval by the assigned Project Manager.</p>
+    const lpPhaseInfo = {
+      lp_submitted:              {color:'#6366f1',bg:'rgba(99,102,241,0.05)',border:'rgba(99,102,241,0.25)',icon:'📋',title:'Local Purchase — Submitted',msg:'Your request has been submitted and is awaiting Project Manager review.'},
+      lp_pending_pm_approval:    {color:'#b45309',bg:'rgba(245,158,11,0.04)',border:'rgba(245,158,11,0.3)',icon:'⏳',title:'Local Purchase — Awaiting Project Manager Approval',msg:'Your request is pending approval by the assigned Project Manager.'},
+      lp_procurement_processing: {color:'#1d4ed8',bg:'rgba(59,130,246,0.04)',border:'rgba(59,130,246,0.25)',icon:'🛒',title:'Local Purchase — With Procurement Team',msg:'Project Manager approved. The Procurement Manager is processing this request.'},
+      lp_payment_pending:        {color:'#b45309',bg:'rgba(245,158,11,0.04)',border:'rgba(245,158,11,0.3)',icon:'💳',title:'Local Purchase — Payment Pending',msg:'Payment is being arranged by the Procurement Manager.'},
+    };
+    const lpInfo = lpPhaseInfo[currentPR.phase];
+    if(lpInfo) {
+      actionSection=`<div style="padding:12px 14px;border:1px solid ${lpInfo.border};border-radius:var(--radius);background:${lpInfo.bg}">
+        <div style="font-weight:700;color:${lpInfo.color};margin-bottom:4px">${lpInfo.icon} ${lpInfo.title}</div>
+        <p style="font-size:0.78rem;color:var(--gray-3);margin:0">${lpInfo.msg}</p>
       </div>`;
-    } else if(currentPR.phase==='procurement_active') {
-      actionSection=`<div style="padding:12px 14px;border:1px solid rgba(34,197,94,0.25);border-radius:var(--radius);background:rgba(34,197,94,0.04)">
-        <div style="font-weight:700;color:#15803d;margin-bottom:4px">🛒 Local Purchase — Approved, Sent to Procurement Manager</div>
-        <p style="font-size:0.78rem;color:var(--gray-3);margin:0">Project Manager approved. The Procurement Manager will process the payment.</p>
-      </div>`;
-    } else if(currentPR.phase==='lp_payment_pending') {
-      actionSection=`<div style="padding:12px 14px;border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);background:rgba(245,158,11,0.04)">
-        <div style="font-weight:700;color:#b45309;margin-bottom:4px">💳 Local Purchase — Payment Pending</div>
-        <p style="font-size:0.78rem;color:var(--gray-3);margin:0">Payment is being arranged by the Procurement Manager.</p>
-      </div>`;
-    } else if(currentPR.phase==='lp_payment_done') {
+    }
+    if(currentPR.phase==='lp_payment_done') {
       const billUrl=currentPR.lp_bill_url;
       actionSection=`<div style="padding:12px 14px;border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius);background:rgba(34,197,94,0.05)">
-        <div style="font-weight:700;color:#15803d;margin-bottom:6px">✅ Local Purchase — Payment Done</div>
+        <div style="font-weight:700;color:#15803d;margin-bottom:6px">✅ Local Purchase — Payment Done & Closed</div>
         ${billUrl?`<a href="${billUrl}" target="_blank" style="font-size:0.82rem;color:#15803d;text-decoration:underline">📄 ${currentPR.lp_bill_name||'View Bill'}</a>`:'<p style="font-size:0.78rem;color:var(--gray-3);margin:0">No bill attached.</p>'}
       </div>`;
     }
@@ -1114,6 +1115,7 @@ async function submitEngineerClose() {
   showLoader(true);
   const{error}=await db.from('procurement_requests').update({
     phase:'rejected',
+    is_closed:true,
     rejection_reason: reason,
     updated_at: new Date().toISOString(),
     phase_timestamps: addPhaseTimestamp(currentPR,'rejected')
