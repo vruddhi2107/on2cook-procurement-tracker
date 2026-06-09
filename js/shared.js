@@ -148,6 +148,7 @@ function getPhaseBadge(phase){
     grn_pending:['GRN / QC','badge-orange'],
     grn_initiated:['GRN — Store','badge-orange'],
     qc_pending:['QC Inspection','badge-orange'],
+    rework_store_form:['Rework — Store Dispatch','badge-orange'],
     rework_pending:['Rework / JWC','badge-orange'],
     rework_returned:['Rework Returned — Re-QC','badge-yellow'],
     rework2_pending:['2nd Rework / JWC','badge-orange'],
@@ -163,6 +164,7 @@ function getPhaseBadge(phase){
     advance_approved:['Advance Approved','badge-green'],
     advance_rejected:['Advance Rejected','badge-red'],
     declined:['Declined by Procurement Manager','badge-red'],
+    lp_procurement_processing:['LP — Processing','badge-blue'],
     lp_payment_pending:['LP — Payment Pending','badge-orange'],
     lp_payment_done:['LP — Payment Done','badge-green'],
   };

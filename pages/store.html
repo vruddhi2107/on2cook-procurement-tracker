@@ -139,17 +139,17 @@ async function loadRequests() {
 
 function updateStats() {
   document.getElementById('sGrnPending').textContent = allRequests.filter(r=>r.phase==='grn_initiated').length;
-  document.getElementById('sRework').textContent = allRequests.filter(r=>['rework_pending','rework2_pending'].includes(r.phase)).length;
+  document.getElementById('sRework').textContent = allRequests.filter(r=>['rework_store_form','rework_pending','rework2_pending'].includes(r.phase)).length;
   document.getElementById('sDone').textContent = allRequests.filter(r=>['qc_passed','accepted'].includes(r.phase)).length;
 }
 
 
 
 function renderTable() {
-  const actionPhases = ['grn_initiated','rework_pending','rework2_pending'];
+  const actionPhases = ['grn_initiated','rework_store_form','rework_pending','rework2_pending'];
   const rows = activeTab==='action'
     ? allRequests.filter(r=>actionPhases.includes(r.phase))
-    : allRequests.filter(r=>['grn_initiated','qc_pending','rework_pending','rework_returned','rework2_pending','rework2_returned','qc_deviated','deviation_approval','qc_passed','accepted'].includes(r.phase));
+    : allRequests.filter(r=>['grn_initiated','qc_pending','rework_store_form','rework_pending','rework_returned','rework2_pending','rework2_returned','qc_deviated','deviation_approval','qc_passed','accepted'].includes(r.phase));
 
   const tbody = document.getElementById('mainTbody');
   if (!rows.length) { tbody.innerHTML=`<tr><td colspan="7" class="empty-state">No requests</td></tr>`; return; }
@@ -157,7 +157,7 @@ function renderTable() {
   tbody.innerHTML = rows.map(r=>{
     const parts = r.parts||[];
     const isAction = actionPhases.includes(r.phase);
-    const lbl = {grn_initiated:'Complete GRN',rework_pending:'Mark Rework Returned',rework2_pending:'Mark 2nd Rework Returned'}[r.phase]||'View';
+    const lbl = {grn_initiated:'Complete GRN',rework_store_form:'Fill Dispatch Form',rework_pending:'Mark Rework Returned',rework2_pending:'Mark 2nd Rework Returned'}[r.phase]||'View';
     return `<tr${isAction?' class="row-action"':''}>
       <td><span class="pr-num">PR-${String(r.request_number).padStart(4,'0')}</span></td>
       <td><span class="fw-600">${r.project_name}</span>${r.project_phase?`<br><span class="text-muted" style="font-size:0.75rem">${r.project_phase}</span>`:''}</td>
@@ -234,6 +234,52 @@ function renderModal() {
       </div>
 
       <button class="btn btn-primary" style="margin-top:14px" onclick="submitGRN()">✅ Submit GRN — Send to QC →</button>
+    </div>`;
+  }
+
+  // ── REWORK STORE FORM: store manager fills dispatch details then sends goods out ──
+  if (pr.phase==='rework_store_form') {
+    const sfJwcData = pr.qc_criteria?.jwc || {};
+    const sfParts = pr.parts||[];
+    const sfToday = new Date().toISOString().split('T')[0];
+    actionSection = `<div class="action-section" style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.25)">
+      <div class="action-section-title" style="color:#b45309">🔄 Rework Dispatch — Fill Details &amp; Send Out <span class="action-badge" style="background:#b45309">ACTION REQUIRED</span></div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">QC has failed these goods. Fill in the rework dispatch details and confirm sending them out. This will raise a JWC and move the request to Rework Pending.</p>
+
+      ${sfJwcData.jwc_number ? `<div style="padding:10px 12px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);font-size:0.82rem;margin-bottom:12px">
+        <div style="font-weight:700;color:#dc2626;margin-bottom:4px">📄 JWC Prefilled by QC — JWC ${sfJwcData.jwc_number}</div>
+        ${sfJwcData.rework_vendor ? `<div>Suggested Rework Vendor: <strong>${sfJwcData.rework_vendor}</strong></div>` : ''}
+        ${sfJwcData.process ? `<div>Process: <strong>${sfJwcData.process}</strong></div>` : ''}
+      </div>` : ''}
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div>
+          <label class="form-label" style="font-size:0.7rem">DISPATCH DATE *</label>
+          <input class="form-control" id="sfDispatchDate" value="${sfToday}" style="font-family:var(--font-mono);font-size:0.82rem"/>
+        </div>
+        <div>
+          <label class="form-label" style="font-size:0.7rem">REWORK VENDOR / DESTINATION *</label>
+          <input class="form-control" id="sfVendor" value="${sfJwcData.rework_vendor||''}" placeholder="Vendor name &amp; address" style="font-size:0.82rem"/>
+        </div>
+        <div>
+          <label class="form-label" style="font-size:0.7rem">VEHICLE / TRANSPORTER</label>
+          <input class="form-control" id="sfVehicle" value="${sfJwcData.vehicle_no||''}" placeholder="Vehicle number or transporter" style="font-size:0.82rem"/>
+        </div>
+        <div>
+          <label class="form-label" style="font-size:0.7rem">EXPECTED RETURN (DAYS) *</label>
+          <input class="form-control" type="number" id="sfDays" value="${sfJwcData.expected_days||''}" placeholder="e.g. 7" style="font-size:0.82rem"/>
+        </div>
+        <div style="grid-column:1/-1">
+          <label class="form-label" style="font-size:0.7rem">PROCESS / REWORK INSTRUCTIONS</label>
+          <input class="form-control" id="sfProcess" value="${sfJwcData.process||'For Re-work'}" style="font-size:0.82rem"/>
+        </div>
+        <div style="grid-column:1/-1">
+          <label class="form-label" style="font-size:0.7rem">DISPATCH NOTES</label>
+          <textarea class="form-control" id="sfNotes" rows="2" placeholder="Packing condition, special instructions..." style="font-size:0.82rem">${sfJwcData.notes||''}</textarea>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="background:#b45309;border-color:#b45309" onclick="submitReworkDispatch()">📦 Confirm Goods Dispatched for Rework →</button>
     </div>`;
   }
 
@@ -383,6 +429,50 @@ async function submitGRN() {
   notifyPhaseChange(currentPR.id,'qc_pending',currentUser?.id);
   await window.postComment(currentPR.id, currentUser?.id, `📦 GRN completed (${grnNumber}) — sent to QC Inspector.`);
   showToast('GRN submitted — QC Inspector notified!','success');
+  closeModal('prModal'); await loadRequests();
+}
+
+async function submitReworkDispatch() {
+  const vendor  = document.getElementById('sfVendor')?.value.trim()||'';
+  const days    = document.getElementById('sfDays')?.value.trim()||'';
+  const dispatchDate = document.getElementById('sfDispatchDate')?.value.trim()||'';
+  const vehicle = document.getElementById('sfVehicle')?.value.trim()||'';
+  const process = document.getElementById('sfProcess')?.value.trim()||'For Re-work';
+  const notes   = document.getElementById('sfNotes')?.value.trim()||'';
+
+  if (!vendor) { showToast('Please enter rework vendor / destination','error'); return; }
+  if (!days)   { showToast('Please enter expected return days','error'); return; }
+
+  showLoader(true);
+
+  // Merge dispatch details into the existing JWC data (QC may have pre-filled some fields)
+  const existingJwc = currentPR.qc_criteria?.jwc || {};
+  const updatedJwc = Object.assign({}, existingJwc, {
+    rework_vendor: vendor,
+    expected_days: days,
+    vehicle_no: vehicle,
+    process: process,
+    notes: notes,
+    dispatch_date: dispatchDate
+  });
+
+  const updatedCriteria = Object.assign({}, currentPR.qc_criteria || {}, { jwc: updatedJwc });
+
+  const { error } = await db.from('procurement_requests').update({
+    phase: 'rework_pending',
+    qc_criteria: updatedCriteria,
+    updated_at: new Date().toISOString(),
+    phase_timestamps: addPhaseTimestamp(currentPR, 'rework_pending')
+  }).eq('id', currentPR.id);
+
+  showLoader(false);
+  if (error) { showToast('Error: '+error.message,'error'); return; }
+
+  notifyPhaseChange(currentPR.id,'rework_pending',currentUser?.id);
+  await window.postComment(currentPR.id, currentUser?.id,
+    `🔄 Goods dispatched for rework to ${vendor}. Expected return: ${days} days. Vehicle: ${vehicle||'—'}.${notes?' Notes: '+notes:''}`
+  );
+  showToast('Goods dispatched for rework — QC notified!','success');
   closeModal('prModal'); await loadRequests();
 }
 

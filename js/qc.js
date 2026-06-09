@@ -72,7 +72,7 @@ async function loadRequests() {
 function updateStats() {
   document.getElementById('sQcPending').textContent = allRequests.filter(function(r){ return ['qc_pending','rework_returned','rework2_pending','rework2_returned'].indexOf(r.phase) !== -1; }).length;
   document.getElementById('sQcPassed').textContent  = allRequests.filter(function(r){ return r.phase === 'qc_passed' || r.phase === 'accepted'; }).length;
-  document.getElementById('sRework').textContent    = allRequests.filter(function(r){ return r.phase === 'rework_pending'; }).length;
+  document.getElementById('sRework').textContent    = allRequests.filter(function(r){ return ['rework_store_form','rework_pending'].indexOf(r.phase) !== -1; }).length;
 
   // update rejected stat (use existing sRework slot or add a new stat if available)
   var rejEl = document.getElementById('sQcRejected');
@@ -81,10 +81,10 @@ function updateStats() {
 
 // ─── Tables ───────────────────────────────────────────────────────────────────
 function renderTable() {
-  var actionPhases = ['qc_pending', 'rework_returned', 'rework2_returned'];
+  var actionPhases = ['qc_pending', 'rework_store_form', 'rework_returned', 'rework2_returned'];
   var rows = activeTab === 'action'
     ? allRequests.filter(function(r){ return actionPhases.indexOf(r.phase) !== -1; })
-    : allRequests.filter(function(r){ return ['qc_pending','qc_passed','rework_pending','rework_returned','rework2_pending','rework2_returned','qc_deviated','deviation_approval','accepted','qc_rejected'].indexOf(r.phase) !== -1; });
+    : allRequests.filter(function(r){ return ['qc_pending','qc_passed','rework_store_form','rework_pending','rework_returned','rework2_pending','rework2_returned','qc_deviated','deviation_approval','accepted','qc_rejected'].indexOf(r.phase) !== -1; });
 
   var tbody = document.getElementById('mainTbody');
   if (!rows.length) {
@@ -322,6 +322,24 @@ function renderModal() {
       + '<p style="font-size:0.82rem;color:var(--gray-3);margin:6px 0">' + (pr.qc_notes || '—') + '</p>'
       + (pr.qc_criteria && pr.qc_criteria.qc_inspector ? '<div style="font-size:0.75rem;color:var(--gray-4)">Inspected by: <strong>' + pr.qc_criteria.qc_inspector + '</strong></div>' : '')
       + rejRows
+      + '</div>';
+
+  } else if (pr.phase === 'rework_store_form') {
+    // QC marked fail → store manager needs to fill dispatch form
+    var sfJwcData = (pr.qc_criteria && pr.qc_criteria.jwc) ? pr.qc_criteria.jwc : {};
+    actionSection = '<div class="action-section" style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius);padding:14px">'
+      + '<div class="action-section-title" style="color:#b45309">🔄 Rework — Awaiting Store Manager Dispatch Form</div>'
+      + (sfJwcData.jwc_number
+          ? '<div style="margin:10px 0;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.82rem">'
+            + '<div style="font-weight:700;color:#b45309;margin-bottom:4px">📄 JWC Details (filled by QC)</div>'
+            + '<div>JWC No: <strong>' + sfJwcData.jwc_number + '</strong></div>'
+            + (sfJwcData.rework_vendor ? '<div>Rework Vendor: <strong>' + sfJwcData.rework_vendor + '</strong></div>' : '')
+            + (sfJwcData.expected_days ? '<div>Expected Duration: <strong>' + sfJwcData.expected_days + ' days</strong></div>' : '')
+            + (sfJwcData.notes ? '<div>Notes: ' + sfJwcData.notes + '</div>' : '')
+            + '</div>'
+          : '')
+      + '<p style="font-size:0.82rem;color:var(--gray-3);margin:8px 0">QC has marked this for rework. The Store Manager is filling the dispatch form and will send goods out. This will move to <strong>Rework Pending</strong> once dispatched.</p>'
+      + '<button class="btn btn-secondary btn-sm" onclick="previewJWC()">📄 View JWC</button>'
       + '</div>';
 
   } else if (pr.phase === 'rework_pending') {
@@ -636,7 +654,7 @@ window.submitQC = async function submitQC() {
   }
 
   showLoader(true);
-  var newPhase = isPassed ? 'qc_passed' : isFail ? 'rework_pending' : 'qc_rejected';
+  var newPhase = isPassed ? 'qc_passed' : isFail ? 'rework_store_form' : 'qc_rejected';
   var qcResult = isPassed ? 'accepted'  : isFail ? 'rejected'       : 'rejected';
 
   var updatedCriteria = Object.assign({}, currentPR.qc_criteria || {}, {
@@ -665,7 +683,7 @@ window.submitQC = async function submitQC() {
   var commentText = isPassed
     ? '✅ QC Passed — ' + notes
     : isFail
-      ? '❌ QC Failed — Rework JWC raised (' + (jwcData ? jwcData.jwc_number : '—') + '). ' + notes
+      ? '❌ QC Failed — Rework noted. Store Manager will fill dispatch form and send goods out.' + (jwcData ? ' JWC: ' + jwcData.jwc_number : '') + ' Notes: ' + notes
       : '🚫 QC Rejected — ' + notes;
   await window.postComment(currentPR.id, currentUser.id, commentText);
 
@@ -673,13 +691,13 @@ window.submitQC = async function submitQC() {
     isPassed
       ? '✅ QC Passed — Procurement & Requestor notified!'
       : isFail
-        ? '❌ QC Failed — JWC raised, Store Manager notified!'
+        ? '❌ QC Failed — Store Manager notified to dispatch for rework!'
         : '🚫 QC Rejected — Procurement & Requestor notified!',
     'success'
   );
 
   if (isFail && jwcData) {
-    currentPR = Object.assign({}, currentPR, { qc_criteria: updatedCriteria, phase: 'rework_pending' });
+    currentPR = Object.assign({}, currentPR, { qc_criteria: updatedCriteria, phase: 'rework_store_form' });
     setTimeout(function(){ previewJWC(); }, 400);
   }
 
