@@ -1042,7 +1042,7 @@ async function openPR(id) {
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Bill / Receipt <span style="color:var(--red)">*</span></label>
         <div class="drop-zone" style="min-height:60px;cursor:pointer" onclick="document.getElementById('lpBillFile').click()">
-          <input type="file" id="lpBillFile" accept=".png,.jpg,.jpeg,.pdf" style="display:none" onchange="previewLPBill(event)"/>
+          <input type="file" id="lpBillFile" accept="*/*" style="display:none" onchange="previewLPBill(event)"/>
           <div class="drop-zone-label" id="lpBillLabel">📎 Click to upload bill or receipt</div>
           <div class="drop-zone-hint">PNG, JPG or PDF — max 5MB</div>
         </div>
@@ -1083,7 +1083,7 @@ async function openPR(id) {
       ${quotations.length?`<div style="margin-bottom:12px"><div class="detail-key" style="margin-bottom:8px">Existing Quotations</div><div style="display:flex;flex-direction:column;gap:6px">${quotations.map(q=>renderQuotationCard(q,false)).join('')}</div></div>`:''}
       <div class="form-label" style="margin-bottom:6px">Upload Quotations (PNG, JPG, PDF)</div>
       <div class="drop-zone" id="quoteDZ" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event)">
-        <input type="file" id="quoteFileInput" accept=".png,.jpg,.jpeg,.pdf" multiple onchange="handleQuoteFiles(event)"/>
+        <input type="file" id="quoteFileInput" accept="*/*" multiple onchange="handleQuoteFiles(event)"/>
         <div class="drop-zone-icon">📎</div>
         <div class="drop-zone-label">Drag &amp; drop or click to upload</div>
         <div class="drop-zone-hint">PNG, JPG or PDF — max 5MB each</div>
@@ -1124,7 +1124,7 @@ async function openPR(id) {
       ${quotations.length?`<div style="margin-bottom:12px"><div class="detail-key" style="margin-bottom:8px">Previously Uploaded Quotations</div><div style="display:flex;flex-direction:column;gap:6px">${quotations.map(q=>renderQuotationCard(q,false)).join('')}</div></div>`:''}
       <div class="form-label" style="margin-bottom:6px">Upload Revised Quotations (PNG, JPG, PDF)</div>
       <div class="drop-zone" id="quoteDZ" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event)">
-        <input type="file" id="quoteFileInput" accept=".png,.jpg,.jpeg,.pdf" multiple onchange="handleQuoteFiles(event)"/>
+        <input type="file" id="quoteFileInput" accept="*/*" multiple onchange="handleQuoteFiles(event)"/>
         <div class="drop-zone-icon">📎</div>
         <div class="drop-zone-label">Drag &amp; drop or click to upload</div>
         <div class="drop-zone-hint">PNG, JPG or PDF — max 5MB each</div>
@@ -1167,7 +1167,7 @@ async function openPR(id) {
         <div class="form-group" style="margin-bottom:10px">
           <label class="form-label">Confirmation Screenshot *</label>
           <div class="drop-zone" style="min-height:60px;cursor:pointer" onclick="document.getElementById('advReceivedFile').click()">
-            <input type="file" id="advReceivedFile" accept=".png,.jpg,.jpeg,.pdf" style="display:none" onchange="previewGenericScreenshot(this,'advReceivedLabel','advReceivedPreview')"/>
+            <input type="file" id="advReceivedFile" accept="*/*" style="display:none" onchange="previewGenericScreenshot(this,'advReceivedLabel','advReceivedPreview')"/>
             <div class="drop-zone-label" id="advReceivedLabel">📎 Click to upload receipt confirmation screenshot</div>
             <div class="drop-zone-hint">PNG, JPG or PDF — max 5MB</div>
           </div>
@@ -1276,7 +1276,7 @@ async function openPR(id) {
         <div class="form-group" style="margin-bottom:10px">
           <label class="form-label">Confirmation Screenshot *</label>
           <div class="drop-zone" style="min-height:60px;cursor:pointer" onclick="document.getElementById('payReceivedFile').click()">
-            <input type="file" id="payReceivedFile" accept=".png,.jpg,.jpeg,.pdf" style="display:none" onchange="previewGenericScreenshot(this,'payReceivedLabel','payReceivedPreview')"/>
+            <input type="file" id="payReceivedFile" accept="*/*" style="display:none" onchange="previewGenericScreenshot(this,'payReceivedLabel','payReceivedPreview')"/>
             <div class="drop-zone-label" id="payReceivedLabel">📎 Click to upload payment confirmation screenshot</div>
             <div class="drop-zone-hint">PNG, JPG or PDF — max 5MB</div>
           </div>
@@ -1494,8 +1494,6 @@ async function handleQuoteFiles(e) {
   const files=[...e.target.files];
   for(const file of files){
     if(file.size>5*1024*1024){showToast(`${file.name} too large`,'error');continue;}
-    const allowed=['image/png','image/jpeg','image/jpg','application/pdf'];
-    if(!allowed.includes(file.type)){showToast(`${file.name} — unsupported`,'error');continue;}
     const b64=await fileToBase64(file);
     uploadedFiles.push({name:file.name,type:file.type,data:b64});
   }
@@ -2257,10 +2255,8 @@ function closeAttPreview() {
 // ── PAYMENT REQUEST ATTACHMENT HELPERS ───────────────────────
 async function handlePRAttachFiles(e) {
   const files = [...e.target.files];
-  const allowed = ['image/png','image/jpeg','application/pdf'];
   for (const file of files) {
     if (file.size > 5*1024*1024) { showToast(`${file.name} too large`,'error'); continue; }
-    if (!allowed.includes(file.type)) { showToast(`${file.name} — unsupported`,'error'); continue; }
     const b64 = await fileToBase64(file);
     paymentRequestFiles.push({name: file.name, type: file.type, data: b64});
   }
@@ -2551,7 +2547,7 @@ async function openPaymentRequestModal(prId) {
           <div class="form-group" style="margin-top:8px">
             <label class="form-label">Smartsheet Screenshot *</label>
             <div class="drop-zone" style="min-height:60px;cursor:pointer" onclick="document.getElementById('prSmartsheetFile').click()">
-              <input type="file" id="prSmartsheetFile" accept=".png,.jpg,.jpeg,.pdf" style="display:none" onchange="previewPayScreenshot(this)"/>
+              <input type="file" id="prSmartsheetFile" accept="*/*" style="display:none" onchange="previewPayScreenshot(this)"/>
               <div class="drop-zone-label" id="prScreenshotLabel">📎 Click to upload Smartsheet screenshot</div>
               <div class="drop-zone-hint">PNG, JPG or PDF — max 5MB</div>
             </div>
@@ -2563,7 +2559,7 @@ async function openPaymentRequestModal(prId) {
           <div style="border:2px dashed var(--border);border-radius:var(--radius);padding:14px 16px;text-align:center;cursor:pointer;transition:border-color .15s" onclick="document.getElementById('prAttachInput').click()" onmouseenter="this.style.borderColor='#6366f1'" onmouseleave="this.style.borderColor=''">
             <div style="font-size:1.4rem;margin-bottom:4px">📁</div>
             <div style="font-size:0.82rem;color:var(--gray-3)">Click to upload · PNG, JPG, PDF · Max 5 MB each</div>
-            <input type="file" id="prAttachInput" accept=".png,.jpg,.jpeg,.pdf" multiple style="display:none" onchange="handlePRAttachFiles(event)"/>
+            <input type="file" id="prAttachInput" accept="*/*" multiple style="display:none" onchange="handlePRAttachFiles(event)"/>
           </div>
           <div id="prAttachList" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
         </div>
@@ -3016,7 +3012,7 @@ function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existin
         <div class="form-group">
           <label class="form-label">Smartsheet Screenshot *</label>
           <div class="drop-zone" style="min-height:60px;cursor:pointer" onclick="document.getElementById('advSmartsheetFile').click()">
-            <input type="file" id="advSmartsheetFile" accept=".png,.jpg,.jpeg,.pdf" style="display:none" onchange="previewAdvScreenshot(this)"/>
+            <input type="file" id="advSmartsheetFile" accept="*/*" style="display:none" onchange="previewAdvScreenshot(this)"/>
             <div class="drop-zone-label" id="advScreenshotLabel">&#x1F4CE; Click to upload Smartsheet screenshot</div>
             <div class="drop-zone-hint">PNG, JPG or PDF — max 5MB</div>
           </div>

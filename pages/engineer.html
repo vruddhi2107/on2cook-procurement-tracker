@@ -313,7 +313,7 @@
       <div style="margin-top:14px">
         <label class="form-label" style="margin-bottom:6px;display:block">Attachments <span style="color:var(--gray-4);font-weight:400;font-size:0.72rem">(drawings, specs, reference images)</span></label>
         <div class="bom-upload-zone" id="attachZone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleAttachDrop(event)">
-          <input type="file" id="attachFile" accept="image/*,.pdf,.doc,.docx" multiple onchange="handleAttachFiles(event)"/>
+          <input type="file" id="attachFile" accept="*/*" multiple onchange="handleAttachFiles(event)"/>
           <div style="font-size:1.3rem;margin-bottom:4px">📎</div>
           <div style="font-size:0.8rem;font-weight:600">Drag & drop or click to attach files</div>
           <div style="font-size:0.72rem;color:var(--gray-4)">Images, PDF, DOC — max 5MB each</div>
