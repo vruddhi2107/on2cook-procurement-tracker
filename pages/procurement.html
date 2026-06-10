@@ -998,20 +998,11 @@ async function openPR(id) {
 
   // ── VENDOR INFO ──
   if(currentPR.phase==='procurement_active'&&currentPR.request_category==='vendor_info') {
-    vendorInfoAttachFiles = [];
     actionSection=`<div class="action-section">
       <div class="action-section-title">🏢 Provide Vendor Information <span class="action-badge">ACTION REQUIRED</span></div>
       <div class="form-group">
         <label class="form-label">Vendor Details *</label>
         <textarea class="form-control" id="vendorInfoDetails" placeholder="Vendor name, contact, email, phone, specialization, lead times..." style="min-height:120px"></textarea>
-      </div>
-      <div class="form-group" style="margin-top:12px">
-        <label class="form-label">Attachments <span style="color:var(--gray-4);font-weight:400;font-size:0.75rem">(optional — brochures, datasheets, quotes)</span></label>
-        <div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:10px 14px;text-align:center;cursor:pointer;background:var(--off-white)" onclick="document.getElementById('vendorInfoAttachInput').click()">
-          <input type="file" id="vendorInfoAttachInput" accept="*/*" multiple style="display:none" onchange="handleVendorInfoAttach(event)"/>
-          <div style="font-size:0.78rem;font-weight:600;color:var(--gray-3)">📎 Click to upload files (any format, max 5MB each)</div>
-        </div>
-        <div id="vendorInfoAttachList" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
       </div>
       <div style="margin-top:12px"><button class="btn btn-primary" onclick="submitVendorInfo()">Send to Engineer →</button></div>
     </div>
@@ -1642,57 +1633,19 @@ async function shareQuotations() {
 }
 
 // ── VENDOR INFO RESPONSE ─────────────────────────────────────
-// ── VENDOR INFO ATTACHMENT STATE ──
-let vendorInfoAttachFiles = [];
-
-function handleVendorInfoAttach(e) {
-  const files = [...e.target.files];
-  for (const file of files) {
-    if (file.size > 5 * 1024 * 1024) { showToast(`${file.name} too large (max 5MB)`, 'error'); continue; }
-    fileToBase64(file).then(b64 => {
-      vendorInfoAttachFiles.push({ name: file.name, type: file.type, data: b64 });
-      renderVendorInfoAttachList();
-    });
-  }
-  e.target.value = '';
-}
-
-function renderVendorInfoAttachList() {
-  const el = document.getElementById('vendorInfoAttachList');
-  if (!el) return;
-  el.innerHTML = vendorInfoAttachFiles.map((f, i) => `
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.78rem">
-      <span>📎 ${f.name}</span>
-      <button onclick="vendorInfoAttachFiles.splice(${i},1);renderVendorInfoAttachList()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--red);font-size:0.72rem">✕</button>
-    </div>`).join('');
-}
-
 async function submitVendorInfo() {
   if (!currentPR) return;
   const detailsEl = document.getElementById('vendorInfoDetails');
   const details = detailsEl?.value ? detailsEl.value.trim() : '';
   if (!details) { showToast('Please enter vendor details','error'); return; }
   showLoader(true);
-
-  // Upload any staged attachments first
-  for (const f of vendorInfoAttachFiles) {
-    await db.from('pr_attachments').insert({
-      pr_id: currentPR.id,
-      attachment_type: 'other',
-      file_name: f.name,
-      file_url: f.data,
-      uploaded_by: currentUser?.id || null
-    });
-  }
-
   const { error } = await db.from('procurement_requests').update({
     phase:'vendor_info_shared', vendor_info_details:details, updated_at:new Date().toISOString(), phase_timestamps:addPhaseTimestamp(currentPR,'vendor_info_shared')
   }).eq('id',currentPR.id);
-  notifyPhaseChange(currentPR.id,'vendor_info_shared',currentUser?.id);
+    notifyPhaseChange(currentPR.id,'vendor_info_shared',currentUser?.id);
 
   if (!error) {
-    const attachNote = vendorInfoAttachFiles.length > 0 ? ` (${vendorInfoAttachFiles.length} attachment${vendorInfoAttachFiles.length>1?'s':''} uploaded)` : '';
-    await window.postComment(currentPR.id, currentUser?.id, `🏢 Vendor information provided to engineer.${attachNote}`);
+    await window.postComment(currentPR.id, currentUser?.id, '🏢 Vendor information provided to engineer.');
   }
   showLoader(false);
   if (error) { showToast('Error: '+error.message,'error'); return; }
