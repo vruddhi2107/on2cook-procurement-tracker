@@ -120,6 +120,7 @@ async function init() {
   document.getElementById('footerMount').innerHTML = buildFooter();
   initNavbar(currentUser);
   await loadRequests();
+  window.initNotifBell && window.initNotifBell(currentUser, function(prId){ var pr=allRequests.find(function(r){return r.id===prId;}); if(pr) openPRModal(pr); });
 }
 
 async function loadRequests() {
@@ -373,12 +374,17 @@ function renderModal() {
     <div style="margin-top:18px">
       <div style="font-size:0.8rem;font-weight:600;color:var(--gray-3);margin-bottom:8px">Comments</div>
       <div id="commentsList" style="margin-bottom:10px"></div>
-      <div style="display:flex;gap:8px">
-        <input class="form-control" id="commentInput" placeholder="Add a comment…" style="flex:1;font-size:0.82rem"/>
+      <div style="position:relative;display:flex;gap:8px">
+        <div style="position:relative;flex:1">
+          <input class="form-control" id="commentInput" placeholder="Add a comment… use @ to tag someone" style="width:100%;font-size:0.82rem" onkeydown="if(event.key==='Enter'&&document.getElementById('mentionDd').style.display==='none')addComment()"/>
+          <div id="mentionDd" style="display:none;position:absolute;z-index:9999;left:0;bottom:calc(100% + 4px);min-width:220px;max-height:200px;overflow-y:auto;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.14)"></div>
+        </div>
         <button class="btn btn-secondary btn-sm" onclick="addComment()">Send</button>
       </div>
+      <div style="font-size:0.7rem;color:var(--gray-4);margin-top:4px">Tip: type @ to mention a team member</div>
     </div>`;
   loadComments(pr.id).then(c=>{ document.getElementById('commentsList').innerHTML=renderComments(c); });
+  setTimeout(function(){ window.initCommentBox && window.initCommentBox('commentInput','mentionDd'); }, 50);
 }
 
 function calcGRNRow(i) {
@@ -513,7 +519,12 @@ async function markRework2Returned() {
 async function addComment() {
   const input=document.getElementById('commentInput'),text=input?.value.trim();
   if(!text||!currentPR)return;
-  try{await postComment(currentPR.id,currentUser.id,text);input.value='';const c=await loadComments(currentPR.id);document.getElementById('commentsList').innerHTML=renderComments(c);}catch(e){showToast('Comment failed','error');}
+  try{
+    await window.postComment(currentPR.id,currentUser.id,text);
+    input.value='';
+    const c=await loadComments(currentPR.id);
+    document.getElementById('commentsList').innerHTML=renderComments(c);
+  }catch(e){showToast('Comment failed','error');}
 }
 
 function logout() { Session.clear(); window.location.href='../index.html'; }

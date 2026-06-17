@@ -307,6 +307,7 @@ async function init() {
   showLoader(true);
   await Promise.all([loadRequests(), loadUsers(), loadVendors()]);
   showLoader(false);
+  window.initNotifBell && window.initNotifBell(currentUser, function(prId){ openPRDetail(prId); });
 }
 
 async function loadRequests() {

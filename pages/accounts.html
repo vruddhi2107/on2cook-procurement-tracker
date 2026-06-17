@@ -214,6 +214,7 @@ async function init() {
   await Promise.all([loadPayments(), loadAdvances()]);
   showLoader(false);
   renderAdvanceBanner();
+  window.initNotifBell && window.initNotifBell(currentUser, null);
 }
 
 // ── DATA LOAD ────────────────────────────────────────────────

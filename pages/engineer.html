@@ -422,6 +422,11 @@ async function init() {
   showLoader(true);
   await Promise.all([loadRequests(), loadPMs(), loadProjects()]);
   showLoader(false);
+
+  window.initNotifBell && window.initNotifBell(currentUser, function(prId){
+    var pr = myRequests.find(function(r){return r.id===prId;});
+    if(pr) openPRModal(prId);
+  });
 }
 
 async function loadRequests() {
@@ -1021,12 +1026,17 @@ async function openPR(id) {
     `<div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
       <div class="section-title" style="margin-bottom:10px">💬 Comments</div>
       <div id="commentsList">${renderComments(comments)}</div>
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <input class="form-control" id="commentInput" placeholder="Add a comment..." style="flex:1" onkeydown="if(event.key==='Enter')addComment()"/>
+      <div style="position:relative;display:flex;gap:8px;margin-top:10px">
+        <div style="position:relative;flex:1">
+          <input class="form-control" id="commentInput" placeholder="Add a comment… use @ to tag someone" style="width:100%" onkeydown="if(event.key==='Enter'&&document.getElementById('mentionDdEng').style.display==='none')addComment()"/>
+          <div id="mentionDdEng" style="display:none;position:absolute;z-index:9999;left:0;bottom:calc(100% + 4px);min-width:220px;max-height:200px;overflow-y:auto;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.14)"></div>
+        </div>
         <button class="btn btn-secondary btn-sm" onclick="addComment()">Post</button>
       </div>
+      <div style="font-size:0.7rem;color:var(--gray-4);margin-top:4px">Tip: type @ to mention a team member</div>
     </div>`;
   openModal('prModal');
+  setTimeout(function(){ window.initCommentBox && window.initCommentBox('commentInput','mentionDdEng'); }, 50);
 }
 
 async function resolveVendorInfo(action) {
@@ -1291,10 +1301,16 @@ async function submitQC() {
   closeModal('prModal');await loadRequests();
 }
 
+// ── ADD COMMENT ─────────────────────────────────────────────
 async function addComment() {
   const input=document.getElementById('commentInput'),text=input?.value.trim();
   if(!text||!currentPR)return;
-  try{await postComment(currentPR.id,currentUser.id,text);input.value='';const c=await loadComments(currentPR.id);document.getElementById('commentsList').innerHTML=renderComments(c);}catch(e){showToast('Comment failed','error');}
+  try{
+    await window.postComment(currentPR.id,currentUser.id,text);
+    input.value='';
+    const c=await loadComments(currentPR.id);
+    document.getElementById('commentsList').innerHTML=renderComments(c);
+  }catch(e){showToast('Comment failed','error');}
 }
 
 init();

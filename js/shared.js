@@ -899,6 +899,17 @@ function openVendorEnquiry(vendor) {
 }
 
 // ── COMMENTS  
+// Cache of all users for @mention autocomplete
+var _allUsersCache = null;
+async function _loadAllUsers() {
+  if (_allUsersCache && _allUsersCache.length) return _allUsersCache;
+  const { data, error } = await db.from('users').select('id,name,email').order('name');
+  if (error) { console.warn('_loadAllUsers failed:', error.message); return _allUsersCache || []; }
+  _allUsersCache = data || [];
+  return _allUsersCache;
+}
+window._loadAllUsers = _loadAllUsers;
+
 window.loadComments = async function (prId) {
   const { data, error } = await db.from('pr_comments').select('*,users(name)').eq('pr_id', prId).order('created_at');
   if (error) { console.error("Load comments error:", error); return []; }
@@ -909,7 +920,91 @@ window.postComment = async function(prId, userId, text) {
   if (!text?.trim()) return;
   const { error } = await db.from('pr_comments').insert({ pr_id: prId, user_id: userId, comment: text.trim() });
   if (error) throw error;
+  // Extract @mentions and notify tagged users (matched against real user list)
+  const targets = await resolveMentionedUsers(text, userId);
+  if (targets.length > 0) {
+    await sendMentionNotifications(prId, userId, text, targets);
+  }
 };
+
+// Finds every "@..." occurrence in the text and matches it against the real
+// user list, preferring the longest name match so multi-word names aren't
+// cut short and single-word names don't swallow the next sentence word
+// (e.g. "@Sandy please approve" must resolve to "Sandy", not "Sandy please").
+async function resolveMentionedUsers(text, actorId) {
+  const users = await _loadAllUsers();
+  if (!users.length) return [];
+
+  // Build every possible match string per user: the full name, plus each
+  // leading-word prefix (e.g. "Sandy Mehta" -> ["sandy mehta", "sandy"]).
+  // This lets "@Sandy please approve" resolve to "Sandy Mehta" using just
+  // the first name, while "@Rajesh Kumar Patel" still prefers the fullest
+  // match available for that user.
+  const candidates = [];
+  for (const u of users) {
+    const words = u.name.toLowerCase().split(/\s+/).filter(Boolean);
+    for (let i = words.length; i >= 1; i--) {
+      candidates.push({ user: u, text: words.slice(0, i).join(' ') });
+    }
+  }
+  // Longest candidate strings first, so fuller names win over shorter ones.
+  candidates.sort((a, b) => b.text.length - a.text.length);
+
+  const found = new Map(); // id -> user
+  const atRe = /@/g;
+  let m;
+  while ((m = atRe.exec(text)) !== null) {
+    const startIdx = m.index + 1;
+    // Only consider the start of a mention (not mid-word, e.g. an email address)
+    if (m.index > 0 && /\S/.test(text[m.index - 1])) continue;
+
+    const rest = text.slice(startIdx);
+    const restLower = rest.toLowerCase();
+
+    for (const c of candidates) {
+      if (restLower.startsWith(c.text)) {
+        // Require the match to end at a word boundary (end of string,
+        // whitespace, or punctuation) so "Sam" doesn't match inside "Samuel".
+        const nextChar = rest[c.text.length];
+        if (nextChar === undefined || /[^A-Za-z]/.test(nextChar)) {
+          if (c.user.id !== actorId) found.set(c.user.id, c.user);
+          break; // longest match already found for this @, stop here
+        }
+      }
+    }
+  }
+  return [...found.values()];
+}
+
+async function sendMentionNotifications(prId, actorId, commentText, targets) {
+  try {
+    if (!targets?.length) return;
+    const mentionedUserIds = targets.map(u => u.id);
+
+    // Delegate to edge function — it handles both DB notification insert AND email.
+    // NOTE: supabase-js functions.invoke() resolves with {data, error} on a
+    // non-2xx response, it does NOT throw — so the error must be checked
+    // explicitly or failures (and missing notification rows) go unnoticed.
+    const { data, error } = await db.functions.invoke('notify-mention', {
+      body: {
+        pr_id:               prId,
+        actor_id:            actorId,
+        comment_text:        commentText,
+        mentioned_user_ids:  mentionedUserIds,
+      },
+    });
+    if (error) {
+      console.error('notify-mention failed:', error.message || error, error.context || '');
+    } else {
+      console.log('notify-mention ok:', data);
+    }
+  } catch(e) {
+    // Non-blocking — log but don't surface to user
+    console.warn('Mention notification failed (non-blocking):', e?.message || e);
+  }
+}
+window.sendMentionNotifications = sendMentionNotifications;
+window.resolveMentionedUsers = resolveMentionedUsers;
 
 function renderComments(comments) {
   if(!comments.length) return '<p style="color:var(--gray-4);font-size:0.78rem;text-align:center;padding:14px 0">No comments yet</p>';
@@ -918,9 +1013,19 @@ function renderComments(comments) {
       <div class="comment-avatar">${(c.users?.name||'?').split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
       <div class="comment-bubble">
         <div class="comment-meta">${c.users?.name||'Unknown'} · ${fmtDateTime(c.created_at)}</div>
-        <div class="comment-text">${c.comment}</div>
+        <div class="comment-text">${highlightMentions(c.comment)}</div>
       </div>
     </div>`).join('')}</div>`;
+}
+
+function highlightMentions(text) {
+  if (!text) return '';
+  // Escape HTML first
+  const safe = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Highlight @mentions
+  return safe.replace(/@([A-Za-z]+(?:\s+[A-Za-z]+)?)/g,
+    '<span style="color:#6366f1;font-weight:600;background:rgba(99,102,241,0.08);border-radius:3px;padding:0 3px">@$1</span>'
+  );
 }
 
 // ── BOM PARSER (CSV + XLSX) ─────────────────────────────────────────────
@@ -1186,9 +1291,12 @@ async function onPartNumInput(rowId, query, containerId) {
 
   if (!matches.length) { dd.style.display='none'; return; }
 
+  // Store matches in a temporary lookup so onclick can reference by index (avoids HTML-attribute JSON escaping issues)
+  dd._catalogMatches = matches;
+
   dd.style.display = 'block';
-  dd.innerHTML = matches.map(p => `
-    <div onclick="selectCatalogPart(${rowId}, ${JSON.stringify(JSON.stringify(p))}, '${containerId}')"
+  dd.innerHTML = matches.map((p, idx) => `
+    <div data-catalog-idx="${idx}"
          style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;transition:background 0.1s"
          onmouseover="this.style.background='rgba(99,102,241,0.06)'"
          onmouseout="this.style.background='white'">
@@ -1200,6 +1308,15 @@ async function onPartNumInput(rowId, query, containerId) {
     </div>
   `).join('');
 
+  // Attach click handlers via JS (not inline onclick) to avoid HTML-attribute JSON escaping issues
+  dd.querySelectorAll('[data-catalog-idx]').forEach(el => {
+    el.addEventListener('mousedown', function(e) {
+      e.preventDefault(); // prevent input blur before we can read value
+      const part = dd._catalogMatches[+el.dataset.catalogIdx];
+      if (part) selectCatalogPart(rowId, part, containerId);
+    });
+  });
+
   // Close on outside click
   document.addEventListener('click', function _closer(e){
     if(!dd.contains(e.target) && e.target.id !== `pnum-${rowId}`){
@@ -1209,8 +1326,8 @@ async function onPartNumInput(rowId, query, containerId) {
   });
 }
 
-function selectCatalogPart(rowId, jsonStr, containerId) {
-  const part = JSON.parse(jsonStr);
+function selectCatalogPart(rowId, partOrJson, containerId) {
+  const part = (typeof partOrJson === 'string') ? JSON.parse(partOrJson) : partOrJson;
   const r = _partsEditorRows.find(r => r._id === rowId);
   if (r) {
     r.part_number = part.part_number;
@@ -1285,3 +1402,180 @@ window.onPartNumInput     = onPartNumInput;
 window.selectCatalogPart  = selectCatalogPart;
 
 }
+// ── SHARED NOTIFICATION BELL ─────────────────────────────────────────────
+// Call window.initNotifBell(currentUser, openPRCallback) once after login.
+window.initNotifBell = function(currentUser, openPRFn) {
+  if (!currentUser) return;
+
+  async function loadAndRender() {
+    try {
+      const { data } = await db.from('notifications')
+        .select('*').eq('user_id', currentUser.id).eq('is_read', false)
+        .order('created_at', { ascending: false }).limit(30);
+      _renderBell(data || []);
+    } catch(e) { console.warn('Notif load failed', e); }
+  }
+
+  function _renderBell(items) {
+    let bell = document.getElementById('notifBell');
+    if (!bell) {
+      const anchor = document.querySelector('.page-header, .topbar, nav, header');
+      if (!anchor) return;
+      bell = document.createElement('div');
+      bell.id = 'notifBell';
+      bell.style.cssText = 'position:relative;display:inline-flex;align-items:center;cursor:pointer;margin-left:10px;vertical-align:middle';
+      bell.innerHTML = [
+        '<button id="notifBellBtn" style="background:none;border:none;cursor:pointer;font-size:1.25rem;position:relative;padding:4px 6px;line-height:1" title="Notifications">',
+        '  \uD83D\uDD14',
+        '  <span id="notifDot" style="display:none;position:absolute;top:3px;right:3px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid white"></span>',
+        '</button>',
+        '<div id="notifPanel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;width:330px;max-height:400px;overflow-y:auto;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,0.16);z-index:10000">',
+        '  <div style="padding:11px 14px;border-bottom:1px solid var(--border);font-weight:600;font-size:0.85rem;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:white;z-index:1">',
+        '    \uD83D\uDD14 Notifications',
+        '    <button id="notifMarkAll" style="font-size:0.72rem;color:#6366f1;background:none;border:none;cursor:pointer;font-weight:500">Mark all read</button>',
+        '  </div>',
+        '  <div id="notifList"></div>',
+        '</div>'
+      ].join('');
+      anchor.appendChild(bell);
+
+      document.getElementById('notifBellBtn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        var p = document.getElementById('notifPanel');
+        var isOpen = p.style.display !== 'none';
+        p.style.display = isOpen ? 'none' : 'block';
+        if (!isOpen) {
+          setTimeout(function() {
+            document.addEventListener('click', function _nc(e2) {
+              if (!bell.contains(e2.target)) {
+                p.style.display = 'none';
+                document.removeEventListener('click', _nc);
+              }
+            });
+          }, 0);
+        }
+      });
+
+      document.getElementById('notifMarkAll').addEventListener('click', async function() {
+        try { await db.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id).eq('is_read', false); } catch(e) {}
+        await loadAndRender();
+      });
+    }
+
+    var dot = document.getElementById('notifDot');
+    if (dot) dot.style.display = items.length ? 'block' : 'none';
+
+    var list = document.getElementById('notifList');
+    if (!list) return;
+    if (!items.length) {
+      list.innerHTML = '<div style="padding:28px 16px;text-align:center;color:var(--gray-4);font-size:0.8rem">\u2705 You\'re all caught up!</div>';
+      return;
+    }
+
+    list.innerHTML = items.map(function(n) {
+      var msg = (n.message||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var ts  = typeof fmtDateTime === 'function' ? fmtDateTime(n.created_at) : n.created_at;
+      return '<div class="_notif-item" data-id="'+n.id+'" data-pr="'+(n.pr_id||'')+'" '+
+        'style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s" '+
+        'onmouseover="this.style.background=\'rgba(99,102,241,0.05)\'" onmouseout="this.style.background=\'white\'">'+
+        '<div style="font-size:0.79rem;color:var(--gray-1);line-height:1.45">'+msg+'</div>'+
+        '<div style="font-size:0.68rem;color:var(--gray-4);margin-top:3px">'+ts+'</div>'+
+        '</div>';
+    }).join('');
+
+    list.querySelectorAll('._notif-item').forEach(function(el) {
+      el.addEventListener('click', async function() {
+        var nid = el.dataset.id, prId = el.dataset.pr;
+        try { await db.from('notifications').update({ is_read: true }).eq('id', nid); } catch(e) {}
+        var p = document.getElementById('notifPanel');
+        if (p) p.style.display = 'none';
+        if (prId && typeof openPRFn === 'function') openPRFn(prId);
+        await loadAndRender();
+      });
+    });
+  }
+
+  loadAndRender();
+  setInterval(loadAndRender, 60000);
+};
+
+// ── SHARED COMMENT BOX WITH @MENTION ─────────────────────────────────────
+// Call window.initCommentBox(inputId, dropdownId) after the modal renders.
+window.initCommentBox = function(inputId, dropdownId) {
+  var _mentionStart = -1;
+  var input = document.getElementById(inputId);
+  var dd    = document.getElementById(dropdownId);
+  if (!input || !dd) return;
+
+  input.addEventListener('input', async function() {
+    var text   = input.value;
+    var cursor = input.selectionStart;
+    var before = text.slice(0, cursor);
+    var atIdx  = before.lastIndexOf('@');
+
+    if (atIdx === -1 || (atIdx > 0 && /\S/.test(before[atIdx - 1]))) {
+      dd.style.display = 'none'; _mentionStart = -1; return;
+    }
+    var query = before.slice(atIdx + 1);
+    if (query.length > 25 || /\s{2}/.test(query)) { dd.style.display = 'none'; return; }
+    _mentionStart = atIdx;
+
+    var users = await window._loadAllUsers();
+    var q = query.toLowerCase();
+    var matches = users.filter(function(u) { return u.name.toLowerCase().includes(q); }).slice(0, 8);
+    if (!matches.length) { dd.style.display = 'none'; return; }
+
+    dd.style.display = 'block';
+    dd.innerHTML = matches.map(function(u) {
+      var initials = u.name.split(' ').map(function(n){ return n[0]; }).join('').slice(0,2);
+      var safeName = u.name.replace(/</g,'&lt;').replace(/"/g,'&quot;');
+      return '<div data-name="'+safeName+'" '+
+        'style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)" '+
+        'onmouseover="this.style.background=\'rgba(99,102,241,0.07)\'" onmouseout="this.style.background=\'white\'">'+
+        '<div style="width:27px;height:27px;border-radius:50%;background:rgba(99,102,241,0.14);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#6366f1;flex-shrink:0">'+initials+'</div>'+
+        '<span style="font-size:0.82rem;font-weight:500">'+u.name.replace(/</g,'&lt;')+'</span>'+
+        '</div>';
+    }).join('');
+
+    dd.querySelectorAll('[data-name]').forEach(function(el) {
+      el.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        var name = el.dataset.name;
+        var t    = input.value;
+        var bef  = t.slice(0, _mentionStart);
+        var aft  = t.slice(input.selectionStart);
+        input.value = bef + '@' + name + ' ' + aft;
+        var pos = bef.length + name.length + 2;
+        input.setSelectionRange(pos, pos);
+        dd.style.display = 'none';
+        _mentionStart = -1;
+        input.focus();
+      });
+    });
+  });
+};
+
+// Shared renderComments exposed for all pages
+window.renderComments = window.renderComments || function(comments) {
+  if (!comments || !comments.length)
+    return '<p style="color:var(--gray-4);font-size:0.78rem;text-align:center;padding:14px 0">No comments yet</p>';
+  function _hlMention(text) {
+    if (!text) return '';
+    var safe = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return safe.replace(/@([A-Za-z]+(?:\s+[A-Za-z]+)?)/g,
+      '<span style="color:#6366f1;font-weight:600;background:rgba(99,102,241,0.08);border-radius:3px;padding:0 3px">@$1</span>'
+    );
+  }
+  return '<div class="comment-list">'+comments.map(function(c) {
+    var initials = (c.users&&c.users.name?c.users.name:'?').split(' ').map(function(n){return n[0];}).join('').slice(0,2);
+    var name     = c.users&&c.users.name ? c.users.name : 'Unknown';
+    var ts       = typeof fmtDateTime==='function' ? fmtDateTime(c.created_at) : c.created_at;
+    return '<div class="comment-item">'+
+      '<div class="comment-avatar">'+initials+'</div>'+
+      '<div class="comment-bubble">'+
+        '<div class="comment-meta">'+name+' \u00B7 '+ts+'</div>'+
+        '<div class="comment-text">'+_hlMention(c.comment)+'</div>'+
+      '</div>'+
+      '</div>';
+  }).join('')+'</div>';
+};

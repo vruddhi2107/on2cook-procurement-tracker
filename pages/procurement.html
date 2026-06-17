@@ -643,6 +643,8 @@ async function init() {
   showLoader(true);
   await Promise.all([loadRequests(), loadVendors()]);
   showLoader(false);
+  // Notification bell (shared helper)
+  window.initNotifBell && window.initNotifBell(currentUser, function(prId){ openPRModal(prId); });
 }
 
 async function openVendorHistory(vendorId) {
@@ -1386,12 +1388,17 @@ async function openPR(id) {
     `<div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
       <div class="section-title" style="margin-bottom:10px">💬 Comments</div>
       <div id="commentsList">${renderComments(comments)}</div>
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <input class="form-control" id="commentInput" placeholder="Add a comment..." style="flex:1" onkeydown="if(event.key==='Enter')addComment()"/>
+      <div style="position:relative;display:flex;gap:8px;margin-top:10px">
+        <div style="position:relative;flex:1">
+          <input class="form-control" id="commentInput" placeholder="Add a comment… use @ to tag someone" style="width:100%" onkeydown="if(event.key==='Enter'&&document.getElementById('mentionDdPr').style.display==='none')addComment()"/>
+          <div id="mentionDdPr" style="display:none;position:absolute;z-index:9999;left:0;bottom:calc(100% + 4px);min-width:220px;max-height:200px;overflow-y:auto;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.14)"></div>
+        </div>
         <button class="btn btn-secondary btn-sm" onclick="addComment()">Post</button>
       </div>
+      <div style="font-size:0.7rem;color:var(--gray-4);margin-top:4px">Tip: type @ to mention a team member</div>
     </div>`;
   openModal('prModal');
+  setTimeout(function(){ window.initCommentBox && window.initCommentBox('commentInput','mentionDdPr'); }, 50);
 }
 
 // ── VENDOR SELECTOR CHIP ─────────────────────────────────────
@@ -1422,6 +1429,11 @@ function showVendorInfoChip(v) {
 const DECLINE_REASONS = [
   'Incomplete or unclear request details',
   'Duplicate request — already submitted',
+  'Not a Local Purchase Request (LPR)',
+  "Not required anymore",
+  "Not a RFQ request",
+  "Change in Requirements or Scope",
+  "Other (provide details in notes)"
 ];
 
 function buildDeclineSection() {
@@ -2708,8 +2720,8 @@ async function openPaymentRequestModal(prId) {
       <div style="margin-bottom:14px">
         <div class="detail-key" style="margin-bottom:6px">BOM / Items</div>
         <table class="parts-table" style="width:100%">
-          <thead><tr><th>#</th><th>Part</th><th>Qty</th><th>Spec</th></tr></thead>
-          <tbody>${(pr.parts||[]).map((p,i)=>`<tr><td>${i+1}</td><td>${p.name}</td><td>${p.qty}</td><td style="color:var(--gray-3)">${p.spec||'—'}</td></tr>`).join('')}</tbody>
+          <thead><tr><th>#</th><th>Part</th><th>Qty</th><th>UOM</th><th>Spec</th></tr></thead>
+          <tbody>${(pr.parts||[]).map((p,i)=>`<tr><td>${i+1}</td><td>${p.name}</td><td>${p.qty}</td><td style="color:var(--gray-3)">${p.uom||'—'}</td><td style="color:var(--gray-3)">${p.spec||'—'}</td></tr>`).join('')}</tbody>
         </table>
       </div>`:''}
       ${selectedQ?`
@@ -3030,6 +3042,7 @@ async function submitVendorRating() {
   closeModal('rateModal');await loadVendors();
 }
 
+// ── COMMENT BOX + NOTIFICATION BELL — delegated to shared.js ────────────
 async function addComment() {
   const input=document.getElementById('commentInput'),text=input?.value.trim();
   if(!text||!currentPR)return;
