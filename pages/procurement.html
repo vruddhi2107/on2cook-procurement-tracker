@@ -263,6 +263,9 @@
         <option value="critical">🔴 Within 48 hours</option>
         <option value="normal">🟢 Within 1 Week</option>
       </select>
+      <select id="filterVendor" onchange="filterTable()" style="min-width:160px">
+        <option value="">All Vendors</option>
+      </select>
       <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕</button>
     </div>
     <div class="card">
@@ -641,7 +644,8 @@ async function init() {
     document.getElementById('customPaymentTermsGroup').style.display=e.target.value==='custom'?'block':'none';
   });
   showLoader(true);
-  await Promise.all([loadRequests(), loadVendors()]);
+  await loadRequests();
+  await loadVendors();
   showLoader(false);
   // Notification bell (shared helper)
   window.initNotifBell && window.initNotifBell(currentUser, function(prId){ openPRModal(prId); });
@@ -724,6 +728,14 @@ async function loadRequests() {
 async function loadVendors() {
   const{data}=await db.from('vendors').select('*').order('name');
   allVendors=data||[];
+  // Populate vendor filter with vendors that actually appear on requests
+  const vendorFilterEl = document.getElementById('filterVendor');
+  if (vendorFilterEl) {
+    const usedVendorIds = new Set(allRequests.map(r=>r.assigned_vendor_id).filter(Boolean));
+    const usedVendors = allVendors.filter(v=>usedVendorIds.has(v.id));
+    vendorFilterEl.innerHTML = '<option value="">All Vendors</option>' +
+      usedVendors.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  }
   document.getElementById('sVendors').textContent=allVendors.filter(v=>v.is_active).length;
 }
 
@@ -744,18 +756,34 @@ function switchTab(t) {
   else filterTable();
 }
 
-function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterPhase').value='';const uf=document.getElementById('filterUrgency');if(uf)uf.value='';filterTable();}
+function clearFilters(){
+  document.getElementById('searchInput').value='';
+  document.getElementById('filterPhase').value='';
+  const uf=document.getElementById('filterUrgency'); if(uf) uf.value='';
+  const vf=document.getElementById('filterVendor'); if(vf) vf.value='';
+  filterTable();
+}
 
 function filterTable(){
   const s=document.getElementById('searchInput').value.toLowerCase();
   const ph=document.getElementById('filterPhase').value;
   const urg=document.getElementById('filterUrgency')?.value||'';
+  const vid=document.getElementById('filterVendor')?.value||'';
   const actionPhases=['lp_procurement_processing','lp_payment_pending','procurement_active','quotes_revision_requested','approved','advance_requested','grn_initiated','qc_pending','rework_store_form','rework_pending','rework2_pending','qc_passed','pending_decline_approval'];
   let reqs=allRequests;
   if(activeTab==='active') reqs=reqs.filter(r=>actionPhases.includes(r.phase));
-  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
+  if(s) reqs=reqs.filter(r=>
+    r.project_name.toLowerCase().includes(s)||
+    String(r.request_number).includes(s)||
+    (r.team_member_name||'').toLowerCase().includes(s)||
+    (r.project_manager_name||'').toLowerCase().includes(s)||
+    (r.users?.name||'').toLowerCase().includes(s)||
+    (r.department||'').toLowerCase().includes(s)||
+    (r.project_phase||'').toLowerCase().includes(s)
+  );
   if(ph) reqs=reqs.filter(r=>r.phase===ph);
   if(urg) reqs=reqs.filter(r=>(r.urgency||'normal')===urg);
+  if(vid) reqs=reqs.filter(r=>r.assigned_vendor_id===vid);
   renderTable(reqs);
 }
 
@@ -3316,11 +3344,17 @@ function renderPartsTable(parts) {
 function filterPartsTable() {
   const s = document.getElementById('partsSearch').value.toLowerCase();
   if (!s) { renderPartsTable(allParts); return; }
-  renderPartsTable(allParts.filter(p =>
-    p.part_number.toLowerCase().includes(s) ||
-    p.part_name.toLowerCase().includes(s) ||
-    (p.category||'').toLowerCase().includes(s)
-  ));
+  renderPartsTable(allParts.filter(p => {
+    if (p.part_number.toLowerCase().includes(s)) return true;
+    if (p.part_name.toLowerCase().includes(s)) return true;
+    if ((p.category||'').toLowerCase().includes(s)) return true;
+    if ((p.unit||'').toLowerCase().includes(s)) return true;
+    if ((p.description||'').toLowerCase().includes(s)) return true;
+    // Search across linked vendor names
+    return (p.part_vendors||[]).some(pv =>
+      (pv.vendors?.name||'').toLowerCase().includes(s)
+    );
+  }));
 }
 
 // ── Add / Edit Part modal ─────────────────────────────────────
