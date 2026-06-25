@@ -236,6 +236,7 @@
     <button class="tab-btn" onclick="switchTab('all')">All Requests</button>
     <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendor DB</button>
     <button class="tab-btn" onclick="switchTab('parts')">🔩 Parts Catalog</button>
+    <button class="tab-btn" onclick="switchTab('createpo')">📝 Create PO</button>
   </div>
 
   <div id="tabRequests">
@@ -323,6 +324,150 @@
       </div>
     </div>
   </div>
+
+  <!-- ── CREATE PO TAB ── -->
+  <div id="tabCreatePO" style="display:none">
+    <div class="card" style="max-width:820px;margin:0 auto">
+      <div style="font-size:0.95rem;font-weight:700;color:var(--primary);margin-bottom:18px;display:flex;align-items:center;gap:8px">
+        📝 Create Custom Purchase Order
+        <span style="font-size:0.72rem;font-weight:400;color:var(--gray-3);margin-left:4px">Fill in details below — the PO is for preview &amp; download only, not saved</span>
+      </div>
+
+      <!-- Section: PO Meta -->
+      <div style="background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.15);border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-size:0.78rem;font-weight:700;color:#6366f1;margin-bottom:10px">🗂 PO Reference</div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">PO Number</label>
+            <input class="form-control" id="cpoPONum" placeholder="e.g. O2C/PO/25-26/0001"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Project / Purpose</label>
+            <input class="form-control" id="cpoProject" placeholder="e.g. R&amp;D Lab Equipment"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Indent / Ref Number</label>
+            <input class="form-control" id="cpoIndent" value="NA"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Vendor -->
+      <div style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.18);border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-size:0.78rem;font-weight:700;color:#b45309;margin-bottom:10px">🏢 Supplier Details</div>
+        <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:10px;flex-wrap:wrap">
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:220px">
+            <label class="form-label">Pick from Vendor DB</label>
+            <select class="form-control" id="cpoVendorPick" onchange="cpoFillVendor(this.value)">
+              <option value="">— Select vendor (or fill manually) —</option>
+            </select>
+          </div>
+          <span style="font-size:0.75rem;color:var(--gray-3);padding-bottom:8px">or fill manually →</span>
+        </div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Vendor Name *</label>
+            <input class="form-control" id="cpoVendorName" placeholder="Company name"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">GSTIN</label>
+            <input class="form-control" id="cpoVendorGSTIN" placeholder="e.g. 24ABCDE1234F1Z5"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Address</label>
+            <input class="form-control" id="cpoVendorAddress" placeholder="Full address"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Contact Person</label>
+            <input class="form-control" id="cpoVendorContact" placeholder="Name"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Phone</label>
+            <input class="form-control" id="cpoVendorPhone" placeholder="+91 XXXXX XXXXX"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Email</label>
+            <input class="form-control" id="cpoVendorEmail" type="email" placeholder="vendor@email.com"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0;grid-column:1/-1">
+            <label class="form-label">Payment Terms</label>
+            <select class="form-control" id="cpoPaymentTerms" onchange="document.getElementById('cpoCustomTermsRow').style.display=this.value==='custom'?'block':'none'">
+              <option value="As agreed">As agreed</option>
+              <option value="50% Advance - 50% Post Delivery">50% Advance — 50% Post Delivery</option>
+              <option value="100% Full Advance">100% Full Advance</option>
+              <option value="100% On Delivery">100% On Delivery</option>
+              <option value="30% Advance - 70% Post Delivery">30% Advance — 70% Post Delivery</option>
+              <option value="No Advance (Net 30/60/90)">No Advance (Net 30/60/90)</option>
+              <option value="custom">Custom (enter below)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;grid-column:1/-1;display:none" id="cpoCustomTermsRow">
+            <label class="form-label">Custom Payment Terms</label>
+            <input class="form-control" id="cpoCustomTerms" placeholder="e.g. 40% on order, 60% on delivery"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Items -->
+      <div style="background:rgba(34,197,94,0.03);border:1px solid rgba(34,197,94,0.18);border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:0.78rem;font-weight:700;color:#15803d">📦 Line Items</div>
+          <button class="btn btn-secondary btn-sm" onclick="cpoAddRow()">+ Add Row</button>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:0.78rem" id="cpoItemsTable">
+          <thead>
+            <tr style="background:var(--off-white)">
+              <th style="padding:6px 8px;text-align:left;border:1px solid var(--border);width:36px">#</th>
+              <th style="padding:6px 8px;text-align:left;border:1px solid var(--border)">Description *</th>
+              <th style="padding:6px 8px;text-align:left;border:1px solid var(--border);width:120px">Spec / Notes</th>
+              <th style="padding:6px 8px;text-align:center;border:1px solid var(--border);width:60px">Qty</th>
+              <th style="padding:6px 8px;text-align:center;border:1px solid var(--border);width:60px">Unit</th>
+              <th style="padding:6px 8px;text-align:right;border:1px solid var(--border);width:100px">Unit Rate (₹)</th>
+              <th style="padding:6px 8px;text-align:right;border:1px solid var(--border);width:100px">Total (₹)</th>
+              <th style="padding:6px 8px;text-align:center;border:1px solid var(--border);width:32px"></th>
+            </tr>
+          </thead>
+          <tbody id="cpoItemsBody"></tbody>
+        </table>
+        <div style="text-align:right;margin-top:8px;font-size:0.82rem;color:var(--gray-3)">
+          Basic Total: ₹ <strong id="cpoBasicTotal">0.00</strong>
+        </div>
+      </div>
+
+      <!-- Section: Taxes -->
+      <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:12px 16px;margin-bottom:18px">
+        <div style="font-size:0.78rem;font-weight:700;color:#b45309;margin-bottom:10px">🧾 Tax &amp; Charges</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+          <div class="form-group" style="margin-bottom:0;min-width:100px">
+            <label class="form-label">CGST %</label>
+            <input class="form-control" type="number" id="cpoCGST" value="9" min="0" max="28" oninput="cpoRecalc()"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0;min-width:100px">
+            <label class="form-label">SGST %</label>
+            <input class="form-control" type="number" id="cpoSGST" value="9" min="0" max="28" oninput="cpoRecalc()"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0;min-width:110px">
+            <label class="form-label">P&amp;F Charge (₹)</label>
+            <input class="form-control" type="number" id="cpoPnF" value="0" min="0" oninput="cpoRecalc()"/>
+          </div>
+          <div class="form-group" style="margin-bottom:0;min-width:110px">
+            <label class="form-label">Discount (%)</label>
+            <input class="form-control" type="number" id="cpoDiscount" value="0" min="0" max="100" oninput="cpoRecalc()"/>
+          </div>
+          <div style="margin-left:auto;padding:8px 14px;background:white;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;min-width:180px">
+            <div style="color:var(--gray-3);font-size:0.72rem">Net Payable (approx.)</div>
+            <div style="font-size:1.1rem;font-weight:700;color:var(--primary)">₹ <span id="cpoNetTotal">0</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn btn-ghost" onclick="cpoReset()">🔄 Reset</button>
+        <button class="btn btn-primary" onclick="cpoPreviewPO()">📄 Preview &amp; Download PO</button>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <!-- PR DETAIL MODAL -->
@@ -747,12 +892,14 @@ function updateStats() {
 
 function switchTab(t) {
   activeTab=t;
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['active','all','vendors','parts'][i]===t));
-  document.getElementById('tabRequests').style.display=['vendors','parts'].includes(t)?'none':'block';
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['active','all','vendors','parts','createpo'][i]===t));
+  document.getElementById('tabRequests').style.display=['vendors','parts','createpo'].includes(t)?'none':'block';
   document.getElementById('tabVendors').style.display=t==='vendors'?'block':'none';
   document.getElementById('tabParts').style.display=t==='parts'?'block':'none';
+  document.getElementById('tabCreatePO').style.display=t==='createpo'?'block':'none';
   if(t==='vendors') renderVendorCards(allVendors,'vendorGrid',true);
   else if(t==='parts') loadPartsTab();
+  else if(t==='createpo') cpoInitTab();
   else filterTable();
 }
 
@@ -3571,6 +3718,419 @@ function escHtml(str) {
   return String(str)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── CREATE PO TAB ─────────────────────────────────────────────
+let _cpoRows = [];
+
+function cpoInitTab() {
+  // Populate vendor dropdown from allVendors
+  const sel = document.getElementById('cpoVendorPick');
+  if (!sel) return;
+  // Keep only first option
+  sel.innerHTML = '<option value="">— Select vendor (or fill manually) —</option>';
+  (allVendors || []).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = v.name || '—';
+    sel.appendChild(opt);
+  });
+  // Auto-generate PO number if empty
+  const poNumEl = document.getElementById('cpoPONum');
+  if (poNumEl && !poNumEl.value) {
+    const now = new Date();
+    const fy = now.getMonth()>=3 ? now.getFullYear() : now.getFullYear()-1;
+    const fyShort = `${String(fy).slice(2)}-${String(fy+1).slice(2)}`;
+    poNumEl.value = `O2C/PO/${fyShort}/`;
+    poNumEl.focus(); poNumEl.setSelectionRange(poNumEl.value.length, poNumEl.value.length);
+  }
+  // Init rows if empty
+  if (_cpoRows.length === 0) {
+    _cpoRows = [];
+    cpoAddRow();
+  }
+  cpoRenderRows();
+  cpoRecalc();
+}
+
+function cpoFillVendor(vendorId) {
+  if (!vendorId) return;
+  const v = (allVendors || []).find(x => x.id === vendorId);
+  if (!v) return;
+  const PAYMENT_TERMS_MAP = {
+    '50_50': '50% Advance - 50% Post Delivery',
+    'full_advance': '100% Full Advance',
+    'full_on_delivery': '100% On Delivery',
+    '30_70': '30% Advance - 70% Post Delivery',
+    'no_advance': 'No Advance (Net 30/60/90)',
+    'custom': 'custom'
+  };
+  document.getElementById('cpoVendorName').value  = v.name || '';
+  document.getElementById('cpoVendorGSTIN').value = v.gstin || '';
+  document.getElementById('cpoVendorAddress').value = v.address || '';
+  document.getElementById('cpoVendorContact').value = v.contact_person || '';
+  document.getElementById('cpoVendorPhone').value = v.phone || '';
+  document.getElementById('cpoVendorEmail').value = v.email || '';
+  const ptSel = document.getElementById('cpoPaymentTerms');
+  const mappedTerm = PAYMENT_TERMS_MAP[v.payment_terms] || 'As agreed';
+  // Find option
+  let found = false;
+  for (let opt of ptSel.options) { if (opt.value === mappedTerm) { ptSel.value = mappedTerm; found=true; break; } }
+  if (!found) ptSel.value = 'As agreed';
+  const customRow = document.getElementById('cpoCustomTermsRow');
+  if (v.payment_terms === 'custom') {
+    customRow.style.display = 'block';
+    document.getElementById('cpoCustomTerms').value = v.custom_payment_terms || '';
+  } else {
+    customRow.style.display = 'none';
+  }
+}
+
+function cpoAddRow() {
+  _cpoRows.push({ desc: '', spec: '', qty: 1, unit: 'Nos', rate: 0 });
+  cpoRenderRows();
+  cpoRecalc();
+}
+
+function cpoRemoveRow(idx) {
+  if (_cpoRows.length <= 1) { showToast('At least one line item is required', 'error'); return; }
+  _cpoRows.splice(idx, 1);
+  cpoRenderRows();
+  cpoRecalc();
+}
+
+function cpoRenderRows() {
+  const tbody = document.getElementById('cpoItemsBody');
+  if (!tbody) return;
+  tbody.innerHTML = _cpoRows.map((r, i) => {
+    const total = (parseFloat(r.rate)||0) * (parseFloat(r.qty)||0);
+    return `<tr>
+      <td style="padding:5px 8px;border:1px solid var(--border);text-align:center;color:var(--gray-3)">${i+1}</td>
+      <td style="padding:4px 6px;border:1px solid var(--border)">
+        <input style="width:100%;border:none;outline:none;font-size:0.78rem;background:transparent" placeholder="Item description" value="${_escHtml(r.desc||'')}" oninput="_cpoRows[${i}].desc=this.value"/>
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border)">
+        <input style="width:100%;border:none;outline:none;font-size:0.78rem;background:transparent" placeholder="Spec / notes" value="${_escHtml(r.spec||'')}" oninput="_cpoRows[${i}].spec=this.value"/>
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border);text-align:center">
+        <input type="number" min="0" style="width:54px;border:none;outline:none;font-size:0.78rem;text-align:center;background:transparent" value="${r.qty||1}" oninput="_cpoRows[${i}].qty=parseFloat(this.value)||0;_cpoUpdateRow(${i})"/>
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border);text-align:center">
+        <input style="width:52px;border:none;outline:none;font-size:0.78rem;text-align:center;background:transparent" value="${_escHtml(r.unit||'Nos')}" oninput="_cpoRows[${i}].unit=this.value"/>
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border);text-align:right">
+        <input type="number" min="0" style="width:88px;border:none;outline:none;font-size:0.78rem;text-align:right;background:transparent" value="${r.rate||0}" oninput="_cpoRows[${i}].rate=parseFloat(this.value)||0;_cpoUpdateRow(${i})"/>
+      </td>
+      <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-size:0.78rem" id="cpo-row-total-${i}">${total.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+      <td style="padding:4px 6px;border:1px solid var(--border);text-align:center">
+        <button style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:1rem;line-height:1" onclick="cpoRemoveRow(${i})" title="Remove row">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function _escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function _cpoUpdateRow(idx) {
+  const r = _cpoRows[idx];
+  const total = (parseFloat(r.rate)||0) * (parseFloat(r.qty)||0);
+  const cell = document.getElementById(`cpo-row-total-${idx}`);
+  if (cell) cell.textContent = total.toLocaleString('en-IN',{minimumFractionDigits:2});
+  cpoRecalc();
+}
+
+function cpoRecalc() {
+  const basicTotal = _cpoRows.reduce((s,r)=>(s+(parseFloat(r.rate)||0)*(parseFloat(r.qty)||0)),0);
+  const cgst = parseFloat(document.getElementById('cpoCGST')?.value||9)||0;
+  const sgst = parseFloat(document.getElementById('cpoSGST')?.value||9)||0;
+  const pnf  = parseFloat(document.getElementById('cpoPnF')?.value||0)||0;
+  const discPct = parseFloat(document.getElementById('cpoDiscount')?.value||0)||0;
+  const discAmt = Math.round(basicTotal * discPct / 100 * 100) / 100;
+  const afterDisc = basicTotal - discAmt;
+  const taxable = afterDisc + pnf;
+  const cgstAmt = Math.round(taxable * cgst / 100 * 100) / 100;
+  const sgstAmt = Math.round(taxable * sgst / 100 * 100) / 100;
+  const net = Math.round(taxable + cgstAmt + sgstAmt);
+  const basicEl = document.getElementById('cpoBasicTotal');
+  const netEl   = document.getElementById('cpoNetTotal');
+  if (basicEl) basicEl.textContent = basicTotal.toLocaleString('en-IN',{minimumFractionDigits:2});
+  if (netEl)   netEl.textContent   = net.toLocaleString('en-IN');
+}
+
+function cpoReset() {
+  ['cpoPONum','cpoProject','cpoIndent','cpoVendorName','cpoVendorGSTIN','cpoVendorAddress',
+   'cpoVendorContact','cpoVendorPhone','cpoVendorEmail','cpoCustomTerms'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('cpoIndent').value='NA';
+  document.getElementById('cpoPaymentTerms').value='As agreed';
+  document.getElementById('cpoCustomTermsRow').style.display='none';
+  document.getElementById('cpoVendorPick').value='';
+  document.getElementById('cpoCGST').value='9';
+  document.getElementById('cpoSGST').value='9';
+  document.getElementById('cpoPnF').value='0';
+  document.getElementById('cpoDiscount').value='0';
+  _cpoRows=[]; cpoAddRow();
+}
+
+function cpoPreviewPO() {
+  // Validate
+  const vendorName = document.getElementById('cpoVendorName')?.value?.trim();
+  if (!vendorName) { showToast('Please enter vendor name', 'error'); return; }
+  const hasItems = _cpoRows.some(r => (r.desc||'').trim());
+  if (!hasItems) { showToast('Please add at least one line item with a description', 'error'); return; }
+
+  const now = new Date();
+  const fy = now.getMonth()>=3 ? now.getFullYear() : now.getFullYear()-1;
+  const fyShort = `${String(fy).slice(2)}-${String(fy+1).slice(2)}`;
+  const todayStr = now.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/');
+
+  const poNumber = document.getElementById('cpoPONum')?.value?.trim() || `O2C/PO/${fyShort}/DRAFT`;
+  const projectName = document.getElementById('cpoProject')?.value?.trim() || '—';
+  const indent = document.getElementById('cpoIndent')?.value?.trim() || 'NA';
+
+  const vName    = vendorName;
+  const vAddress = document.getElementById('cpoVendorAddress')?.value?.trim() || '';
+  const vContact = document.getElementById('cpoVendorContact')?.value?.trim() || '';
+  const vPhone   = document.getElementById('cpoVendorPhone')?.value?.trim() || '';
+  const vEmail   = document.getElementById('cpoVendorEmail')?.value?.trim() || '';
+  const vGSTIN   = document.getElementById('cpoVendorGSTIN')?.value?.trim() || '';
+
+  const ptSel    = document.getElementById('cpoPaymentTerms');
+  const ptVal    = ptSel?.value || 'As agreed';
+  const ptLabel  = ptVal === 'custom'
+    ? (document.getElementById('cpoCustomTerms')?.value?.trim() || 'Custom Terms')
+    : ptVal;
+
+  const cgstPct  = parseFloat(document.getElementById('cpoCGST')?.value||9)||0;
+  const sgstPct  = parseFloat(document.getElementById('cpoSGST')?.value||9)||0;
+  const pnfVal   = parseFloat(document.getElementById('cpoPnF')?.value||0)||0;
+  const discPct  = parseFloat(document.getElementById('cpoDiscount')?.value||0)||0;
+
+  const baseAmt  = _cpoRows.reduce((s,r)=>(s+(parseFloat(r.rate)||0)*(parseFloat(r.qty)||0)),0);
+  const discAmt  = Math.round(baseAmt * discPct / 100 * 100) / 100;
+  const afterDisc = baseAmt - discAmt;
+  const taxable   = afterDisc + pnfVal;
+  const cgstAmt   = Math.round(taxable * cgstPct / 100 * 100) / 100;
+  const sgstAmt   = Math.round(taxable * sgstPct / 100 * 100) / 100;
+  const netPayable = Math.round(taxable + cgstAmt + sgstAmt);
+  const sym = '₹';
+
+  const savedLogo = localStorage.getItem('po_logo');
+  const savedSig  = localStorage.getItem('po_sig');
+  const logoSrc   = savedLogo || '../on2cooklogo-bg.png';
+  const sigSrc    = savedSig  || '../stamp.png';
+
+  const defaultTermsHTML = `- <strong>Terms &amp; Conditions :</strong>
+  - <strong>Quality :</strong> Supply of goods under this purchase order should be as per our agreed specifications and approved samples. Any change in supplier production process with respect to change in raw material &amp; additives that can change specification (or other technical parameters not appearing on specifications), should be notified to ON2COOK and prior consent should be taken before supply.
+  - <strong>Packing :</strong> Goods must be packed in new containers with clear markings for content, gross weight, tare weight, net weight, and hazard information. We will reject goods that do not meet these packing requirements.
+  - <strong>Delivery :</strong> Goods should be delivered at the desired destination between 9 AM to 5 PM. We shall allow the delivery of the vehicle inside our premises at any time, but unloading of goods is as per Instructions.
+  - <strong>Payment :</strong> This will be according to the terms mentioned in the Purchase Order.
+  - <strong>Weight &amp; Purity :</strong> Both parameters should be in accordance with the order form. Any difference in weight or purity will be calculated to determine the actual quantity supplied, and payment shall be made based on this actual quantity.
+  - <strong>Mandatory Documents Set :</strong> Material supplied should be accompanied with invoice for buyer along with duplicate for transporter, COA, PDI &amp; MSDS, else the vehicle will not be unloaded. All supplied document(s) must clearly indicate our purchase order number &amp; date, else the payment may not be processed.
+  - <strong>Rejection &amp; Replacement :</strong> In case of rejected material due to quality/specification issues, vendor shall be responsible for replacement/rework of material and shall bear all related transportation, pickup, return, and resupply costs. Rejected material handling shall be solely under vendor responsibility.
+  - <strong>Jurisdiction :</strong> Subject To Ahmedabad jurisdiction only.`;
+
+  const itemRows = _cpoRows.filter(r=>(r.desc||'').trim()).map((r, i) => {
+    const qty = parseFloat(r.qty)||0;
+    const rate = parseFloat(r.rate)||0;
+    const rowTotal = qty * rate;
+    return `<tr>
+      <td class="center">${i+1}</td>
+      <td class="center"><input class="po-meta-input" style="text-align:center" placeholder="—"/></td>
+      <td><div class="item-desc-main">${_escHtml(r.desc||'')}</div>${r.spec?`<div class="item-desc-sub">${_escHtml(r.spec)}</div>`:''}</td>
+      <td class="center"><input class="po-meta-input" style="text-align:center" placeholder="—"/></td>
+      <td class="center">${qty}</td>
+      <td class="center">${_escHtml(r.unit||'Nos')}</td>
+      <td class="right"><input class="po-meta-input" id="cpo-po-unitrate-${i}" style="text-align:right" type="number" value="${rate.toFixed(2)}" oninput="cpoRecalcPORow(${i},${qty})"/></td>
+      <td class="right" id="cpo-po-rowtotal-${i}">${sym} ${rowTotal.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('poModalSub').textContent = `${poNumber} — ${projectName} (Custom PO)`;
+
+  document.getElementById('poModalBody').innerHTML = `
+    <!-- Tax controls strip -->
+    <div style="margin-bottom:12px;padding:9px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:6px;font-size:0.78rem;display:flex;align-items:center;flex-wrap:wrap;gap:12px">
+      <span>⚙️ Review and edit fields directly in the PO below. Adjust tax rates here:</span>
+      <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
+        <label style="font-size:0.74rem;white-space:nowrap">P&amp;F (₹)</label>
+        <input id="pnfInput" type="number" value="${pnfVal}" min="0" class="po-tax-input" style="width:80px" onchange="recalcPO()" title="P&F is added to the discounted amount before GST is applied"/>
+        <label style="font-size:0.74rem;white-space:nowrap;margin-left:4px">CGST %</label>
+        <input id="cgstInput" type="number" value="${cgstPct}" min="0" max="28" class="po-tax-input" onchange="recalcPO()"/>
+        <label style="font-size:0.74rem;white-space:nowrap">SGST %</label>
+        <input id="sgstInput" type="number" value="${sgstPct}" min="0" max="28" class="po-tax-input" onchange="recalcPO()"/>
+        <span style="font-size:0.7rem;color:#92400e;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:2px 7px;white-space:nowrap">GST on Basic + P&amp;F</span>
+      </div>
+    </div>
+
+    <div id="poPreviewBox">
+      <!-- Header -->
+      <div class="po-top-bar">
+        <div style="width:130px"></div>
+        <div class="po-paper-title">Purchase Order</div>
+        <div id="poLogoSlot" style="width:130px;display:flex;justify-content:flex-end">
+          <img src="${logoSrc}" class="po-logo-img" alt="Logo" onerror="this.style.display='none'"/>
+        </div>
+      </div>
+
+      <!-- Row 1: Buyer | PO Meta -->
+      <div class="po-addr-grid" style="border-top:1px solid #999">
+        <div class="po-addr-cell">
+          <div class="cell-head">Name and Address of Buyer :</div>
+          <div class="company-name">ON2COOK INDIA PVT. LTD.</div>
+          Ch03, Inspire Business Park,<br/>
+          Adani Shantigram, Near Vaishnodevi Circle, Gandhinagar,<br/>
+          Ahmedabad (Gujarat) India - 382421<br/>
+          GSTIN : 24AACCI7644H1ZK<br/>
+          Contact Person: Charmi Shah<br/>
+          Email: charmi@on2cook.com<br/>
+          Contact No.: 7227029540<br/>
+          Place of Supply: Gujarat.India
+        </div>
+        <div class="po-addr-cell">
+          <table style="width:100%;font-size:0.74rem">
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">PO Number :</td><td><input class="po-meta-input" id="poPreviewNum" value="${_escHtml(poNumber)}" style="font-weight:700;font-size:0.82rem"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">PO Date :</td><td><input class="po-meta-input" id="poDate" value="${todayStr}"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Date :</td><td><input class="po-meta-input" id="poDelivery" value="—"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Payment Terms :</td><td>${_escHtml(ptLabel)}</td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Terms :</td><td>NA</td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Mode of Transport :</td><td>NA</td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Final Destination :</td><td>On2Cook</td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Quote Ref :</td><td><input class="po-meta-input" id="poQuoteRef" placeholder="—"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Indent Number :</td><td><input class="po-meta-input" id="poIndent" value="${_escHtml(indent)}"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Project Code/Name :</td><td><input class="po-meta-input" id="poProjectCode" value="${_escHtml(projectName)}"/></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Row 2: Supplier | Shipping -->
+      <div class="po-addr-grid">
+        <div class="po-addr-cell">
+          <div class="cell-head">Name and Address of Supplier :</div>
+          <div class="company-name">${_escHtml(vName)}</div>
+          ${vAddress ? _escHtml(vAddress)+'<br/>' : ''}
+          ${vContact ? 'Contact: '+_escHtml(vContact)+'<br/>' : ''}
+          ${vPhone   ? 'Phone: '+_escHtml(vPhone)+'<br/>' : ''}
+          ${vEmail   ? _escHtml(vEmail)+'<br/>' : ''}
+          ${vGSTIN   ? 'GSTIN : '+_escHtml(vGSTIN)+'<br/>' : ''}
+          Place of Supply: Gujarat.India
+        </div>
+        <div class="po-addr-cell">
+          <div class="cell-head">Shipping Details :</div>
+          <input class="po-meta-input" id="shippingCompany" value="ON2COOK INDIA PVT. LTD." style="font-weight:700;margin-bottom:4px;width:100%;box-sizing:border-box"/><br/>
+          <input class="po-meta-input" id="shippingAddress1" value="Ch03, Inspire Business Park," style="width:100%;box-sizing:border-box"/><br/>
+          <input class="po-meta-input" id="shippingAddress2" value="Adani Shantigram, Ahmedabad (Gujarat) India - 382421" style="width:100%;box-sizing:border-box"/><br/>
+          GSTIN : <input class="po-meta-input" id="shippingGSTIN" value="24AACC17644H1ZK" style="width:calc(100% - 60px);box-sizing:border-box"/><br/>
+          Contact Person: <input class="po-meta-input" id="shippingContact" value="Charmi Shah" style="width:calc(100% - 120px);box-sizing:border-box"/><br/>
+          Email: <input class="po-meta-input" id="shippingEmail" value="charmi@on2cook.com" style="width:calc(100% - 50px);box-sizing:border-box"/><br/>
+          Contact No.: <input class="po-meta-input" id="shippingPhone" value="7227029540" style="width:calc(100% - 100px);box-sizing:border-box"/><br/>
+          Place of Supply: <input class="po-meta-input" id="shippingPlace" value="Gujarat.India" style="width:calc(100% - 130px);box-sizing:border-box"/>
+        </div>
+      </div>
+
+      <!-- Items table -->
+      <table class="po-items-table">
+        <thead>
+          <tr>
+            <th style="width:42px">Sr No</th>
+            <th style="width:72px">Item Code</th>
+            <th>Description</th>
+            <th style="width:72px">HSN/SAC Code</th>
+            <th style="width:64px">Quantity</th>
+            <th style="width:52px">UOM</th>
+            <th style="width:82px">Unit Rate</th>
+            <th style="width:96px">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemRows}
+          <tr style="height:22px"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+          <tr style="height:22px"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+
+      <!-- Bottom: Terms | Amounts + Sig -->
+      <div class="po-bottom-grid">
+        <div class="po-left-bottom">
+          <div class="po-terms-section">
+            <div class="terms-head">Terms &amp; Conditions:</div>
+            <div id="poTermsEditable" class="po-terms-editable" contenteditable="true">${defaultTermsHTML}</div>
+          </div>
+        </div>
+        <div>
+          <table class="po-amount-table">
+            <tr><td>Basic Amount :</td><td id="poBasicAmt">${sym} ${baseAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
+            <tr><td>Discount (%) :</td><td id="poDiscount">${discPct.toFixed(2)}</td></tr>
+            <tr><td>Amount after Discount :</td><td id="poAfterDiscount">${sym} ${afterDisc.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
+            <tr><td>P&amp;F Charge :</td><td id="poPnf">${sym} ${pnfVal.toFixed(2)}</td></tr>
+            <tr><td>Taxable Value :</td><td id="poTaxableValue">${sym} ${taxable.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
+            <tr><td>CGST % &nbsp; <span id="poCgstPctLabel">${cgstPct}</span>.00 :</td><td id="poCgst">${sym} ${cgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
+            <tr><td>SGST % &nbsp; <span id="poSgstPctLabel">${sgstPct}</span>.00 :</td><td id="poSgst">${sym} ${sgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
+            <tr class="net-row"><td>Net Payable (INR) :</td><td id="poNet">${sym} ${netPayable.toLocaleString('en-IN',{minimumFractionDigits:0})}</td></tr>
+            <tr class="words-row"><td colspan="2"><strong>Amount in words :</strong><br/><span id="poWords">${numToWords(netPayable)}</span></td></tr>
+          </table>
+          <div class="po-sig-section">
+            <div class="po-sig-img-wrap">
+              <div id="poSigSlot">
+                <img src="${sigSrc}" alt="Authorized Signatory" style="max-height:68px;max-width:100%;object-fit:contain" onerror="this.style.display='none'"/>
+              </div>
+            </div>
+            <div class="po-sig-label">(Authorized Signatory)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="po-doc-footer">
+        <span>This is a computer generated document</span>
+        <span>Jurisdiction : Subject To Ahmedabad jurisdiction only.</span>
+      </div>
+    </div>
+  `;
+
+  // Set base amounts for recalc
+  window._poBaseAmt = baseAmt;
+  window._poCurrSymbol = sym;
+  window._poCgstPct = cgstPct;
+  window._poSgstPct = sgstPct;
+
+  // Hide the "Generate & Save PO" button since this is download-only
+  const footerPrimary = document.querySelector('#poModal .modal-footer .btn-primary');
+  if (footerPrimary) { footerPrimary.style.display = 'none'; footerPrimary.dataset.cpoHidden = '1'; }
+
+  openModal('poModal');
+}
+
+// Restore the Generate & Save button when modal closes from any path
+const _origCloseModal = window.closeModal;
+window.closeModal = function(id) {
+  if (id === 'poModal') {
+    const btn = document.querySelector('#poModal .modal-footer .btn-primary');
+    if (btn && btn.dataset.cpoHidden) { btn.style.display = ''; delete btn.dataset.cpoHidden; }
+  }
+  _origCloseModal(id);
+};
+
+function cpoRecalcPORow(idx, qty) {
+  const input = document.getElementById(`cpo-po-unitrate-${idx}`);
+  const totalCell = document.getElementById(`cpo-po-rowtotal-${idx}`);
+  const sym = window._poCurrSymbol || '₹';
+  if (!input || !totalCell) return;
+  const unitRate = parseFloat(input.value) || 0;
+  const rowTotal = unitRate * qty;
+  totalCell.textContent = `${sym} ${rowTotal.toLocaleString('en-IN',{minimumFractionDigits:2})}`;
+  // Recalc base from all rows
+  let newBase = 0;
+  const rows = document.querySelectorAll('#poPreviewBox tbody tr [id^="cpo-po-unitrate-"]');
+  document.querySelectorAll('[id^="cpo-po-unitrate-"]').forEach((el, i) => {
+    const q = _cpoRows.filter(r=>(r.desc||'').trim())[i]?.qty || 1;
+    newBase += (parseFloat(el.value)||0) * q;
+  });
+  window._poBaseAmt = newBase;
+  const basicEl = document.getElementById('poBasicAmt');
+  if (basicEl) basicEl.textContent = `${sym} ${newBase.toLocaleString('en-IN',{minimumFractionDigits:2})}`;
+  recalcPO();
 }
 
 init();
