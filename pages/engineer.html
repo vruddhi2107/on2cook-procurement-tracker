@@ -255,7 +255,6 @@
             <option value="new">New Order</option>
             <option value="repeat">Repeat Order</option>
             <option value="custom">Custom Order</option>
-            <option value="modification">Modification Request</option>
             <option value="inventory">Inventory Item</option>
           </select>
         </div>
@@ -346,14 +345,6 @@
         <div id="partsEditorContainer"></div>
       </div>
 
-      <!-- ── Modification Note ── -->
-      <div id="modificationNoteSection" style="display:none;margin-top:16px;padding:14px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius)">
-        <div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;color:#6366f1">↺ Resubmitting as a Modified Request</div>
-        <div class="form-group">
-          <label class="form-label">What changed? *</label>
-          <textarea class="form-control" id="fModNote" placeholder="Briefly describe what was changed from the original request..."></textarea>
-        </div>
-      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('prFormModal')">Cancel</button>
@@ -616,7 +607,6 @@ function renderTable(reqs) {
       <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gray-4)">${fmtDate(r.updated_at||r.created_at)}</td>
       <td style="white-space:nowrap">
         <button class="btn ${needsAction?'btn-primary':'btn-ghost'} btn-sm" onclick='openPR("${r.id}")'>${needsAction?'Action':'View'}</button>
-        ${['submitted','pending_initial_pm_approval'].includes(r.phase)?`<button class="btn btn-ghost btn-sm" onclick='openEditPR("${r.id}")' style="margin-left:4px">Edit</button>`:''}
       </td>
     </tr>`;
   }).join('');
@@ -731,7 +721,6 @@ async function handleBOMFile(e) {
   document.getElementById('prFormTitle').textContent='New Procurement Request';
   document.getElementById('prFormSub').textContent='All starred fields are required';
   document.getElementById('prFormSubmitBtn').textContent='Submit Request →';
-  document.getElementById('modificationNoteSection').style.display='none';
   document.getElementById('pmApprovalSection').style.display='block';
   document.getElementById('pmScreenshotSection').style.display='none';
   document.getElementById('pmSsPreview').style.display='none';
@@ -752,46 +741,6 @@ async function handleBOMFile(e) {
   openModal('prFormModal');
 }
 
-function openEditPR(id) {
-  const pr=myRequests.find(r=>r.id===id); if(!pr) return;
-  isEditMode=true; editingParentId=id;
-  selectedSourcing=pr.sourcing?(Array.isArray(pr.sourcing)?pr.sourcing:JSON.parse(pr.sourcing||'[]')):[];
-  attachedFiles=[]; pmScreenshotBase64=null;
-  document.getElementById('prFormTitle').textContent='Edit & Resubmit Request';
-  document.getElementById('prFormSub').textContent=`Based on PR-${String(pr.request_number).padStart(4,'0')}`;
-  document.getElementById('prFormSubmitBtn').textContent='↺ Resubmit as Modified →';
-  document.getElementById('modificationNoteSection').style.display='block';
-  document.getElementById('pmApprovalSection').style.display='none';
-  document.getElementById('pmScreenshotSection').style.display='none';
-  document.getElementById('fCategory').value=pr.request_category;
-  document.getElementById('fDept').value=pr.department;
-  document.getElementById('fPhaseSelect').innerHTML=`<option value="${pr.project_phase}" selected>${pr.project_phase}</option>`;
-  document.getElementById('fPMSelect').value=pr.assigned_pm_id||'';
-  document.getElementById('fOrderType').value=pr.order_type||'';
-  document.getElementById('fVendor').value=pr.vendor_suggestion||'';
-  const urgEditEl=document.getElementById('fUrgency');if(urgEditEl)urgEditEl.value=pr.urgency||'normal';
-  document.getElementById('fDesc').value=pr.description||'';
-  document.getElementById('fProductLink').value=pr.product_link||'';
-  document.getElementById('fQcColor').value=pr.qc_criteria?.preferred_color||'';
-  document.getElementById('fQcMaterial').value=pr.qc_criteria?.preferred_material||'';
-  document.getElementById('fQcCustom').value=pr.qc_criteria?.custom||'';
-  document.getElementById('fTeam').value=currentUser.name;
-  document.getElementById('fModNote').value='';
-  document.getElementById('attachList').innerHTML='';
-  document.getElementById('bomStatus').innerHTML='';
-  // Set sourcing chips
-  document.getElementById('srcDomestic').classList.toggle('selected',selectedSourcing.includes('domestic'));
-  document.getElementById('srcInternational').classList.toggle('selected',selectedSourcing.includes('international'));
-  // Set project dropdown — try to find project
-  const proj=allProjects.find(p=>p.name===pr.project_name);
-  if(proj){document.getElementById('fProjectSelect').value=proj.id;}
-  const parts=(pr.parts||[]).map((p,i)=>({...p,_id:i+1}));
-  if(!parts.length) parts.push({_id:1,part_number:'',name:'',qty:1,spec:''});
-  const _editPhase=(pr.project_phase||'').toLowerCase().trim();
-  initPartsEditor('partsEditorContainer',parts, _editPhase==='production');
-  onCategoryChange();
-  openModal('prFormModal');
-}
 
 async function submitPR() {
   const cat=document.getElementById('fCategory').value;
@@ -820,7 +769,6 @@ async function submitPR() {
       return;
     }
   }
-  if(isEditMode){const modNote=document.getElementById('fModNote').value.trim();if(!modNote){showToast('Please describe what changed','error');return;}}
   const pmUser=allPMs.find(p=>p.id===pmId);
   const qcCriteria={
     preferred_color:document.getElementById('fQcColor').value.trim()||null,
@@ -849,18 +797,16 @@ async function submitPR() {
     initial_pm_approval:isEditMode?'already_approved':(isLP?'needs_approval':isVI?null:selectedPMApproval),
     is_modification:isEditMode,
     parent_request_id:isEditMode?editingParentId:null,
-    modification_note:isEditMode?document.getElementById('fModNote').value.trim():null,
     phase_timestamps:(function(){var ts={'submitted':new Date().toISOString()};var ph=isLP?'lp_submitted':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval';if(ph!=='submitted')ts[ph]=new Date().toISOString();return ts;})()
   };
   if(!isVI&&!isLP) vals.order_type=orderType;
   showLoader(true);
   const{error,data}=await db.from('procurement_requests').insert(vals).select().single();
   if(!error&&isEditMode&&editingParentId){
-    await postComment(editingParentId,currentUser.id,`↺ Modified and resubmitted as PR-${String(data.request_number).padStart(4,'0')}`);
   }
   showLoader(false);
   if(error){showToast('Submit failed: '+error.message,'error');return;}
-  showToast(isEditMode?'↺ Resubmitted as a new modified request!':isLP?'Local Purchase request submitted!':isVI?'Vendor Info request sent to Procurement Manager!':'Request submitted!','success');
+  showToast(isLP?'Local Purchase request submitted!':isVI?'Vendor Info request sent to Procurement Manager!':'Request submitted!','success');
   if(newPR?.id) notifyPhaseChange(newPR.id, newPR.phase||'submitted', currentUser?.id);
   closeModal('prFormModal');
   await loadRequests();

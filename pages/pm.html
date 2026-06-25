@@ -142,7 +142,6 @@
             <option value="new">New Order</option>
             <option value="repeat">Repeat Order</option>
             <option value="custom">Custom Order</option>
-            <option value="modification">Modification Request</option>
             <option value="inventory">Inventory Item</option>
           </select>
         </div>
@@ -213,14 +212,6 @@
         <div id="partsEditorContainer"></div>
       </div>
 
-      <!-- Modification Note -->
-      <div id="modificationNoteSection" style="display:none;margin-top:16px;padding:14px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius)">
-        <div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;color:#6366f1">↺ Resubmitting as a Modified Request</div>
-        <div class="form-group">
-          <label class="form-label">What changed? *</label>
-          <textarea class="form-control" id="fModNote" placeholder="Briefly describe what was changed from the original request..."></textarea>
-        </div>
-      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('prFormModal')">Cancel</button>
@@ -924,7 +915,6 @@ function openNewPR() {
   document.getElementById('prFormTitle').textContent='New Procurement Request';
   document.getElementById('prFormSub').textContent='All starred fields are required — you are the assigned Project Manager';
   document.getElementById('prFormSubmitBtn').textContent='Submit Request →';
-  document.getElementById('modificationNoteSection').style.display='none';
   document.getElementById('srcDomestic').classList.remove('selected');
   document.getElementById('srcInternational').classList.remove('selected');
   document.getElementById('attachList').innerHTML='';
@@ -962,7 +952,6 @@ async function submitPR() {
     const missing=parts.filter(p=>!p.part_number||!p.part_number.trim());
     if(missing.length){showToast(`Production phase requires a Part Number for every item (${missing.length} missing)`,'error');return;}
   }
-  if(isEditMode){const modNote=document.getElementById('fModNote').value.trim();if(!modNote){showToast('Please describe what changed','error');return;}}
   const qcCriteria={
     preferred_color:document.getElementById('fQcColor').value.trim()||null,
     preferred_material:document.getElementById('fQcMaterial').value.trim()||null,
@@ -991,7 +980,6 @@ async function submitPR() {
     initial_pm_approval:'already_approved',
     is_modification:isEditMode,
     parent_request_id:isEditMode?editingParentId:null,
-    modification_note:isEditMode?document.getElementById('fModNote').value.trim():null,
     phase_timestamps:{submitted:new Date().toISOString(),procurement_active:new Date().toISOString()}
   };
   if(!isVI&&!isLP) vals.order_type=orderType;
