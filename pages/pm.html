@@ -19,24 +19,27 @@
   </div>
 
   <div class="stats-grid">
-    <div class="stat-card"><div class="stat-card-value" id="sClearance">—</div><div class="stat-card-label">Needs Clearance</div><div class="stat-card-icon">🔐</div></div>
+    <div class="stat-card"><div class="stat-card-value" id="sTotal">—</div><div class="stat-card-label">Total Requests</div><div class="stat-card-icon">📋</div></div>
+    <div class="stat-card" style="--accent:#6366f1"><div class="stat-card-value" id="sClearance">—</div><div class="stat-card-label">Needs Clearance</div><div class="stat-card-icon">🔐</div></div>
     <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sFinal">—</div><div class="stat-card-label">Pending Final</div><div class="stat-card-icon">✍️</div></div>
-    <div class="stat-card" style="--accent:#7c3aed"><div class="stat-card-value" id="sEscalated">—</div><div class="stat-card-label">Sent to Director</div><div class="stat-card-icon">👤</div></div>
-    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sApproved">—</div><div class="stat-card-label">Approved</div><div class="stat-card-icon"></div></div>
-    <div class="stat-card" style="--accent:#dc2626"><div class="stat-card-value" id="sRejected">—</div><div class="stat-card-label">Rejected</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#3b82f6"><div class="stat-card-value" id="sOngoing">—</div><div class="stat-card-label">Ongoing</div><div class="stat-card-icon">⚙️</div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sDone">—</div><div class="stat-card-label">Closed</div><div class="stat-card-icon">✅</div></div>
+    <div class="stat-card" style="--accent:#dc2626"><div class="stat-card-value" id="sRejected">—</div><div class="stat-card-label">Declined / Rejected</div><div class="stat-card-icon">❌</div></div>
   </div>
 
   <div id="pendingBanner" style="display:none;margin-bottom:16px"></div>
 
   <div class="tabs">
-  <button class="tab-btn active" data-tab="clearance" onclick="switchTab('clearance')">🔐 Clearance</button>
-  <button class="tab-btn" data-tab="final" onclick="switchTab('final')">✍️ Final Approval</button>
-  <button class="tab-btn" data-tab="all" onclick="switchTab('all')">All Requests</button>
-  <button class="tab-btn" data-tab="mine" onclick="switchTab('mine')">📝 My Requests</button>
-  <button class="tab-btn" data-tab="vendors" onclick="switchTab('vendors')">🏢 Vendors</button>
-
-  <button class="tab-btn" onclick="goToProjects()">📋 Projects</button>
-</div>
+    <button class="tab-btn active" data-tab="clearance" onclick="switchTab('clearance')">🔐 Clearance</button>
+    <button class="tab-btn" data-tab="final" onclick="switchTab('final')">✍️ Final Approval</button>
+    <button class="tab-btn" data-tab="all" onclick="switchTab('all')">All Requests</button>
+    <button class="tab-btn" data-tab="ongoing" onclick="switchTab('ongoing')">⚙️ Ongoing</button>
+    <button class="tab-btn" data-tab="declined" onclick="switchTab('declined')">❌ Declined / Rejected</button>
+    <button class="tab-btn" data-tab="closed" onclick="switchTab('closed')">✅ Closed</button>
+    <button class="tab-btn" data-tab="mine" onclick="switchTab('mine')">📝 My Requests</button>
+    <button class="tab-btn" data-tab="vendors" onclick="switchTab('vendors')">🏢 Vendors</button>
+    <button class="tab-btn" onclick="goToProjects()">📋 Projects</button>
+  </div>
 
   <div id="tabContent">
     <div class="filter-bar">
@@ -300,11 +303,16 @@ async function loadRequests() {
 }
 
 function updateStats() {
-  document.getElementById('sClearance').textContent=allRequests.filter(r=>['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase)).length;
+  const declinedPhases=['rejected','qc_rejected','declined','lp_rejected'];
+  const closedPhases=['qc_passed','accepted','payment_requested','payment_received','lp_payment_done'];
+  const clearancePhases=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'];
+  const allTerminal=[...declinedPhases,...closedPhases];
+  document.getElementById('sTotal').textContent=allRequests.length;
+  document.getElementById('sClearance').textContent=allRequests.filter(r=>clearancePhases.includes(r.phase)).length;
   document.getElementById('sFinal').textContent=allRequests.filter(r=>r.phase==='pending_pm_final_approval').length;
-  document.getElementById('sEscalated').textContent=allRequests.filter(r=>r.phase==='pending_sandy_approval').length;
-  document.getElementById('sApproved').textContent=allRequests.filter(r=>r.pm_final_approval_status==='approved').length;
-  document.getElementById('sRejected').textContent=allRequests.filter(r=>r.pm_final_approval_status==='rejected').length;
+  document.getElementById('sOngoing').textContent=allRequests.filter(r=>!allTerminal.includes(r.phase)&&!clearancePhases.includes(r.phase)&&r.phase!=='pending_pm_final_approval').length;
+  document.getElementById('sDone').textContent=allRequests.filter(r=>closedPhases.includes(r.phase)).length;
+  document.getElementById('sRejected').textContent=allRequests.filter(r=>declinedPhases.includes(r.phase)).length;
 }
 
 function renderBanner() {
@@ -333,9 +341,16 @@ function switchTab(t) {
 
 function filterTable() {
   const s=document.getElementById('searchInput').value.toLowerCase();
+  const declinedPhases=['rejected','qc_rejected','declined','lp_rejected'];
+  const closedPhases=['qc_passed','accepted','payment_requested','payment_received','lp_payment_done'];
+  const clearancePhases=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'];
+  const allTerminal=[...declinedPhases,...closedPhases];
   let reqs=allRequests;
-  if(activeTab==='clearance') reqs=reqs.filter(r=>['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase));
+  if(activeTab==='clearance') reqs=reqs.filter(r=>clearancePhases.includes(r.phase));
   else if(activeTab==='final') reqs=reqs.filter(r=>r.phase==='pending_pm_final_approval');
+  else if(activeTab==='ongoing') reqs=reqs.filter(r=>!allTerminal.includes(r.phase)&&!clearancePhases.includes(r.phase)&&r.phase!=='pending_pm_final_approval');
+  else if(activeTab==='declined') reqs=reqs.filter(r=>declinedPhases.includes(r.phase));
+  else if(activeTab==='closed') reqs=reqs.filter(r=>closedPhases.includes(r.phase));
   else if(activeTab==='mine') reqs=reqs.filter(r=>r.created_by===currentUser.id);
   if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
   renderTable(reqs);
@@ -343,7 +358,10 @@ function filterTable() {
 
 function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
-  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${activeTab==='clearance'?'🔐':activeTab==='mine'?'📝':'✍️'}</div><h3>No requests here</h3><p>${activeTab==='clearance'?'No pending clearance requests.':activeTab==='final'?'No final approvals pending.':activeTab==='mine'?'You haven\'t submitted any requests yet. Click + New Request to get started.':'No requests assigned to you yet.'}</p>${activeTab==='mine'?'<button class="btn btn-primary" style="margin-top:12px" onclick="openNewPR()">+ New Request</button>':''}</div></td></tr>`;return;}
+  const emptyIcon={clearance:'🔐',final:'✍️',all:'📭',ongoing:'⚙️',declined:'❌',closed:'✅',mine:'📝'}[activeTab]||'📭';
+  const emptyTitle={clearance:'No pending clearance requests',final:'No final approvals pending',all:'No requests assigned yet',ongoing:'No ongoing requests',declined:'No declined or rejected requests',closed:'No closed requests',mine:'You haven\'t submitted any requests yet'}[activeTab]||'No requests found';
+  const emptySub={mine:'Click + New Request to get started.',clearance:'All clearance requests have been handled.',final:'No quotes are awaiting your final decision.',ongoing:'All requests are in terminal or action-pending states.',declined:'No requests have been declined or rejected.',closed:'No requests have been fully completed yet.',all:'No procurement requests assigned to you yet.'}[activeTab]||'';
+  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${emptyIcon}</div><h3>${emptyTitle}</h3><p>${emptySub}</p>${activeTab==='mine'?'<button class="btn btn-primary" style="margin-top:12px" onclick="openNewPR()">+ New Request</button>':''}</div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
     const needsAction=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval','pending_pm_final_approval'].includes(r.phase);
     const isClearance=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase), isFinal=r.phase==='pending_pm_final_approval';

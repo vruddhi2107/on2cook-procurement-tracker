@@ -45,20 +45,22 @@
   </div>
 
   <div class="stats-grid">
-    <div class="stat-card"><div class="stat-card-value" id="sTotal">—</div><div class="stat-card-label">Total</div><div class="stat-card-icon">📋</div></div>
-    <div class="stat-card" style="--accent:#3b82f6"><div class="stat-card-value" id="sActive">—</div><div class="stat-card-label">In Progress</div><div class="stat-card-icon">⚡</div></div>
+    <div class="stat-card"><div class="stat-card-value" id="sTotal">—</div><div class="stat-card-label">Total Requests</div><div class="stat-card-icon">📋</div></div>
+    <div class="stat-card" style="--accent:#3b82f6"><div class="stat-card-value" id="sOngoing">—</div><div class="stat-card-label">Ongoing</div><div class="stat-card-icon">⚙️</div></div>
     <div class="stat-card" style="--accent:#D62B2B"><div class="stat-card-value" id="sAction">—</div><div class="stat-card-label">Needs Action</div><div class="stat-card-icon">🔔</div></div>
-    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sClosed">—</div><div class="stat-card-label">Closed</div><div class="stat-card-icon">✔</div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sClosed">—</div><div class="stat-card-label">Closed</div><div class="stat-card-icon">✅</div></div>
+    <div class="stat-card" style="--accent:#dc2626"><div class="stat-card-value" id="sDeclined">—</div><div class="stat-card-label">Declined / Rejected</div><div class="stat-card-icon">❌</div></div>
   </div>
 
   <div id="actionBanner" style="display:none;margin-bottom:16px"></div>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('all')">All</button>
-    <button class="tab-btn" onclick="switchTab('action')">🔔 Action Needed</button>
-    <button class="tab-btn" onclick="switchTab('closed')">Closed</button>
-    <button class="tab-btn" onclick="switchTab('parts')">🔩 Parts Catalog</button>
-    <!-- <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendors</button> -->
+    <button class="tab-btn active" data-tab="all" onclick="switchTab('all')">All Requests</button>
+    <button class="tab-btn" data-tab="ongoing" onclick="switchTab('ongoing')">⚙️ Ongoing</button>
+    <button class="tab-btn" data-tab="action" onclick="switchTab('action')">🔔 Action Needed</button>
+    <button class="tab-btn" data-tab="declined" onclick="switchTab('declined')">❌ Declined / Rejected</button>
+    <button class="tab-btn" data-tab="closed" onclick="switchTab('closed')">✅ Closed</button>
+    <button class="tab-btn" data-tab="parts" onclick="switchTab('parts')">🔩 Parts Catalog</button>
   </div>
 
   <div id="tabRequests">
@@ -484,11 +486,15 @@ function onPhaseChange() {
 
 // ── STATS / BANNER ───────────────────────────────────────────
 function updateStats() {
-  const closed=['qc_passed','accepted','rejected','qc_rejected','declined','payment_requested','payment_received','lp_payment_done'], action=['quotations_shared','grn_pending','vendor_info_shared','lp_submitted'];
+  const declinedPhases=['rejected','qc_rejected','declined','lp_rejected'];
+  const closedPhases=['qc_passed','accepted','payment_requested','payment_received','lp_payment_done'];
+  const actionPhases=['quotations_shared','grn_pending','vendor_info_shared','lp_submitted'];
+  const allTerminal=[...declinedPhases,...closedPhases];
   document.getElementById('sTotal').textContent=myRequests.length;
-  document.getElementById('sActive').textContent=myRequests.filter(r=>!closed.includes(r.phase)).length;
-  document.getElementById('sAction').textContent=myRequests.filter(r=>action.includes(r.phase)).length;
-  document.getElementById('sClosed').textContent=myRequests.filter(r=>closed.includes(r.phase)).length;
+  document.getElementById('sOngoing').textContent=myRequests.filter(r=>!allTerminal.includes(r.phase)&&!actionPhases.includes(r.phase)).length;
+  document.getElementById('sAction').textContent=myRequests.filter(r=>actionPhases.includes(r.phase)).length;
+  document.getElementById('sClosed').textContent=myRequests.filter(r=>closedPhases.includes(r.phase)).length;
+  document.getElementById('sDeclined').textContent=myRequests.filter(r=>declinedPhases.includes(r.phase)).length;
 }
 
 function renderBanner() {
@@ -506,7 +512,7 @@ function renderBanner() {
 
 function switchTab(t) {
   activeTab=t;
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['all','action','closed','parts','vendors'][i]===t));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('data-tab')===t));
   document.getElementById('tabRequests').style.display=['vendors','parts'].includes(t)?'none':'block';
   document.getElementById('tabVendors').style.display=t==='vendors'?'block':'none';
   document.getElementById('tabParts').style.display=t==='parts'?'block':'none';
@@ -576,10 +582,15 @@ function clearFilters(){document.getElementById('searchInput').value='';document
 function filterTable() {
   const s=document.getElementById('searchInput').value.toLowerCase(), ph=document.getElementById('filterPhase').value;
   const urg=document.getElementById('filterUrgency')?.value||'';
-  const closed=['qc_passed','accepted','rejected','qc_rejected','declined','payment_requested','payment_received','lp_payment_done'], action=['quotations_shared','grn_pending','vendor_info_shared','lp_submitted'];
+  const declinedPhases=['rejected','qc_rejected','declined','lp_rejected'];
+  const closedPhases=['qc_passed','accepted','payment_requested','payment_received','lp_payment_done'];
+  const actionPhases=['quotations_shared','grn_pending','vendor_info_shared','lp_submitted'];
+  const allTerminal=[...declinedPhases,...closedPhases];
   let reqs=myRequests;
-  if(activeTab==='action') reqs=reqs.filter(r=>action.includes(r.phase));
-  if(activeTab==='closed') reqs=reqs.filter(r=>closed.includes(r.phase));
+  if(activeTab==='ongoing') reqs=reqs.filter(r=>!allTerminal.includes(r.phase)&&!actionPhases.includes(r.phase));
+  else if(activeTab==='action') reqs=reqs.filter(r=>actionPhases.includes(r.phase));
+  else if(activeTab==='declined') reqs=reqs.filter(r=>declinedPhases.includes(r.phase));
+  else if(activeTab==='closed') reqs=reqs.filter(r=>closedPhases.includes(r.phase));
   if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
   if(ph) reqs=reqs.filter(r=>r.phase===ph);
   if(urg) reqs=reqs.filter(r=>(r.urgency||'normal')===urg);
@@ -588,7 +599,10 @@ function filterTable() {
 
 function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
-  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>${activeTab==='action'?'All caught up!':'No requests found'}</h3><p>${activeTab==='action'?'No actions needed right now.':'Submit a new request to get started.'}</p></div></td></tr>`;return;}
+  const emptyIcon={all:'📭',ongoing:'⚙️',action:'🔔',declined:'❌',closed:'✅'}[activeTab]||'📭';
+  const emptyTitle={all:'No requests found',ongoing:'No ongoing requests',action:'All caught up!',declined:'No declined requests',closed:'No closed requests'}[activeTab]||'No requests found';
+  const emptySub={all:'Submit a new request to get started.',ongoing:'All your requests are either completed or need action.',action:'No actions needed right now.',declined:'None of your requests have been declined.',closed:'No requests have been completed yet.'}[activeTab]||'';
+  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${emptyIcon}</div><h3>${emptyTitle}</h3><p>${emptySub}</p></div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
     const needsAction=['quotations_shared','grn_pending','vendor_info_shared'].includes(r.phase);
     const pmName=r.users?.name||r.project_manager_name||'—';
@@ -607,6 +621,7 @@ function renderTable(reqs) {
       <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gray-4)">${fmtDate(r.updated_at||r.created_at)}</td>
       <td style="white-space:nowrap">
         <button class="btn ${needsAction?'btn-primary':'btn-ghost'} btn-sm" onclick='openPR("${r.id}")'>${needsAction?'Action':'View'}</button>
+        ''
       </td>
     </tr>`;
   }).join('');
