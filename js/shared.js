@@ -490,6 +490,45 @@ function renderPartsTable(parts) {
 }
 
 // ── PR DETAIL HTML ──────────────────────────────────────────
+// ── EDITABLE REQUEST FORM (Procurement) ────────────────────────
+// Renders an editable version of the core request fields + BOM/parts.
+// Used only where the caller explicitly wires up an edit/save flow
+// (currently: procurement.html). Does not touch workflow-status
+// sections (QC results, GRN, payments) which have their own flows.
+function buildPRDetailEditableHTML(pr) {
+  const sourcingArr = pr.sourcing ? (Array.isArray(pr.sourcing)?pr.sourcing:JSON.parse(pr.sourcing||'[]')) : [];
+  const deptOpts = Object.keys(DEPARTMENTS).map(k=>`<option value="${k}" ${pr.department===k?'selected':''}>${DEPARTMENTS[k]}</option>`).join('');
+  const orderTypeOpts = ['',...Object.keys(ORDER_TYPES)].map(k=>`<option value="${k}" ${(pr.order_type||'')===k?'selected':''}>${k?ORDER_TYPES[k]:'— None —'}</option>`).join('');
+  return `
+    <div style="padding:12px 14px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius);margin-bottom:14px;font-size:0.78rem;color:#4f46e5">
+      ✏️ Editing request details. Changes save directly to this request when you click <strong>Save Changes</strong>.
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Project</label><input class="form-control" id="editReqProject" value="${_shEsc(pr.project_name)}"/></div>
+      <div class="form-group"><label class="form-label">Phase</label><input class="form-control" id="editReqPhase" value="${_shEsc(pr.project_phase)}"/></div>
+      <div class="form-group"><label class="form-label">Project Manager</label><input class="form-control" id="editReqPM" value="${_shEsc(pr.project_manager_name)}"/></div>
+      <div class="form-group"><label class="form-label">Team Member</label><input class="form-control" id="editReqTeamMember" value="${_shEsc(pr.team_member_name)}"/></div>
+      <div class="form-group"><label class="form-label">Department</label><select class="form-control" id="editReqDept">${deptOpts}</select></div>
+      <div class="form-group"><label class="form-label">Order Type</label><select class="form-control" id="editReqOrderType">${orderTypeOpts}</select></div>
+      <div class="form-group full"><label class="form-label">Product Link</label><input class="form-control" id="editReqProductLink" value="${_shEsc(pr.product_link)}" placeholder="https://…"/></div>
+      <div class="form-group full">
+        <label class="form-label">Sourcing</label>
+        <div style="display:flex;gap:16px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem"><input type="checkbox" id="editReqSourcingDomestic" ${sourcingArr.includes('domestic')?'checked':''}/> 🏠 Domestic</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem"><input type="checkbox" id="editReqSourcingIntl" ${sourcingArr.includes('international')?'checked':''}/> 🌍 International</label>
+        </div>
+      </div>
+      <div class="form-group full"><label class="form-label">Description / Notes</label><textarea class="form-control" id="editReqDescription" style="min-height:80px">${_shEsc(pr.description)}</textarea></div>
+    </div>
+    <div style="margin-top:16px">
+      <div class="detail-key" style="margin-bottom:8px">BOM / Items</div>
+      <div id="reqEditPartsContainer"></div>
+    </div>
+  `;
+}
+function _shEsc(v) { return v==null ? '' : String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+window.buildPRDetailEditableHTML = buildPRDetailEditableHTML;
+
 function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={}) {
   // extras: { poData, advPayRec, payRec }
   // poData       = purchase_orders row (or null)

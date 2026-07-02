@@ -1170,7 +1170,7 @@ async function openPR(id) {
   const attachments = currentAttachments;
   showLoader(false);
   const footer=document.getElementById('prModalFooter');
-  footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('prModal')">Close</button>`;
+  footer.innerHTML=`<button class="btn btn-secondary" onclick="enterRequestEditMode()">✏️ Edit Request</button><button class="btn btn-secondary" onclick="closeModal('prModal')" style="margin-left:auto">Close</button>`;
   let actionSection='';
 
   // ── VENDOR INFO ──
@@ -1557,7 +1557,9 @@ async function openPR(id) {
   const attachmentsSectionHTML = _buildAttsSection(attachments, 'Attachments');
 
   document.getElementById('prModalBody').innerHTML=
+    `<div id="prDetailViewSection">`+
     buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',currentPR.project_manager_name||'',{poData:existingPO,advPayRec:advRes.data||null,payRec:payRes.data||null})
+    +`</div><div id="prDetailEditSection" style="display:none"></div>`
     +attachmentsSectionHTML
     +actionSection+
     `<div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
@@ -1574,6 +1576,62 @@ async function openPR(id) {
     </div>`;
   openModal('prModal');
   setTimeout(function(){ window.initCommentBox && window.initCommentBox('commentInput','mentionDdPr'); }, 50);
+}
+
+// ── EDITABLE REQUEST (Procurement) ─────────────────────────────
+function enterRequestEditMode() {
+  if (!currentPR) return;
+  const viewSec = document.getElementById('prDetailViewSection');
+  const editSec = document.getElementById('prDetailEditSection');
+  if (!viewSec || !editSec) return;
+  editSec.innerHTML = buildPRDetailEditableHTML(currentPR);
+  viewSec.style.display = 'none';
+  editSec.style.display = 'block';
+  initPartsEditor('reqEditPartsContainer', currentPR.parts||[], false);
+
+  const footer = document.getElementById('prModalFooter');
+  footer.innerHTML = `<button class="btn btn-secondary" onclick="cancelRequestEdit()">✕ Cancel</button><button class="btn btn-primary" onclick="saveRequestEdits()" style="margin-left:auto">💾 Save Changes</button>`;
+}
+
+function cancelRequestEdit() {
+  if (!currentPR) return;
+  openPR(currentPR.id); // simplest safe way to fully reset view + footer
+}
+
+async function saveRequestEdits() {
+  if (!currentPR) return;
+  const projectName = document.getElementById('editReqProject')?.value.trim();
+  if (!projectName) { showToast('Project name is required', 'error'); return; }
+
+  const sourcing = [];
+  if (document.getElementById('editReqSourcingDomestic')?.checked) sourcing.push('domestic');
+  if (document.getElementById('editReqSourcingIntl')?.checked) sourcing.push('international');
+
+  const parts = getPartsFromEditor();
+
+  const vals = {
+    project_name: projectName,
+    project_phase: document.getElementById('editReqPhase')?.value.trim() || null,
+    project_manager_name: document.getElementById('editReqPM')?.value.trim() || null,
+    team_member_name: document.getElementById('editReqTeamMember')?.value.trim() || null,
+    department: document.getElementById('editReqDept')?.value || null,
+    order_type: document.getElementById('editReqOrderType')?.value || null,
+    product_link: document.getElementById('editReqProductLink')?.value.trim() || null,
+    sourcing,
+    description: document.getElementById('editReqDescription')?.value.trim() || null,
+    parts
+  };
+
+  showLoader(true);
+  const { error } = await db.from('procurement_requests').update(vals).eq('id', currentPR.id);
+  showLoader(false);
+  if (error) { showToast('Error saving request: ' + error.message, 'error'); return; }
+
+  showToast('Request updated!', 'success');
+  await loadRequests();
+  const updated = allRequests.find(r => r.id === currentPR.id);
+  if (updated) currentPR = updated;
+  await openPR(currentPR.id);
 }
 
 // ── VENDOR SELECTOR CHIP ─────────────────────────────────────
@@ -2279,11 +2337,14 @@ async function openPOModal(prId) {
     return `<tr>
       <td class="center">${i+1}</td>
       <td class="center"><input class="po-meta-input" style="text-align:center" placeholder="—"/></td>
-      <td><div class="item-desc-main">${p.name||'—'}</div>${p.spec?`<div class="item-desc-sub">${p.spec}</div>`:''}</td>
+      <td>
+        <input class="po-meta-input item-desc-main" id="po-desc-${i}" value="${_escHtml(p.name||'')}" placeholder="Item description" style="width:100%;font-weight:600"/>
+        <input class="po-meta-input item-desc-sub" id="po-spec-${i}" value="${_escHtml(p.spec||'')}" placeholder="Spec / notes" style="width:100%;font-size:0.72rem;color:var(--gray-3);margin-top:2px"/>
+      </td>
       <td class="center"><input class="po-meta-input" style="text-align:center" placeholder="—"/></td>
-      <td class="center">${p.qty||1}</td>
-      <td class="center">Nos</td>
-      <td class="right"><input class="po-meta-input" id="po-unitrate-${i}" style="text-align:right" type="number" value="${unitRate.toFixed(2)}" oninput="recalcPORow(${i},${p.qty||1})"/></td>
+      <td class="center"><input class="po-meta-input" id="po-qty-${i}" type="number" min="0" step="any" value="${p.qty||1}" style="text-align:center;width:48px" oninput="recalcPORow(${i})"/></td>
+      <td class="center"><input class="po-meta-input" id="po-uom-${i}" value="Nos" style="text-align:center;width:46px"/></td>
+      <td class="right"><input class="po-meta-input" id="po-unitrate-${i}" style="text-align:right" type="number" value="${unitRate.toFixed(2)}" oninput="recalcPORow(${i})"/></td>
       <td class="right" id="po-rowtotal-${i}">${currSymbol} ${rowTotal.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
     </tr>`;
   }).join('');
@@ -2319,25 +2380,24 @@ async function openPOModal(prId) {
       <div class="po-addr-grid" style="border-top:1px solid #999">
         <div class="po-addr-cell">
           <div class="cell-head">Name and Address of Buyer :</div>
-          <div class="company-name">ON2COOK INDIA PVT. LTD.</div>
-          Ch03, Inspire Business Park,<br/>
-          Adani Shantigram, Near Vaishnodevi Circle, Gandhinagar,<br/>
-          Ahmedabad (Gujarat) India - 382421<br/>
-          GSTIN : 24AACCI7644H1ZK<br/>
-          Contact Person: Charmi Shah<br/>
-          Email: charmi@on2cook.com<br/>
-          Contact No.: 7227029540<br/>
-          Place of Supply: Gujarat.India
+          <input class="po-meta-input company-name" id="poBuyerName" value="ON2COOK INDIA PVT. LTD." style="font-weight:700;width:100%;box-sizing:border-box;margin-bottom:2px"/><br/>
+          <input class="po-meta-input" id="poBuyerAddr1" value="Ch03, Inspire Business Park," style="width:100%;box-sizing:border-box"/><br/>
+          <input class="po-meta-input" id="poBuyerAddr2" value="Adani Shantigram, Near Vaishnodevi Circle, Gandhinagar, Ahmedabad (Gujarat) India - 382421" style="width:100%;box-sizing:border-box"/><br/>
+          GSTIN : <input class="po-meta-input" id="poBuyerGSTIN" value="24AACCI7644H1ZK" style="width:calc(100% - 55px);box-sizing:border-box"/><br/>
+          Contact Person: <input class="po-meta-input" id="poBuyerContact" value="Charmi Shah" style="width:calc(100% - 110px);box-sizing:border-box"/><br/>
+          Email: <input class="po-meta-input" id="poBuyerEmail" value="charmi@on2cook.com" style="width:calc(100% - 46px);box-sizing:border-box"/><br/>
+          Contact No.: <input class="po-meta-input" id="poBuyerPhone" value="7227029540" style="width:calc(100% - 92px);box-sizing:border-box"/><br/>
+          Place of Supply: <input class="po-meta-input" id="poBuyerPlace" value="Gujarat.India" style="width:calc(100% - 118px);box-sizing:border-box"/>
         </div>
         <div class="po-addr-cell">
           <table style="width:100%;font-size:0.74rem">
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">PO Number :</td><td><input class="po-meta-input" id="poPreviewNum" value="${poNumber}" style="font-weight:700;font-size:0.82rem"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">PO Date :</td><td><input class="po-meta-input" id="poDate" value="${todayStr}" oninput="document.getElementById('poPreviewNum')&&recalcPO()"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Date :</td><td><input class="po-meta-input" id="poDelivery" value="${deliveryDate}"/></td></tr>
-            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Payment Terms :</td><td>${ptLabel}</td></tr>
-            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Terms :</td><td>NA</td></tr>
-            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Mode of Transport :</td><td>NA</td></tr>
-            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Final Destination :</td><td>On2Cook</td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Payment Terms :</td><td><input class="po-meta-input" id="poPaymentTerms" value="${ptLabel}"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Terms :</td><td><input class="po-meta-input" id="poDeliveryTerms" value="NA"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Mode of Transport :</td><td><input class="po-meta-input" id="poModeTransport" value="NA"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Final Destination :</td><td><input class="po-meta-input" id="poFinalDest" value="On2Cook"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Quote Ref :</td><td><input class="po-meta-input" id="poQuoteRef" placeholder="—"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Indent Number :</td><td><input class="po-meta-input" id="poIndent" value="NA"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Project Code/Name :</td><td><input class="po-meta-input" id="poProjectCode" value="${pr.project_name||'NA'}"/></td></tr>
@@ -2349,15 +2409,15 @@ async function openPOModal(prId) {
       <div class="po-addr-grid">
         <div class="po-addr-cell">
           <div class="cell-head">Name and Address of Supplier :</div>
-          <div class="company-name">${vendor?.name||'—'}</div>
-          ${vendor?.address?vendor.address+'<br/>':''}
-          ${vendor?.contact_person?`Contact: ${vendor.contact_person}<br/>`:''}
-          ${vendor?.phone?`Phone: ${vendor.phone}<br/>`:''}
-          ${vendor?.email?`${vendor.email}<br/>`:''}
-          ${vendor?.gstin?`GSTIN : ${vendor.gstin}<br/>`:''}
-          ${vendor?.country?`Country : ${vendor.country}<br/>`:''}
-          ${vendor?.vendor_type?`Vendor Type : ${vendor.vendor_type}<br/>`:''}
-          Place of Supply: Gujarat.India
+          <input class="po-meta-input company-name" id="poSupplierName" value="${_escHtml(vendor?.name||'')}" placeholder="Supplier name" style="font-weight:700;width:100%;box-sizing:border-box;margin-bottom:2px"/><br/>
+          <input class="po-meta-input" id="poSupplierAddress" value="${_escHtml(vendor?.address||'')}" placeholder="Address" style="width:100%;box-sizing:border-box"/><br/>
+          Contact: <input class="po-meta-input" id="poSupplierContact" value="${_escHtml(vendor?.contact_person||'')}" style="width:calc(100% - 58px);box-sizing:border-box"/><br/>
+          Phone: <input class="po-meta-input" id="poSupplierPhone" value="${_escHtml(vendor?.phone||'')}" style="width:calc(100% - 48px);box-sizing:border-box"/><br/>
+          Email: <input class="po-meta-input" id="poSupplierEmail" value="${_escHtml(vendor?.email||'')}" style="width:calc(100% - 46px);box-sizing:border-box"/><br/>
+          GSTIN : <input class="po-meta-input" id="poSupplierGSTIN" value="${_escHtml(vendor?.gstin||'')}" style="width:calc(100% - 55px);box-sizing:border-box"/><br/>
+          Country : <input class="po-meta-input" id="poSupplierCountry" value="${_escHtml(vendor?.country||'')}" style="width:calc(100% - 62px);box-sizing:border-box"/><br/>
+          Vendor Type : <input class="po-meta-input" id="poSupplierType" value="${_escHtml(vendor?.vendor_type||'')}" style="width:calc(100% - 90px);box-sizing:border-box"/><br/>
+          Place of Supply: <input class="po-meta-input" id="poSupplierPlace" value="Gujarat.India" style="width:calc(100% - 118px);box-sizing:border-box"/>
         </div>
         <div class="po-addr-cell">
           <div class="cell-head">Shipping Details :</div>
@@ -2410,12 +2470,14 @@ async function openPOModal(prId) {
         <div>
           <table class="po-amount-table">
             <tr><td>Basic Amount :</td><td id="poBasicAmt">${currSymbol} ${baseAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
-            <tr><td>Discount (%) :</td><td id="poDiscount">0.00</td></tr>
+            <tr><td>Discount (%) :</td><td><input class="po-meta-input" id="poDiscountPct" type="number" min="0" max="100" step="any" value="0" style="width:60px;text-align:right" oninput="recalcPO()"/></td></tr>
             <tr><td>Amount after Discount :</td><td id="poAfterDiscount">${currSymbol} ${baseAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr><td>P&amp;F Charge :</td><td id="poPnf">${currSymbol} 0.00</td></tr>
+            <tr><td>Other Charges :</td><td><input class="po-meta-input" id="poOtherCharges" type="number" min="0" step="any" value="0" style="width:80px;text-align:right" oninput="recalcPO()"/></td></tr>
             <tr><td>Taxable Value :</td><td id="poTaxableValue">${currSymbol} ${baseAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr><td>CGST % &nbsp; <span id="poCgstPctLabel">${cgstPct}</span>.00 :</td><td id="poCgst">${currSymbol} ${cgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr><td>SGST % &nbsp; <span id="poSgstPctLabel">${sgstPct}</span>.00 :</td><td id="poSgst">${currSymbol} ${sgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
+            <tr><td>Round Off :</td><td id="poRoundOff">0.00</td></tr>
             <tr class="net-row"><td>Net Payable (INR) :</td><td id="poNet">${currSymbol} ${netPayable.toLocaleString('en-IN',{minimumFractionDigits:0})}</td></tr>
             <tr class="words-row"><td colspan="2"><strong>Amount in words :</strong><br/><span id="poWords">${numToWords(netPayable)}</span></td></tr>
           </table>
@@ -2495,27 +2557,27 @@ function syncPnfInputs() {
   recalcPO();
 }
 
-function recalcPORow(idx, qty) {
-  const input = document.getElementById(`po-unitrate-${idx}`);
+function recalcPORow(idx) {
+  const rateInput = document.getElementById(`po-unitrate-${idx}`);
+  const qtyInput  = document.getElementById(`po-qty-${idx}`);
   const totalCell = document.getElementById(`po-rowtotal-${idx}`);
   const sym = window._poCurrSymbol || '₹';
-  if (!input || !totalCell) return;
-  const unitRate = parseFloat(input.value) || 0;
+  if (!rateInput || !totalCell) return;
+  const unitRate = parseFloat(rateInput.value) || 0;
+  const qty = parseFloat(qtyInput?.value) || 0;
   const rowTotal = unitRate * qty;
   totalCell.textContent = `${sym} ${rowTotal.toLocaleString('en-IN',{minimumFractionDigits:2})}`;
 
-  // Recalculate base amount from all row unit rates
-  const partsArr = currentPR?.parts?.length ? currentPR.parts : [{qty:1}];
+  // Recalculate base amount from all row unit rates × their (now-editable) quantities
   let newBase = 0;
-  partsArr.forEach((p, i) => {
-    const el = document.getElementById(`po-unitrate-${i}`);
-    newBase += (parseFloat(el?.value) || 0) * (p.qty || 1);
+  document.querySelectorAll('[id^="po-unitrate-"]').forEach(el => {
+    const i = el.id.replace('po-unitrate-','');
+    const q = parseFloat(document.getElementById(`po-qty-${i}`)?.value) || 0;
+    newBase += (parseFloat(el.value) || 0) * q;
   });
   window._poBaseAmt = newBase;
   const basicEl = document.getElementById('poBasicAmt');
   if (basicEl) basicEl.textContent = `${sym} ${newBase.toLocaleString('en-IN',{minimumFractionDigits:2})}`;
-  const afterEl = document.getElementById('poAfterDiscount');
-  if (afterEl) afterEl.textContent = `${sym} ${newBase.toLocaleString('en-IN',{minimumFractionDigits:2})}`;
   recalcPO();
 }
 // ── DOWNLOAD PO AS PDF ────────────────────────────────────────
@@ -2680,10 +2742,11 @@ async function confirmGeneratePO() {
   const base     = window._poBaseAmt || 0;
   // P&F is part of taxable value; tax applies on (base + pnf)
   const discPct = parseFloat(document.getElementById('poDiscountPct')?.value || 0) || 0;
+  const other    = parseFloat(document.getElementById('poOtherCharges')?.value || 0) || 0;
   const discAmt = Math.round(base * discPct / 100 * 100) / 100;
   const afterDiscount = base - discAmt;
   const taxableValue = afterDiscount + pnf;
-  const netPayable = taxableValue + Math.round(taxableValue*cgstPct/100*100)/100 + Math.round(taxableValue*sgstPct/100*100)/100;
+  const netPayable = Math.round(taxableValue + Math.round(taxableValue*cgstPct/100*100)/100 + Math.round(taxableValue*sgstPct/100*100)/100 + other);
 
   const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',currentPR.id);
   const selectedQ=quotations?.find(q=>q.is_selected)||quotations?.[0];
