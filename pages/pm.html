@@ -43,7 +43,7 @@
 
   <div id="tabContent">
     <div class="filter-bar">
-      <input type="text" id="searchInput" placeholder="Search by project or PR #..." oninput="filterTable()"/>
+      <input type="text" id="searchInput" placeholder="Search by project, PR #, or item note..." oninput="filterTable()"/>
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('searchInput').value='';filterTable()">✕</button>
     </div>
     <div class="card">
@@ -94,22 +94,6 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Department *</label>
-          <select class="form-control" id="fDept">
-            <option value="">Select</option>
-            <option value="npd">Production &amp; Operations - NPD</option>
-            <option value="electronics">Production &amp; Operations - Electronics</option>
-            <option value="id">Industrial Design</option>
-            <option value="assembly">Production &amp; Operations - Assembly</option>
-            <option value="scm_stores">SCM - Stores &amp; Logistics</option>
-            <option value="service">Production &amp; Operations - Service</option>
-            <option value="machine_shop">Production &amp; Operations - Machine Shop</option>
-            <option value="quality">Production &amp; Operations - Quality</option>
-            <option value="mech_design">Mechanical Design Engineering</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        <div class="form-group">
           <label class="form-label">Project Name *</label>
           <select class="form-control" id="fProjectSelect" onchange="onProjectChange()">
             <option value="">Select Project...</option>
@@ -151,6 +135,10 @@
         <div class="form-group">
           <label class="form-label">Vendor Suggestion <span style="color:var(--gray-4);font-weight:400">(optional)</span></label>
           <input class="form-control" id="fVendor" placeholder="Preferred vendor, if any"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Item Tag / Note <span style="color:var(--gray-4);font-weight:400">(optional, helps search later)</span></label>
+          <input class="form-control" id="fItemNote" placeholder="e.g. gearbox seal, HDMI cable"/>
         </div>
         <div class="form-group full">
           <label class="form-label">Product Link <span style="color:var(--gray-4);font-weight:400">(optional)</span></label>
@@ -352,7 +340,7 @@ function filterTable() {
   else if(activeTab==='declined') reqs=reqs.filter(r=>declinedPhases.includes(r.phase));
   else if(activeTab==='closed') reqs=reqs.filter(r=>closedPhases.includes(r.phase));
   else if(activeTab==='mine') reqs=reqs.filter(r=>r.created_by===currentUser.id);
-  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
+  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s)||(r.item_note||'').toLowerCase().includes(s));
   renderTable(reqs);
 }
 
@@ -937,13 +925,12 @@ function openNewPR() {
   document.getElementById('srcInternational').classList.remove('selected');
   document.getElementById('attachList').innerHTML='';
   document.getElementById('bomStatus').innerHTML='';
-  ['fCategory','fProjectSelect','fOrderType','fVendor','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['fCategory','fProjectSelect','fOrderType','fVendor','fItemNote','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('fPhaseSelect').innerHTML='<option value="">Select project first...</option>';
   const urgEl=document.getElementById('fUrgency');if(urgEl)urgEl.value='normal';
   document.getElementById('fTeam').value=currentUser.name;
   document.getElementById('fPMName').value=currentUser.name;
   document.getElementById('fPMSelect').value=currentUser.id;
-  if(currentUser.department) document.getElementById('fDept').value=currentUser.department;
   populateProjectDropdown();
   initPartsEditor('partsEditorContainer',[{_id:1,part_number:'',name:'',qty:1,spec:''}],false);
   onCategoryChange();
@@ -959,10 +946,10 @@ async function submitPR() {
   const projectObj=allProjects.find(p=>p.id===projectId);
   const projectName=projectObj?.name||document.getElementById('fProjectSelect').options[document.getElementById('fProjectSelect').selectedIndex]?.text||'';
   const projectPhase=document.getElementById('fPhaseSelect').value;
-  const dept=document.getElementById('fDept').value;
+  const dept=currentUser.department||'other';
   const orderType=document.getElementById('fOrderType').value;
   const urgency=document.getElementById('fUrgency').value||'normal';
-  if(!cat||!projectName||!projectPhase||!dept){showToast('Please fill all required fields','error');return;}
+  if(!cat||!projectName||!projectPhase){showToast('Please fill all required fields','error');return;}
   if(!isVI&&!isLP&&!orderType){showToast('Please select an order type','error');return;}
   const parts=getPartsFromEditor();
   if(!parts.length){showToast('Please add at least one part or item','error');return;}
@@ -986,6 +973,7 @@ async function submitPR() {
     department:dept,
     urgency,
     vendor_suggestion:document.getElementById('fVendor').value.trim()||null,
+    item_note:document.getElementById('fItemNote').value.trim()||null,
     description:document.getElementById('fDesc').value.trim()||null,
     product_link:document.getElementById('fProductLink').value.trim()||null,
     sourcing:selectedSourcing,

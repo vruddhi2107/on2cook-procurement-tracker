@@ -186,7 +186,7 @@
         <div class="panel-title">Closed Requests</div>
         <div class="panel-sub">All terminal requests — accepted, rejected, declined, QC rejected, LP done, LP rejected. Lead time is frozen at the close date.</div>
         <div class="filter-bar" style="margin-bottom:14px">
-          <input type="text" id="closedSearch" placeholder="Search project, PR #..." oninput="filterClosed()"/>
+          <input type="text" id="closedSearch" placeholder="Search project, PR #, item note..." oninput="filterClosed()"/>
           <select id="closedType" onchange="filterClosed()">
             <option value="">All Types</option>
             <option value="RFQ">RFQ</option>
@@ -352,7 +352,7 @@ function filterClosed() {
   const type = document.getElementById('closedType').value;
   const phase = document.getElementById('closedPhase').value;
   let reqs = closedRequests;
-  if (s) reqs = reqs.filter(r => r.project_name.toLowerCase().includes(s) || String(r.request_number).includes(s));
+  if (s) reqs = reqs.filter(r => r.project_name.toLowerCase().includes(s) || String(r.request_number).includes(s) || (r.item_note||'').toLowerCase().includes(s));
   if (type) {
     if (type === 'RFQ') reqs = reqs.filter(r => r.request_category === 'RFQ');
     else reqs = reqs.filter(r => r.request_category === type);
@@ -452,7 +452,8 @@ function searchForOverride() {
   if (s.length < 2) { document.getElementById('overrideSearchResults').innerHTML = ''; return; }
   const matches = allRequests.filter(r =>
     String(r.request_number).includes(s) ||
-    r.project_name.toLowerCase().includes(s)
+    r.project_name.toLowerCase().includes(s) ||
+    (r.item_note||'').toLowerCase().includes(s)
   ).slice(0, 8);
   document.getElementById('overrideSearchResults').innerHTML = matches.length
     ? `<div style="background:var(--off-white);border:1px solid var(--border);border-radius:6px;overflow:hidden">${

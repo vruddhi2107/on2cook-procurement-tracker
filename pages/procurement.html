@@ -241,7 +241,7 @@
 
   <div id="tabRequests">
     <div class="filter-bar">
-<input type="text" id="searchInput" placeholder="Search by project or PR or Team Member / Project Manager name..." oninput="filterTable()" autocomplete="off"/>      <select id="filterPhase" onchange="filterTable()">
+<input type="text" id="searchInput" placeholder="Search by project, PR #, item note, or name..." oninput="filterTable()" autocomplete="off"/>      <select id="filterPhase" onchange="filterTable()">
         <option value="">All Phases</option>
         <option value="procurement_active">Procurement Active</option>
         <option value="quotes_revision_requested">Quote Revision Requested</option>
@@ -926,7 +926,8 @@ function filterTable(){
     (r.project_manager_name||'').toLowerCase().includes(s)||
     (r.users?.name||'').toLowerCase().includes(s)||
     (r.department||'').toLowerCase().includes(s)||
-    (r.project_phase||'').toLowerCase().includes(s)
+    (r.project_phase||'').toLowerCase().includes(s)||
+    (r.item_note||'').toLowerCase().includes(s)
   );
   if(ph) reqs=reqs.filter(r=>r.phase===ph);
   if(urg) reqs=reqs.filter(r=>(r.urgency||'normal')===urg);
@@ -944,7 +945,7 @@ function renderTable(reqs) {
     const typeBg=r.request_category==='local_purchase'?'background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.35);color:#15803d':r.request_category==='vendor_info'?'background:rgba(139,92,246,0.08);border-color:rgba(139,92,246,0.3);color:#6d28d9':'background:var(--off-white);border-color:var(--border)';
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
       <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
-      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase||''}</div></td>
+      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase||''}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${r.item_note}</div>`:''}</td>
       <td><span style="font-size:0.72rem;padding:1px 7px;border-radius:3px;border:1px solid;${typeBg}">${typeLabel}</span></td>
       <td>${getPhaseBadge(r.phase)}</td>
       <td>${getUrgencyBadge(r.urgency)}</td>
@@ -1618,6 +1619,7 @@ async function saveRequestEdits() {
     order_type: document.getElementById('editReqOrderType')?.value || null,
     product_link: document.getElementById('editReqProductLink')?.value.trim() || null,
     sourcing,
+    item_note: document.getElementById('editReqItemNote')?.value.trim() || null,
     description: document.getElementById('editReqDescription')?.value.trim() || null,
     parts
   };

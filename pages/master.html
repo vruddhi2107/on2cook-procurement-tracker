@@ -48,7 +48,7 @@
   <!-- REQUESTS TAB -->
   <div id="tab-requests">
     <div class="filter-bar">
-      <input type="text" id="searchInput" placeholder="Search by project, PR #, team member..." oninput="filterRequests()"/>
+      <input type="text" id="searchInput" placeholder="Search by project, PR #, team member, item note..." oninput="filterRequests()"/>
       <select id="filterPhase" onchange="filterRequests()">
         <option value="">All Phases</option>
         <option value="submitted">📋 Submitted</option>
@@ -378,7 +378,7 @@ function filterRequests() {
   const ph=document.getElementById('filterPhase').value;
   const dp=document.getElementById('filterDept').value;
   let reqs=allRequests;
-  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s)||(r.team_member_name||'').toLowerCase().includes(s)||(r.users?.name||'').toLowerCase().includes(s));
+  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s)||(r.team_member_name||'').toLowerCase().includes(s)||(r.users?.name||'').toLowerCase().includes(s)||(r.item_note||'').toLowerCase().includes(s));
   if(ph) reqs=reqs.filter(r=>r.phase===ph);
   if(dp) reqs=reqs.filter(r=>r.department===dp);
   renderTable(reqs);
@@ -389,7 +389,7 @@ function renderTable(reqs) {
   if(!reqs.length){tbody.innerHTML=`<tr><td colspan="10"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>No requests found</h3><p>No procurement requests match your current filters.</p></div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>`<tr>
     <td><span class="pr-number">PR-${String(r.request_number).padStart(4,'0')}</span></td>
-    <td><strong>${r.project_name}</strong><br/><span style="font-size:0.74rem;color:var(--gray-4)">${r.project_phase}</span></td>
+    <td><strong>${r.project_name}</strong><br/><span style="font-size:0.74rem;color:var(--gray-4)">${r.project_phase}</span>${r.item_note?`<br/><span style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${r.item_note}</span>`:''}</td>
     <td class="mono">${r.request_category}</td>
     <td style="font-size:0.82rem">${DEPARTMENTS[r.department]||r.department}</td>
     <td style="font-size:0.8rem;max-width:110px;overflow:hidden;text-overflow:ellipsis">${r.vendors?.name||'—'}</td>

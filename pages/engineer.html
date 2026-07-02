@@ -65,7 +65,7 @@
 
   <div id="tabRequests">
     <div class="filter-bar">
-<input type="text" id="searchInput" placeholder="Search by project or PR #..." oninput="filterTable()" autocomplete="off"/>      <select id="filterPhase" onchange="filterTable()">
+<input type="text" id="searchInput" placeholder="Search by project, PR #, or item note..." oninput="filterTable()" autocomplete="off"/>      <select id="filterPhase" onchange="filterTable()">
         <option value="">All Phases</option>
         <option value="submitted">Submitted</option>
         <option value="pending_initial_pm_approval">Awaiting Project Manager Clearance</option>
@@ -193,23 +193,6 @@
             <option value="local_purchase">Local Purchase</option>
           </select>
         </div>
-        <div class="form-group">
-          <label class="form-label">Department *</label>
-          <select class="form-control" id="fDept">
-            <option value="">Select</option>
-            <option value="npd">Production &amp; Operations - NPD</option>
-            <option value="electronics">Production &amp; Operations - Electronics</option>
-            <option value="id">Industrial Design</option>
-            <option value="assembly">Production &amp; Operations - Assembly</option>
-            <option value="scm_stores">SCM - Stores &amp; Logistics</option>
-            <option value="service">Production &amp; Operations - Service</option>
-            <option value="machine_shop">Production &amp; Operations - Machine Shop</option>
-            <option value="quality">Production &amp; Operations - Quality</option>
-            <option value="mech_design">Mechanical Design Engineering</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-
         <!-- Project name — dropdown from DB -->
         <div class="form-group">
           <label class="form-label">Project Name *</label>
@@ -264,6 +247,11 @@
         <div class="form-group">
           <label class="form-label">Vendor Suggestion <span style="color:var(--gray-4);font-weight:400">(optional)</span></label>
           <input class="form-control" id="fVendor" placeholder="Preferred vendor, if any"/>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Item Tag / Note <span style="color:var(--gray-4);font-weight:400">(optional, helps search later)</span></label>
+          <input class="form-control" id="fItemNote" placeholder="e.g. gearbox seal, HDMI cable"/>
         </div>
 
         <!-- Product Link -->
@@ -410,7 +398,6 @@ async function init() {
   document.getElementById('footerMount').innerHTML=buildFooter();
   initNavbar(currentUser);
   document.getElementById('fTeam').value=currentUser.name;
-  if(currentUser.department) document.getElementById('fDept').value=currentUser.department;
   initPartsEditor('partsEditorContainer',[{_id:1,part_number:'',name:'',qty:1,spec:''}],false);
   showLoader(true);
   await Promise.all([loadRequests(), loadPMs(), loadProjects()]);
@@ -591,7 +578,7 @@ function filterTable() {
   else if(activeTab==='action') reqs=reqs.filter(r=>actionPhases.includes(r.phase));
   else if(activeTab==='declined') reqs=reqs.filter(r=>declinedPhases.includes(r.phase));
   else if(activeTab==='closed') reqs=reqs.filter(r=>closedPhases.includes(r.phase));
-  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s));
+  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s)||(r.item_note||'').toLowerCase().includes(s));
   if(ph) reqs=reqs.filter(r=>r.phase===ph);
   if(urg) reqs=reqs.filter(r=>(r.urgency||'normal')===urg);
   renderTable(reqs);
@@ -746,10 +733,9 @@ async function handleBOMFile(e) {
   document.getElementById('bomStatus').innerHTML='';
   document.getElementById('pmOptYes').classList.remove('selected');
   document.getElementById('pmOptNo').classList.remove('selected');
-  ['fCategory','fProjectSelect','fPhaseSelect','fPMSelect','fOrderType','fVendor','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['fCategory','fProjectSelect','fPhaseSelect','fPMSelect','fOrderType','fVendor','fItemNote','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   const urgEl=document.getElementById('fUrgency');if(urgEl)urgEl.value='normal';
   document.getElementById('fTeam').value=currentUser.name;
-  if(currentUser.department) document.getElementById('fDept').value=currentUser.department;
   document.getElementById('fPhaseSelect').innerHTML='<option value="">Select project first...</option>';
   initPartsEditor('partsEditorContainer',[{_id:1,part_number:'',name:'',qty:1,spec:''}],false);
   onCategoryChange();
@@ -769,10 +755,10 @@ async function submitPR() {
   const projectObj=allProjects.find(p=>p.id===projectId);
   const projectName=projectObj?.name||document.getElementById('fProjectSelect').options[document.getElementById('fProjectSelect').selectedIndex]?.text||'';
   const projectPhase=document.getElementById('fPhaseSelect').value;
-  const dept=document.getElementById('fDept').value;
+  const dept=currentUser.department||'other';
   const orderType=document.getElementById('fOrderType').value;
   const urgency=document.getElementById('fUrgency').value||'normal';
-  if(!cat||!projectName||!projectPhase||!dept){showToast('Please fill all required fields','error');return;}
+  if(!cat||!projectName||!projectPhase){showToast('Please fill all required fields','error');return;}
   if(!isVI&&!isLP&&!orderType){showToast('Please select an order type','error');return;}
   const parts=getPartsFromEditor();
   if(!parts.length){showToast('Please add at least one part or item','error');return;}
@@ -800,6 +786,7 @@ async function submitPR() {
     department:dept,
     urgency,
     vendor_suggestion:document.getElementById('fVendor').value.trim()||null,
+    item_note:document.getElementById('fItemNote').value.trim()||null,
     description:document.getElementById('fDesc').value.trim()||null,
     product_link:document.getElementById('fProductLink').value.trim()||null,
     sourcing:selectedSourcing,

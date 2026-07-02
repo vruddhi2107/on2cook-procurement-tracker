@@ -518,6 +518,7 @@ function buildPRDetailEditableHTML(pr) {
           <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem"><input type="checkbox" id="editReqSourcingIntl" ${sourcingArr.includes('international')?'checked':''}/> 🌍 International</label>
         </div>
       </div>
+      <div class="form-group full"><label class="form-label">Item Tag / Note</label><input class="form-control" id="editReqItemNote" value="${_shEsc(pr.item_note)}" placeholder="e.g. gearbox seal"/></div>
       <div class="form-group full"><label class="form-label">Description / Notes</label><textarea class="form-control" id="editReqDescription" style="min-height:80px">${_shEsc(pr.description)}</textarea></div>
     </div>
     <div style="margin-top:16px">
@@ -552,6 +553,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       ${pr.sourcing?`<div class="detail-item"><div class="detail-key">Sourcing</div><div class="detail-value">${(Array.isArray(pr.sourcing)?pr.sourcing:JSON.parse(pr.sourcing||'[]')).map(s=>s==='domestic'?'🏠 Domestic':'🌍 International').join(', ')}</div></div>`:''}
       <div class="detail-item"><div class="detail-key">Assigned Vendor</div><div class="detail-value">${vendorName||'—'}</div></div>
       <div class="detail-item"><div class="detail-key">Submitted</div><div class="detail-value">${fmtDate(pr.created_at)}</div></div>
+      ${pr.item_note?`<div class="detail-item" style="grid-column:1/-1"><div class="detail-key">🏷️ Item Tag / Note</div><div class="detail-value">${pr.item_note}</div></div>`:''}
       ${pr.description?`<div class="detail-item" style="grid-column:1/-1"><div class="detail-key">Description / Notes</div><div class="detail-value" style="line-height:1.5">${pr.description}</div></div>`:''}
       ${pr.modification_note?`<div class="detail-item" style="grid-column:1/-1"><div class="detail-key" style="color:#6366f1">Modification Note</div><div class="detail-value">${pr.modification_note}</div></div>`:''}
     </div>
