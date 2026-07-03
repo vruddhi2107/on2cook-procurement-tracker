@@ -835,13 +835,30 @@ function onProjectChange() {
   const pid=document.getElementById('fProjectSelect').value;
   const project=allProjects.find(p=>p.id===pid);
   const phSel=document.getElementById('fPhaseSelect');
+  updatePMFieldForProject(project);
   if(!project){phSel.innerHTML='<option value="">Select project first...</option>';return;}
   const phases=project.project_phases||[];
   if(!phases.length){phSel.innerHTML='<option value="">No phases added yet</option>';return;}
   phSel.innerHTML='<option value="">Select Phase...</option>'+phases.map(ph=>`<option value="${ph.name}">${ph.name}</option>`).join('');
-  // Change 2: auto-fill and lock PM if project has a default PM (for PM page this is always themselves)
-  // PM portal self-assigns — no change needed here, PM is always currentUser
   onPhaseChange();
+}
+
+// Auto-fill the Project Manager field with whoever is actually assigned to the
+// project (project.default_pm_id). Falls back to the logged-in PM only when the
+// project has no assigned PM on record.
+function updatePMFieldForProject(project) {
+  const pmNameEl=document.getElementById('fPMName');
+  const pmSelectEl=document.getElementById('fPMSelect');
+  if(!pmNameEl||!pmSelectEl) return;
+  const assignedPmId=project&&project.default_pm_id;
+  if(assignedPmId) {
+    const pmUser=allPMs.find(p=>p.id===assignedPmId);
+    pmSelectEl.value=assignedPmId;
+    pmNameEl.value=pmUser?.name||'Assigned Project Manager';
+  } else {
+    pmSelectEl.value=currentUser.id;
+    pmNameEl.value=currentUser.name;
+  }
 }
 
 function onPhaseChange() {
@@ -929,8 +946,7 @@ function openNewPR() {
   document.getElementById('fPhaseSelect').innerHTML='<option value="">Select project first...</option>';
   const urgEl=document.getElementById('fUrgency');if(urgEl)urgEl.value='normal';
   document.getElementById('fTeam').value=currentUser.name;
-  document.getElementById('fPMName').value=currentUser.name;
-  document.getElementById('fPMSelect').value=currentUser.id;
+  updatePMFieldForProject(null); // defaults to self until a project (with an assigned PM) is picked
   populateProjectDropdown();
   initPartsEditor('partsEditorContainer',[{_id:1,part_number:'',name:'',qty:1,spec:''}],false);
   onCategoryChange();
@@ -941,7 +957,7 @@ async function submitPR() {
   const cat=document.getElementById('fCategory').value;
   const isVI=cat==='vendor_info';
   const isLP=cat==='local_purchase';
-  const pmId=currentUser.id; // PM is always themselves
+  const pmId=document.getElementById('fPMSelect').value||currentUser.id; // assigned PM for the project, falling back to self
   const projectId=document.getElementById('fProjectSelect').value;
   const projectObj=allProjects.find(p=>p.id===projectId);
   const projectName=projectObj?.name||document.getElementById('fProjectSelect').options[document.getElementById('fProjectSelect').selectedIndex]?.text||'';
@@ -968,7 +984,7 @@ async function submitPR() {
     project_name:projectName,
     project_phase:projectPhase,
     assigned_pm_id:pmId,
-    project_manager_name:currentUser.name,
+    project_manager_name:allPMs.find(p=>p.id===pmId)?.name||currentUser.name,
     team_member_name:currentUser.name,
     department:dept,
     urgency,
