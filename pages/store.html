@@ -31,7 +31,7 @@
 
   <div class="tabs">
     <button class="tab-btn active" data-tab="action" onclick="switchTab('action')">🔔 Action Required</button>
-    <button class="tab-btn" data-tab="all" onclick="switchTab('all')">All Requests</button>
+    <button class="tab-btn" data-tab="all" onclick="switchTab('all')">📊 All Cycles — Status</button>
     <button class="tab-btn" data-tab="myrequests" onclick="switchTab('myrequests')">📋 My PR Submissions</button>
   </div>
 
@@ -148,9 +148,10 @@ function updateStats() {
 
 function renderTable() {
   const actionPhases = ['grn_initiated','rework_store_form','rework_pending','rework2_pending'];
+  const postOrderPhases = ['order_placed','grn_pending','grn_initiated','qc_pending','rework_store_form','rework_pending','rework_returned','rework2_pending','rework2_returned','qc_deviated','deviation_approval','qc_passed','qc_rejected','accepted','rejected','payment_requested','advance_requested','advance_raised_to_accounts','advance_approved','advance_payment_received','advance_rejected','lp_procurement_processing','lp_payment_pending','lp_payment_done'];
   const rows = activeTab==='action'
     ? allRequests.filter(r=>actionPhases.includes(r.phase))
-    : allRequests.filter(r=>['grn_initiated','qc_pending','rework_store_form','rework_pending','rework_returned','rework2_pending','rework2_returned','qc_deviated','deviation_approval','qc_passed','accepted'].includes(r.phase));
+    : allRequests.filter(r=>postOrderPhases.includes(r.phase)); // "All Cycles" shows every cycle from the point the order was placed onward
 
   const tbody = document.getElementById('mainTbody');
   if (!rows.length) { tbody.innerHTML=`<tr><td colspan="7" class="empty-state">No requests</td></tr>`; return; }
