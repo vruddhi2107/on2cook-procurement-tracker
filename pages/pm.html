@@ -363,7 +363,7 @@ function renderTable(reqs) {
     const isClearance=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase), isFinal=r.phase==='pending_pm_final_approval';
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
       <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
-      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div></td>
+      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${r.item_note}</div>`:''}</td>
       <td style="font-size:0.8rem">${r.users?.name||'—'}</td>
       <td style="font-size:0.78rem">${DEPARTMENTS[r.department]||r.department}</td>
       <td><span style="font-size:0.72rem;background:var(--off-white);border:1px solid var(--border);padding:1px 7px;border-radius:3px">${r.request_category==='vendor_info'?'Vendor Info':'RFQ'}</span></td>

@@ -629,7 +629,7 @@ function renderTable(reqs) {
         <span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span>
         ${needsAction?`<span style="margin-left:6px;font-size:0.6rem;background:var(--red);color:white;padding:1px 5px;border-radius:2px;font-family:var(--font-mono)">ACT</span>`:''}
       </td>
-      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div></td>
+      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${r.item_note}</div>`:''}</td>
       <td><span style="font-size:0.72rem;padding:1px 7px;border-radius:3px;border:1px solid;${typeBg}">${typeLabel}</span></td>
       <td>${getPhaseBadge(r.phase)}</td>
       <td>${getUrgencyBadge(r.urgency)}</td>
