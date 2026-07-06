@@ -231,7 +231,7 @@
         <div class="form-group"><label class="form-label">Email *</label><input class="form-control" id="uEmail" type="email" placeholder="jane@company.com"/></div>
         <div class="form-group"><label class="form-label">Password</label><input class="form-control" id="uPassword" value="12345"/></div>
         <div class="form-group"><label class="form-label">Role *</label>
-          <select class="form-control" id="uRole">
+          <select class="form-control" id="uRole" onchange="onUserRoleChange()">
             <option value="">Select</option>
             <option value="director">Director</option>
             <option value="master">Master Admin</option>
@@ -239,6 +239,13 @@
             <option value="engineer">Engineer</option>
             <option value="project_manager">Project Manager</option>
             <option value="accounts">Accounts</option>
+          </select>
+        </div>
+        <div class="form-group" id="uPMTypeGroup" style="display:none">
+          <label class="form-label">Project Manager Type *</label>
+          <select class="form-control" id="uPMType">
+            <option value="npd">NPD</option>
+            <option value="production">Production</option>
           </select>
         </div>
         <div class="form-group"><label class="form-label">Department</label>
@@ -676,7 +683,7 @@ function renderUsers() {
   document.getElementById('usersBody').innerHTML=allUsers.map(u=>`<tr>
     <td><strong>${u.name}</strong></td>
     <td class="mono" style="font-size:0.8rem">${u.email}</td>
-    <td><span class="user-role-tag role-${u.role}">${roleLabel(u.role)}</span></td>
+    <td><span class="user-role-tag role-${u.role}">${roleLabel(u.role)}${u.role==='project_manager'?' · '+(u.pm_type==='production'?'Production':'NPD'):''}</span></td>
     <td style="font-size:0.83rem">${u.department?DEPARTMENTS[u.department]:'—'}</td>
     <td class="mono" style="font-size:0.75rem">${formatDate(u.created_at)}</td>
     <td style="white-space:nowrap">
@@ -857,11 +864,21 @@ function renderAnalytics() {
 }
 
 
+function onUserRoleChange() {
+  const role=document.getElementById('uRole').value;
+  const grp=document.getElementById('uPMTypeGroup');
+  if(!grp) return;
+  grp.style.display=role==='project_manager'?'block':'none';
+  if(role==='project_manager'&&!document.getElementById('uPMType').value){document.getElementById('uPMType').value='npd';}
+}
+
 function openAddUser() {
   editingUserId=null;
   document.getElementById('userModalTitle').textContent='Add New User';
   ['uName','uEmail','uRole','uDept'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('uPassword').value='12345';
+  document.getElementById('uPMType').value='npd';
+  onUserRoleChange();
   openModal('userModal');
 }
 
@@ -875,6 +892,8 @@ function editUser(id) {
   document.getElementById('uPassword').value=u.password;
   document.getElementById('uRole').value=u.role;
   document.getElementById('uDept').value=u.department||'';
+  document.getElementById('uPMType').value=u.pm_type||'npd';
+  onUserRoleChange();
   openModal('userModal');
 }
 
@@ -884,11 +903,12 @@ async function saveUser() {
   const password=document.getElementById('uPassword').value.trim()||'12345';
   const role=document.getElementById('uRole').value;
   const department=document.getElementById('uDept').value||null;
+  const pm_type=role==='project_manager'?(document.getElementById('uPMType').value||'npd'):null;
   if(!name||!email||!role){showToast('Please fill all required fields','error');return;}
   showLoader(true);
   let error;
-  if(editingUserId){({error}=await db.from('users').update({name,email,password,role,department}).eq('id',editingUserId));}
-  else{({error}=await db.from('users').insert({name,email,password,role,department}));}
+  if(editingUserId){({error}=await db.from('users').update({name,email,password,role,department,pm_type}).eq('id',editingUserId));}
+  else{({error}=await db.from('users').insert({name,email,password,role,department,pm_type}));}
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
   showToast(editingUserId?'User updated!':'User created!','success');

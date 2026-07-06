@@ -94,6 +94,13 @@
           </select>
         </div>
         <div class="form-group">
+          <label class="form-label">Request For *</label>
+          <select class="form-control" id="fRequestFor" onchange="onRequestForChange()">
+            <option value="npd">NPD</option>
+            <option value="production">Production</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label class="form-label">Project Name *</label>
           <select class="form-control" id="fProjectSelect" onchange="onProjectChange()">
             <option value="">Select Project...</option>
@@ -108,6 +115,7 @@
         <div class="form-group">
           <label class="form-label">Project Manager</label>
           <input class="form-control" id="fPMName" readonly style="background:var(--off-white);color:var(--gray-3)"/>
+          <select class="form-control" id="fPMProdSelect" style="display:none;margin-top:6px" onchange="onProdPMPick()"></select>
           <input type="hidden" id="fPMSelect"/>
         </div>
         <div class="form-group">
@@ -815,8 +823,21 @@ let isEditMode=false, editingParentId=null;
 let selectedSourcing=[], attachedFiles=[], pmSelectedForNewPR=null;
 
 async function loadPMs() {
-  const{data}=await db.from('users').select('id,name,role').in('role',['project_manager','master','director']).order('name');
+  const{data}=await db.from('users').select('id,name,role,pm_type').in('role',['project_manager','master','director']).order('name');
   allPMs=data||[];
+}
+
+function onProdPMPick() {
+  const prodSel=document.getElementById('fPMProdSelect');
+  const pmSelectEl=document.getElementById('fPMSelect');
+  if(!prodSel||!pmSelectEl) return;
+  pmSelectEl.value=prodSel.value;
+}
+
+function onRequestForChange() {
+  const pid=document.getElementById('fProjectSelect').value;
+  const project=allProjects.find(p=>p.id===pid);
+  updatePMFieldForProject(project);
 }
 
 async function loadProjects() {
@@ -849,7 +870,30 @@ function onProjectChange() {
 function updatePMFieldForProject(project) {
   const pmNameEl=document.getElementById('fPMName');
   const pmSelectEl=document.getElementById('fPMSelect');
+  const prodSelectEl=document.getElementById('fPMProdSelect');
   if(!pmNameEl||!pmSelectEl) return;
+  const reqFor=document.getElementById('fRequestFor')?.value||'npd';
+  if(reqFor==='production') {
+    // Production requests always go to a Project Manager-Production, regardless of project default.
+    pmNameEl.style.display='none';
+    const prodPMs=allPMs.filter(p=>p.pm_type==='production');
+    if(prodSelectEl){
+      prodSelectEl.style.display='block';
+      if(!prodPMs.length){
+        prodSelectEl.innerHTML='<option value="">No Production PMs configured — set in Master Admin</option>';
+        pmSelectEl.value='';
+      } else {
+        const prevVal=prodSelectEl.value;
+        prodSelectEl.innerHTML=prodPMs.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+        prodSelectEl.value=prodPMs.some(p=>p.id===prevVal)?prevVal:prodPMs[0].id;
+        pmSelectEl.value=prodSelectEl.value;
+      }
+    }
+    return;
+  }
+  // NPD — usual process
+  if(prodSelectEl) prodSelectEl.style.display='none';
+  pmNameEl.style.display='block';
   const assignedPmId=project&&project.default_pm_id;
   if(assignedPmId) {
     const pmUser=allPMs.find(p=>p.id===assignedPmId);
@@ -945,6 +989,7 @@ function openNewPR() {
   ['fCategory','fProjectSelect','fOrderType','fVendor','fItemNote','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('fPhaseSelect').innerHTML='<option value="">Select project first...</option>';
   const urgEl=document.getElementById('fUrgency');if(urgEl)urgEl.value='normal';
+  const reqForEl=document.getElementById('fRequestFor');if(reqForEl)reqForEl.value='npd';
   document.getElementById('fTeam').value=currentUser.name;
   updatePMFieldForProject(null); // defaults to self until a project (with an assigned PM) is picked
   populateProjectDropdown();
@@ -957,7 +1002,9 @@ async function submitPR() {
   const cat=document.getElementById('fCategory').value;
   const isVI=cat==='vendor_info';
   const isLP=cat==='local_purchase';
-  const pmId=document.getElementById('fPMSelect').value||currentUser.id; // assigned PM for the project, falling back to self
+  const requestFor=document.getElementById('fRequestFor')?.value||'npd';
+  const pmId=document.getElementById('fPMSelect').value||(requestFor==='production'?'':currentUser.id); // assigned PM for the project, falling back to self (NPD only)
+  if(requestFor==='production'&&!pmId){showToast('Please select a Project Manager-Production (add one in Master Admin if none listed)','error');return;}
   const projectId=document.getElementById('fProjectSelect').value;
   const projectObj=allProjects.find(p=>p.id===projectId);
   const projectName=projectObj?.name||document.getElementById('fProjectSelect').options[document.getElementById('fProjectSelect').selectedIndex]?.text||'';
@@ -981,6 +1028,7 @@ async function submitPR() {
   // PM submitting their own request — treat as already approved (goes straight to procurement_active)
   const vals={
     request_category:cat,
+    request_for:requestFor,
     project_name:projectName,
     project_phase:projectPhase,
     assigned_pm_id:pmId,

@@ -193,6 +193,13 @@
             <option value="local_purchase">Local Purchase</option>
           </select>
         </div>
+        <div class="form-group">
+          <label class="form-label">Request For *</label>
+          <select class="form-control" id="fRequestFor" onchange="onRequestForChange()">
+            <option value="npd">NPD</option>
+            <option value="production">Production</option>
+          </select>
+        </div>
         <!-- Project name — dropdown from DB -->
         <div class="form-group">
           <label class="form-label">Project Name *</label>
@@ -416,10 +423,29 @@ async function loadRequests() {
 }
 
 async function loadPMs() {
-  const{data}=await db.from('users').select('id,name').eq('role','project_manager').order('name');
+  const{data}=await db.from('users').select('id,name,pm_type').eq('role','project_manager').order('name');
   allPMs=data||[];
+  refreshPMOptions();
+}
+
+// Rebuilds the Project Manager dropdown based on the Request For (NPD/Production) selection.
+function refreshPMOptions() {
   const sel=document.getElementById('fPMSelect');
-  sel.innerHTML='<option value="">Select Project Manager</option>'+allPMs.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  if(!sel) return;
+  const reqFor=document.getElementById('fRequestFor')?.value||'npd';
+  const prevVal=sel.value;
+  const filtered=reqFor==='production'?allPMs.filter(p=>p.pm_type==='production'):allPMs.filter(p=>p.pm_type!=='production');
+  if(reqFor==='production'&&!filtered.length){
+    sel.innerHTML='<option value="">No Production PMs configured — set in Master Admin</option>';
+    return;
+  }
+  sel.innerHTML='<option value="">'+(reqFor==='production'?'Select Production PM':'Select Project Manager')+'</option>'+filtered.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  if(filtered.some(p=>p.id===prevVal)) sel.value=prevVal;
+}
+
+function onRequestForChange() {
+  refreshPMOptions();
+  onProjectChange();
 }
 
 async function loadProjects() {
@@ -450,16 +476,19 @@ function onProjectChange() {
   const phases=project.project_phases||[];
   if(!phases.length){phSel.innerHTML='<option value="">No phases added yet</option>';}
   else {phSel.innerHTML='<option value="">Select Phase...</option>'+phases.map(ph=>`<option value="${ph.name}">${ph.name}</option>`).join('');}
-  // Change 2: Auto-fill AND LOCK PM when project has a default_pm_id
-  if(project.default_pm_id) {
+  const reqFor=document.getElementById('fRequestFor')?.value||'npd';
+  // Change 2: Auto-fill AND LOCK PM when project has a default_pm_id — NPD only.
+  // Production requests always pick a Project Manager-Production instead.
+  if(project.default_pm_id && reqFor!=='production') {
     if(pmSelect){ pmSelect.value=project.default_pm_id; pmSelect.style.display='none'; pmSelect.disabled=false; }
     const pmUser=allPMs.find(pm=>pm.id===project.default_pm_id);
     if(pmLockedDisplay){ pmLockedDisplay.style.display='block'; }
     if(pmLockedName){ pmLockedName.textContent=pmUser?.name||'Assigned Project Manager'; }
   } else {
-    // No default PM — show dropdown normally
+    // No default PM, or Production request — show dropdown filtered to the right PM type
     if(pmLockedDisplay){pmLockedDisplay.style.display='none';}
-    if(pmSelect){pmSelect.style.display='block'; pmSelect.value='';}
+    if(pmSelect){pmSelect.style.display='block'; pmSelect.disabled=false;}
+    refreshPMOptions();
   }
   // Trigger phase-change check in case a phase is already selected
   onPhaseChange();
@@ -735,8 +764,10 @@ async function handleBOMFile(e) {
   document.getElementById('pmOptNo').classList.remove('selected');
   ['fCategory','fProjectSelect','fPhaseSelect','fPMSelect','fOrderType','fVendor','fItemNote','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   const urgEl=document.getElementById('fUrgency');if(urgEl)urgEl.value='normal';
+  const reqForEl=document.getElementById('fRequestFor');if(reqForEl)reqForEl.value='npd';
   document.getElementById('fTeam').value=currentUser.name;
   document.getElementById('fPhaseSelect').innerHTML='<option value="">Select project first...</option>';
+  refreshPMOptions();
   initPartsEditor('partsEditorContainer',[{_id:1,part_number:'',name:'',qty:1,spec:''}],false);
   onCategoryChange();
   openModal('prFormModal');
@@ -749,8 +780,9 @@ async function submitPR() {
   const isLP=cat==='local_purchase';
   if(!isEditMode&&!isVI&&!isLP&&!selectedPMApproval){showToast('Please indicate Project Manager approval status','error');return;}
   if(!isEditMode&&!isVI&&!isLP&&selectedPMApproval==='already_approved'&&!pmScreenshotBase64){showToast('Please upload Project Manager approval screenshot','error');return;}
+  const requestFor=document.getElementById('fRequestFor')?.value||'npd';
   const pmId=document.getElementById('fPMSelect').value;
-  if(!pmId){showToast('Please select a Project Manager','error');return;}
+  if(!pmId){showToast(requestFor==='production'?'Please select a Project Manager-Production (add one in Master Admin if none listed)':'Please select a Project Manager','error');return;}
   const projectId=document.getElementById('fProjectSelect').value;
   const projectObj=allProjects.find(p=>p.id===projectId);
   const projectName=projectObj?.name||document.getElementById('fProjectSelect').options[document.getElementById('fProjectSelect').selectedIndex]?.text||'';
@@ -778,6 +810,7 @@ async function submitPR() {
   };
   const vals={
     request_category:cat,
+    request_for:requestFor,
     project_name:projectName,
     project_phase:projectPhase,
     assigned_pm_id:pmId,
