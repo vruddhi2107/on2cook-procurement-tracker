@@ -2533,7 +2533,7 @@ function recalcPO() {
   const sgstAmt = Math.round(taxableValue * sgst / 100 * 100) / 100;
   const subtotal = taxableValue + cgstAmt + sgstAmt + other;
   const net = Math.round(subtotal);
-  const roundOff = Math.round((net - subtotal) * 100) / 100;
+  const roundOff = 0;
 
   const s = (el, val) => { const e = document.getElementById(el); if(e) e.textContent = val; };
   const f = v => v.toLocaleString('en-IN', {minimumFractionDigits:2});
