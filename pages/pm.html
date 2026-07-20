@@ -101,6 +101,14 @@
           </select>
         </div>
         <div class="form-group">
+          <label class="form-label">Discipline *</label>
+          <select class="form-control" id="fDiscipline">
+            <option value="">Select</option>
+            <option value="elec">Elec</option>
+            <option value="mechanical">Mechanical</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label class="form-label">Project Name *</label>
           <select class="form-control" id="fProjectSelect" onchange="onProjectChange()">
             <option value="">Select Project...</option>
@@ -265,7 +273,7 @@ function handleAttachmentDownload(e, url, fileName) {
 }
 
 async function init() {
-  currentUser=Session.require(['project_manager','master','director']); if(!currentUser) return;
+  currentUser=Session.require(null); if(!currentUser) return;
   document.getElementById('navbarMount').innerHTML=buildNavbar(currentUser);
   document.getElementById('footerMount').innerHTML=buildFooter();
   initNavbar(currentUser);
@@ -276,11 +284,18 @@ async function init() {
 }
 
 async function loadRequests() {
-  // Load requests assigned to this PM OR created by this PM
-  const[assigned, deviatedToMe, created]=await Promise.all([
+  // Load requests assigned to this PM (final quote approval + tracking) OR
+  // routed to this user as the initial-clearance approver (department manager
+  // for a request_for x discipline combo, or an Antunes override) OR created
+  // by this user OR deviated to this user.
+  const[assigned, clearance, deviatedToMe, created]=await Promise.all([
     db.from('procurement_requests')
       .select('*, users!procurement_requests_created_by_fkey(name,email)')
       .eq('assigned_pm_id', currentUser.id)
+      .order('updated_at',{ascending:false}),
+    db.from('procurement_requests')
+      .select('*, users!procurement_requests_created_by_fkey(name,email)')
+      .eq('initial_approver_id', currentUser.id)
       .order('updated_at',{ascending:false}),
     db.from('procurement_requests')
       .select('*, users!procurement_requests_created_by_fkey(name,email)')
@@ -293,9 +308,22 @@ async function loadRequests() {
   ]);
   // Merge and deduplicate by id
   const map=new Map();
-  for(const r of [...(assigned.data||[]),...(created.data||[]),...(deviatedToMe.data||[])]) map.set(r.id,r);
+  for(const r of [...(assigned.data||[]),...(clearance.data||[]),...(created.data||[]),...(deviatedToMe.data||[])]) map.set(r.id,r);
   allRequests=[...map.values()].sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
   updateStats(); renderBanner(); filterTable();
+}
+
+// Requirement clearance (pending_initial_pm_approval) is now routed to
+// initial_approver_id (the resolved department manager / Antunes override),
+// which may be someone other than this project's linked PM. The other
+// clearance-style phases (LP approval, decline confirmation) are unchanged
+// and still belong to assigned_pm_id. This tells us whether the CURRENT
+// user is actually the one who owes an action on a given clearance-phase PR
+// (vs. just seeing it for visibility because they're assigned_pm_id/creator).
+function isMyClearanceAction(r) {
+  if(r.phase==='pending_initial_pm_approval') return r.initial_approver_id===currentUser.id;
+  if(['lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase)) return r.assigned_pm_id===currentUser.id;
+  return false;
 }
 
 function updateStats() {
@@ -304,15 +332,15 @@ function updateStats() {
   const clearancePhases=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'];
   const allTerminal=[...declinedPhases,...closedPhases];
   document.getElementById('sTotal').textContent=allRequests.length;
-  document.getElementById('sClearance').textContent=allRequests.filter(r=>clearancePhases.includes(r.phase)).length;
+  document.getElementById('sClearance').textContent=allRequests.filter(r=>clearancePhases.includes(r.phase)&&isMyClearanceAction(r)).length;
   document.getElementById('sFinal').textContent=allRequests.filter(r=>r.phase==='pending_pm_final_approval').length;
-  document.getElementById('sOngoing').textContent=allRequests.filter(r=>!allTerminal.includes(r.phase)&&!clearancePhases.includes(r.phase)&&r.phase!=='pending_pm_final_approval').length;
+  document.getElementById('sOngoing').textContent=allRequests.filter(r=>!allTerminal.includes(r.phase)&&!(clearancePhases.includes(r.phase)&&isMyClearanceAction(r))&&r.phase!=='pending_pm_final_approval').length;
   document.getElementById('sDone').textContent=allRequests.filter(r=>closedPhases.includes(r.phase)).length;
   document.getElementById('sRejected').textContent=allRequests.filter(r=>declinedPhases.includes(r.phase)).length;
 }
 
 function renderBanner() {
-  const clearance=allRequests.filter(r=>['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase));
+  const clearance=allRequests.filter(r=>['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase)&&isMyClearanceAction(r));
   const final=allRequests.filter(r=>r.phase==='pending_pm_final_approval');
   const total=clearance.length+final.length;
   const b=document.getElementById('pendingBanner');
@@ -342,9 +370,9 @@ function filterTable() {
   const clearancePhases=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'];
   const allTerminal=[...declinedPhases,...closedPhases];
   let reqs=allRequests;
-  if(activeTab==='clearance') reqs=reqs.filter(r=>clearancePhases.includes(r.phase));
+  if(activeTab==='clearance') reqs=reqs.filter(r=>clearancePhases.includes(r.phase)&&isMyClearanceAction(r));
   else if(activeTab==='final') reqs=reqs.filter(r=>r.phase==='pending_pm_final_approval');
-  else if(activeTab==='ongoing') reqs=reqs.filter(r=>!allTerminal.includes(r.phase)&&!clearancePhases.includes(r.phase)&&r.phase!=='pending_pm_final_approval');
+  else if(activeTab==='ongoing') reqs=reqs.filter(r=>!allTerminal.includes(r.phase)&&!(clearancePhases.includes(r.phase)&&isMyClearanceAction(r))&&r.phase!=='pending_pm_final_approval');
   else if(activeTab==='declined') reqs=reqs.filter(r=>declinedPhases.includes(r.phase));
   else if(activeTab==='closed') reqs=reqs.filter(r=>closedPhases.includes(r.phase));
   else if(activeTab==='mine') reqs=reqs.filter(r=>r.created_by===currentUser.id);
@@ -359,8 +387,9 @@ function renderTable(reqs) {
   const emptySub={mine:'Click + New Request to get started.',clearance:'All clearance requests have been handled.',final:'No quotes are awaiting your final decision.',ongoing:'All requests are in terminal or action-pending states.',declined:'No requests have been declined or rejected.',closed:'No requests have been fully completed yet.',all:'No procurement requests assigned to you yet.'}[activeTab]||'';
   if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${emptyIcon}</div><h3>${emptyTitle}</h3><p>${emptySub}</p>${activeTab==='mine'?'<button class="btn btn-primary" style="margin-top:12px" onclick="openNewPR()">+ New Request</button>':''}</div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
-    const needsAction=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval','pending_pm_final_approval'].includes(r.phase);
-    const isClearance=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase), isFinal=r.phase==='pending_pm_final_approval';
+    const isClearancePhase=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase);
+    const isClearance=isClearancePhase&&isMyClearanceAction(r), isFinal=r.phase==='pending_pm_final_approval';
+    const needsAction=isClearance||isFinal;
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
       <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
       <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${r.item_note}</div>`:''}</td>
@@ -395,8 +424,16 @@ async function openPR(id) {
   footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('prModal')">Close</button>`;
   let actionSection='';
 
+  // ── AWAITING MASTER TO ASSIGN AN APPROVER ──
+  if(currentPR.phase==='pending_master_reassignment') {
+    actionSection=`<div class="action-section" style="border-color:#dc262633;background:rgba(220,38,38,0.04)">
+      <div class="action-section-title" style="color:#dc2626">🧭 Awaiting Approver Assignment</div>
+      <p style="font-size:0.82rem;color:var(--gray-3)">This request could not be auto-routed for requirement clearance (usually because the requester is themselves the resolved approver). It is waiting for <strong>Master Admin</strong> to manually assign who should clear it.</p>
+    </div>`;
+  }
+
   // ── INITIAL CLEARANCE ──
-  if(currentPR.phase==='pending_initial_pm_approval') {
+  if(currentPR.phase==='pending_initial_pm_approval' && currentPR.initial_approver_id===currentUser.id) {
     actionSection=`<div class="action-section">
       <div class="action-section-title">🔐 Requirement Clearance <span class="action-badge">ACTION REQUIRED</span></div>
       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">The engineer does not yet have <strong>Project Manager approval</strong> for this requirement. Review and grant or deny clearance to begin procurement.</p>
@@ -408,6 +445,11 @@ async function openPR(id) {
         <button class="btn btn-success" onclick="grantClearance('approved')" style="flex:1"> Grant Clearance</button>
         <button class="btn btn-danger" onclick="grantClearance('rejected')" style="flex:1">✗ Deny</button>
       </div>
+    </div>`;
+  } else if(currentPR.phase==='pending_initial_pm_approval') {
+    actionSection=`<div class="action-section" style="border-color:#f59e0b33;background:rgba(245,158,11,0.04)">
+      <div class="action-section-title" style="color:#b45309">🔐 Awaiting Requirement Clearance</div>
+      <p style="font-size:0.82rem;color:var(--gray-3)">Waiting on ${currentPR.initial_approver_id?'the assigned department approver':'Master Admin to assign an approver'} — no action needed from you.</p>
     </div>`;
   }
 
@@ -986,7 +1028,7 @@ function openNewPR() {
   document.getElementById('srcInternational').classList.remove('selected');
   document.getElementById('attachList').innerHTML='';
   document.getElementById('bomStatus').innerHTML='';
-  ['fCategory','fProjectSelect','fOrderType','fVendor','fItemNote','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['fCategory','fDiscipline','fProjectSelect','fOrderType','fVendor','fItemNote','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('fPhaseSelect').innerHTML='<option value="">Select project first...</option>';
   const urgEl=document.getElementById('fUrgency');if(urgEl)urgEl.value='normal';
   const reqForEl=document.getElementById('fRequestFor');if(reqForEl)reqForEl.value='npd';
@@ -1003,6 +1045,8 @@ async function submitPR() {
   const isVI=cat==='vendor_info';
   const isLP=cat==='local_purchase';
   const requestFor=document.getElementById('fRequestFor')?.value||'npd';
+  const discipline=document.getElementById('fDiscipline')?.value||'';
+  if(!isVI&&!isLP&&!discipline){showToast('Please select a Discipline (Elec / Mechanical)','error');return;}
   const pmId=document.getElementById('fPMSelect').value||(requestFor==='production'?'':currentUser.id); // assigned PM for the project, falling back to self (NPD only)
   if(requestFor==='production'&&!pmId){showToast('Please select a Project Manager-Production (add one in Master Admin if none listed)','error');return;}
   const projectId=document.getElementById('fProjectSelect').value;
@@ -1025,13 +1069,36 @@ async function submitPR() {
     preferred_material:document.getElementById('fQcMaterial').value.trim()||null,
     custom:document.getElementById('fQcCustom').value.trim()||null
   };
-  // PM submitting their own request — treat as already approved (goes straight to procurement_active)
+
+  // ── A Project Manager's OWN request still needs requirement clearance —
+  //    it just can't come from themselves. Resolve the department manager
+  //    for this request_for/discipline (with Antunes override), and if that
+  //    resolves to nobody-but-themselves, forward it to Master Admin to
+  //    manually pick and assign the actual approver. ──
+  let initialApproverId=null, needsReassignment=false;
+  const willNeedClearance=!isVI&&!isLP;
+  if(willNeedClearance){
+    showLoader(true);
+    try {
+      ({approverId:initialApproverId, needsReassignment}=await resolveApproverForSubmission(currentUser,projectId,requestFor,discipline));
+    } catch(e) {
+      showLoader(false);
+      console.error('Approver resolution failed:',e);
+      showToast('Could not resolve an approver ('+e.message+'). Request not submitted — please try again or contact Master Admin.','error');
+      return;
+    }
+    showLoader(false);
+  }
+  const basePhase=isLP?'lp_submitted':isVI?'procurement_active':(needsReassignment?'pending_master_reassignment':'pending_initial_pm_approval');
+
   const vals={
     request_category:cat,
     request_for:requestFor,
+    discipline:(!isVI&&!isLP)?discipline:null,
     project_name:projectName,
     project_phase:projectPhase,
     assigned_pm_id:pmId,
+    initial_approver_id:(willNeedClearance&&!needsReassignment)?initialApproverId:null,
     project_manager_name:allPMs.find(p=>p.id===pmId)?.name||currentUser.name,
     team_member_name:currentUser.name,
     department:dept,
@@ -1046,11 +1113,11 @@ async function submitPR() {
     parts,
     attachments:attachedFiles.map(f=>({name:f.name,type:f.type,data:f.data})),
     created_by:currentUser.id,
-    phase:'procurement_active', // PM self-approves
-    initial_pm_approval:'already_approved',
+    phase:basePhase,
+    initial_pm_approval:isLP?'needs_approval':(isVI?null:(needsReassignment?'needs_approval':'needs_approval')),
     is_modification:isEditMode,
     parent_request_id:isEditMode?editingParentId:null,
-    phase_timestamps:{submitted:new Date().toISOString(),procurement_active:new Date().toISOString()}
+    phase_timestamps:(function(){var ts={submitted:new Date().toISOString()};if(basePhase!=='submitted')ts[basePhase]=new Date().toISOString();return ts;})()
   };
   if(!isVI&&!isLP) vals.order_type=orderType;
   showLoader(true);
@@ -1060,8 +1127,8 @@ async function submitPR() {
   }
   showLoader(false);
   if(error){showToast('Submit failed: '+error.message,'error');return;}
-  showToast(isLP?'Local Purchase request sent to Procurement!':isVI?'Vendor Info request sent to Procurement!':'Request submitted and sent to Procurement!','success');
-  if(newPR?.id) notifyPhaseChange(newPR.id,newPR.phase||'procurement_active',currentUser?.id);
+  showToast(isLP?'Local Purchase request sent to Procurement!':isVI?'Vendor Info request sent to Procurement!':needsReassignment?'Request submitted — Master Admin will assign an approver.':'Request submitted for clearance.','success');
+  if(newPR?.id) notifyPhaseChange(newPR.id,newPR.phase||'submitted',currentUser?.id);
   closeModal('prFormModal');
   await loadRequests();
 }

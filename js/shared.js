@@ -10,6 +10,94 @@ function escHtml(str) {
 // ══════════════════════════════════════════════════════════════
 const _fileRegistry = [];
 
+// ══════════════════════════════════════════════════════════════
+// INITIAL-CLEARANCE APPROVAL ROUTING
+// Resolves who must grant "requirement clearance" (pending_initial_pm_approval)
+// for a new RFQ, based on request_for (npd/production) x discipline
+// (elec/mechanical), with a per-project override for Antunes projects.
+// This is INDEPENDENT of assigned_pm_id, which still drives final quote
+// approval and stays tied to the project's linked Project Manager.
+// ══════════════════════════════════════════════════════════════
+async function resolveInitialApprover(projectId, requestFor, discipline) {
+  if (!discipline || !requestFor) return null;
+  try {
+    // 1. Antunes override — only applies if the project is flagged is_antunes
+    //    AND a routing row exists for this exact request_for/discipline combo.
+    if (projectId) {
+      const { data: proj } = await db.from('projects').select('is_antunes').eq('id', projectId).maybeSingle();
+      if (proj && proj.is_antunes) {
+        const { data: aRow } = await db.from('antunes_routing')
+          .select('manager_id').eq('request_for', requestFor).eq('discipline', discipline).maybeSingle();
+        if (aRow && aRow.manager_id) return aRow.manager_id;
+      }
+    }
+    // 2. Default department routing (one of the 4 standing combos)
+    const { data: dRow } = await db.from('department_routing')
+      .select('manager_id').eq('request_for', requestFor).eq('discipline', discipline).maybeSingle();
+    return dRow ? dRow.manager_id : null;
+  } catch (e) {
+    console.warn('resolveInitialApprover failed:', e.message);
+    return null;
+  }
+}
+window.resolveInitialApprover = resolveInitialApprover;
+
+// True if this request cannot go straight to the auto-resolved approver and
+// instead needs a human at Master Admin to pick and forward it:
+//  - no routing configured at all for this combo (resolvedApproverId is null)
+//  - the requester IS the resolved approver (can't clear your own request)
+//  - the requester has been flagged by Master as always needing manual routing
+//    (covers managers/PMs, or any "exceptional" user Master wants routed by hand)
+function needsManualReassignment(requesterUser, resolvedApproverId) {
+  if (!resolvedApproverId) return true;
+  if (requesterUser?.manual_routing) return true;
+  if (resolvedApproverId === requesterUser?.id) return true;
+  return false;
+}
+window.needsManualReassignment = needsManualReassignment;
+
+// Single entry point used at submission time. Priority order:
+//  1. Fixed per-user override — "everything user A submits goes straight to
+//     user B", set on the user record by Master. Bypasses discipline
+//     routing AND the manual-reassignment queue entirely (it's a standing,
+//     pre-decided answer, irrespective of role/department/category).
+//  2. Antunes / department discipline routing (resolveInitialApprover).
+//  3. If that's empty, is the requester themselves, or the requester is
+//     flagged manual_routing — send to Master's reassignment queue.
+//
+// IMPORTANT: `requesterUser` is normally the cached Session object, which is
+// only ever refreshed on login. manual_routing / override_approver_id are
+// exactly the kind of setting Master can change mid-session without the
+// requester logging out — so we re-fetch those two fields live from the
+// users table here rather than trusting whatever's cached, to avoid acting
+// on a stale override/flag.
+async function resolveApproverForSubmission(requesterUser, projectId, requestFor, discipline) {
+  console.log('%c[ROUTING] resolveApproverForSubmission called — build v2 (live-refetch)', 'color:#7c3aed;font-weight:bold', { requesterId: requesterUser?.id, requesterName: requesterUser?.name, projectId, requestFor, discipline });
+
+  let liveUser = requesterUser;
+  try {
+    const { data, error } = await db.from('users')
+      .select('id, manual_routing, override_approver_id')
+      .eq('id', requesterUser.id).maybeSingle();
+    if (error) throw error;
+    if (data) liveUser = { ...requesterUser, ...data };
+    console.log('%c[ROUTING] live user flags fetched:', 'color:#7c3aed', data);
+  } catch (e) {
+    console.warn('[ROUTING] Could not refresh live routing flags for user, falling back to cached session:', e.message);
+  }
+
+  if (liveUser?.override_approver_id && liveUser.override_approver_id !== liveUser.id) {
+    console.log('%c[ROUTING] DECISION: fixed override applies -> '+liveUser.override_approver_id, 'color:#059669;font-weight:bold');
+    return { approverId: liveUser.override_approver_id, needsReassignment: false };
+  }
+  console.log('%c[ROUTING] DECISION: no override in effect (override_approver_id='+liveUser?.override_approver_id+'), falling back to department/Antunes routing', 'color:#b45309;font-weight:bold');
+  const resolved = await resolveInitialApprover(projectId, requestFor, discipline);
+  const needsReassignment = needsManualReassignment(liveUser, resolved);
+  console.log('%c[ROUTING] department/Antunes result:', 'color:#7c3aed', { resolved, needsReassignment });
+  return { approverId: resolved, needsReassignment };
+}
+window.resolveApproverForSubmission = resolveApproverForSubmission;
+
 // ── EMAIL NOTIFICATION HELPER ────────────────────────────────
 async function notifyPhaseChange(prId, phase, triggerUserId) {
   try {
@@ -239,8 +327,13 @@ function buildNavbar(user) {
       {href:'pm.html',label:'PM Portal'},
     ],
   };
-  const links = navLinks[user.role]||[];
-  return `<nav class="navbar">
+  const links = [...(navLinks[user.role]||[])];
+  // Anyone can be made a requirement-clearance approver for a category
+  // (or a fixed per-user override target) regardless of their role — so
+  // everyone needs a way to actually reach the page where that clearance
+  // happens, not just formal Project Managers.
+  if(!links.some(l=>l.href==='pm.html')) links.push({href:'pm.html', label:'✓ Approvals', badge:'navApprovalBadge'});
+  const html = `<nav class="navbar">
     <a class="nav-logo" href="#">
       <div class="nav-logo-mark">
         <img src="../on2cooklogo-bg.png" alt="Logo" width="60" height="20">
@@ -248,7 +341,7 @@ function buildNavbar(user) {
       <div><div class="nav-logo-text">Procure<span>X</span></div></div>
     </a>
     <div class="nav-links" style="display:flex;gap:4px;margin-left:18px">
-      ${links.map(l=>`<a href="${l.href}" class="nav-link ${window.location.pathname.includes(l.href)?'active':''}" style="font-size:0.78rem;padding:5px 12px;border-radius:5px;color:rgba(255,255,255,0.8);text-decoration:none;transition:background 0.15s;${window.location.pathname.includes(l.href)?'background:rgba(255,255,255,0.15);color:white':''}" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='${window.location.pathname.includes(l.href)?'rgba(255,255,255,0.15)':'transparent'}'">${l.label}</a>`).join('')}
+      ${links.map(l=>`<a href="${l.href}" class="nav-link ${window.location.pathname.includes(l.href)?'active':''}" style="font-size:0.78rem;padding:5px 12px;border-radius:5px;color:rgba(6, 5, 5, 0.8);text-decoration:none;transition:background 0.15s;${window.location.pathname.includes(l.href)?'background:rgba(255,255,255,0.15);color:black':''}" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='${window.location.pathname.includes(l.href)?'rgba(255,255,255,0.15)':'transparent'}'">${l.label}${l.badge?` <span id="${l.badge}" style="display:none;background:#dc2626;color:#fff;border-radius:999px;padding:0 6px;font-size:0.68rem;margin-left:2px"></span>`:''}</a>`).join('')}
     </div>
     <div class="nav-spacer"></div>
     <span class="nav-role-badge" id="navRoleBadge"></span>
@@ -280,7 +373,29 @@ function buildNavbar(user) {
       </div>
     </div>
   </nav>`;
+  // Schedule after the caller assigns this HTML into the DOM (buildNavbar
+  // itself returns synchronously, so the badge element doesn't exist yet
+  // at this exact line — a 0ms timeout runs after that assignment).
+  setTimeout(() => refreshApprovalBadge(user), 0);
+  return html;
 }
+
+// Live count of clearance items waiting on this user, shown on the
+// "Approvals" nav link so nobody has to be told a URL or remember to check.
+async function refreshApprovalBadge(user) {
+  try {
+    const { count, error } = await db.from('procurement_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('initial_approver_id', user.id)
+      .eq('phase', 'pending_initial_pm_approval');
+    if (error) throw error;
+    const el = document.getElementById('navApprovalBadge');
+    if (el) { el.textContent = count || ''; el.style.display = count ? '' : 'none'; }
+  } catch (e) {
+    console.warn('refreshApprovalBadge failed:', e.message);
+  }
+}
+window.refreshApprovalBadge = refreshApprovalBadge;
 
 function buildFooter() {
   return `<footer>
@@ -548,6 +663,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       <div class="detail-item"><div class="detail-key">Project Manager</div><div class="detail-value">${pmName||pr.project_manager_name||'—'}</div></div>
       <div class="detail-item"><div class="detail-key">Team Member</div><div class="detail-value">${pr.team_member_name}</div></div>
       <div class="detail-item"><div class="detail-key">Department</div><div class="detail-value">${DEPARTMENTS[pr.department]||pr.department}</div></div>
+      ${pr.request_for?`<div class="detail-item"><div class="detail-key">Request For</div><div class="detail-value">${pr.request_for==='npd'?'NPD':'Production'}${pr.discipline?' · '+(DISCIPLINES[pr.discipline]||pr.discipline):''}</div></div>`:''}
       ${pr.order_type?`<div class="detail-item"><div class="detail-key">Order Type</div><div class="detail-value">${ORDER_TYPES[pr.order_type]||pr.order_type}</div></div>`:''}
       ${pr.product_link?`<div class="detail-item"><div class="detail-key">Product Link</div><div class="detail-value"><a href="${pr.product_link}" target="_blank" style="color:var(--red)">🔗 View Product</a></div></div>`:''}
       ${pr.sourcing?`<div class="detail-item"><div class="detail-key">Sourcing</div><div class="detail-value">${(Array.isArray(pr.sourcing)?pr.sourcing:JSON.parse(pr.sourcing||'[]')).map(s=>s==='domestic'?'🏠 Domestic':'🌍 International').join(', ')}</div></div>`:''}

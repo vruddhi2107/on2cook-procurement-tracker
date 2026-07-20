@@ -38,6 +38,7 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('requests')">📋 All Requests</button>
     <button class="tab-btn" onclick="switchTab('director')">👤 Director Approvals <span id="directorBadge" style="display:none;background:#7c3aed;color:#fff;border-radius:999px;padding:0 7px;font-size:0.72rem;margin-left:4px;vertical-align:middle"></span></button>
+    <button class="tab-btn" onclick="switchTab('routing')">🧭 Approval Routing <span id="reassignBadge" style="display:none;background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:0.72rem;margin-left:4px;vertical-align:middle"></span></button>
     <button class="tab-btn" onclick="switchTab('users')">👥 Users</button>
     <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendors</button>
     <button class="tab-btn" onclick="switchTab('analytics')">📊 Analytics</button>
@@ -106,6 +107,48 @@
         <table class="data-table">
           <thead><tr><th>PR #</th><th>Project</th><th>Phase</th><th>Selected Quote</th><th>Amount</th><th>PM Notes</th><th>Submitted</th><th></th></tr></thead>
           <tbody id="directorBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPROVAL ROUTING TAB -->
+  <div id="tab-routing" style="display:none">
+    <div class="card" style="margin-bottom:18px;border:1.5px solid rgba(220,38,38,0.25);background:rgba(220,38,38,0.03)">
+      <div class="card-header">
+        <span class="section-title" style="color:#dc2626">🧭 Awaiting Approver Assignment</span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Requester couldn't be auto-routed — pick who this goes to</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>PR #</th><th>Project</th><th>Category</th><th>Requester</th><th>Submitted</th><th>Assign To</th><th></th></tr></thead>
+          <tbody id="reassignBody"><tr><td colspan="7" style="text-align:center;padding:24px;color:var(--gray-4)">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-header">
+        <span class="section-title">Default Department Routing</span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Who clears requirement approval for each category, by default — pick any user, any role</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Request For</th><th>Discipline</th><th>Department Manager</th><th></th></tr></thead>
+          <tbody id="deptRoutingBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="section-title">Antunes Project Override</span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Applies instead of the default above, only for projects flagged "Antunes" in Projects</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Request For</th><th>Discipline</th><th>Antunes Manager</th><th></th></tr></thead>
+          <tbody id="antunesRoutingBody"></tbody>
         </table>
       </div>
     </div>
@@ -263,6 +306,17 @@
             <option value="other">Other</option>
           </select>
         </div>
+        <div class="form-group full" style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <input type="checkbox" id="uManualRouting" style="width:auto"/>
+          <label class="form-label" for="uManualRouting" style="margin:0">Send this user's own requests to Master for manual approver assignment each time (managers, or any exception you want reviewed by hand)</label>
+        </div>
+        <div class="form-group full" style="margin-top:8px">
+          <label class="form-label">Always forward this user's requests to (optional — overrides everything above, any role)</label>
+          <select class="form-control" id="uOverrideApprover">
+            <option value="">— No fixed override —</option>
+          </select>
+          <div style="font-size:0.72rem;color:var(--gray-4);margin-top:4px">If set, this user's requests skip the department/Antunes routing entirely and go straight to the person picked here — no queue, no manual step each time.</div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -312,7 +366,7 @@ async function init() {
   document.getElementById('footerMount').innerHTML=buildFooter();
   initNavbar(currentUser);
   showLoader(true);
-  await Promise.all([loadRequests(), loadUsers(), loadVendors()]);
+  await Promise.all([loadRequests(), loadUsers(), loadVendors(), loadRoutingConfig()]);
   showLoader(false);
   window.initNotifBell && window.initNotifBell(currentUser, function(prId){ openPRDetail(prId); });
 }
@@ -349,6 +403,111 @@ async function loadVendors() {
   renderVendorGrid(allVendors);
 }
 
+let deptRouting=[], antunesRouting=[];
+const ROUTING_COMBOS=[['npd','elec'],['npd','mechanical'],['production','elec'],['production','mechanical']];
+
+async function loadRoutingConfig() {
+  const[dr,ar]=await Promise.all([
+    db.from('department_routing').select('*'),
+    db.from('antunes_routing').select('*')
+  ]);
+  if(dr.error) console.error('loadRoutingConfig department_routing failed:',dr.error);
+  if(ar.error) console.error('loadRoutingConfig antunes_routing failed:',ar.error);
+  deptRouting=dr.data||[];
+  antunesRouting=ar.data||[];
+}
+
+function userPickerOptions(selectedId, excludeId) {
+  const opts=['<option value="">— Unassigned —</option>'];
+  [...allUsers].filter(u=>u.id!==excludeId).sort((a,b)=>a.name.localeCompare(b.name)).forEach(u=>{
+    opts.push(`<option value="${u.id}" ${u.id===selectedId?'selected':''}>${u.name} (${u.role})</option>`);
+  });
+  return opts.join('');
+}
+
+function renderRoutingTab() {
+  document.getElementById('deptRoutingBody').innerHTML=ROUTING_COMBOS.map(([rf,disc])=>{
+    const row=deptRouting.find(r=>r.request_for===rf&&r.discipline===disc);
+    return `<tr>
+      <td>${rf==='npd'?'NPD':'Production'}</td>
+      <td>${disc==='elec'?'Elec':'Mechanical'}</td>
+      <td><select class="form-control" id="dr-${rf}-${disc}" style="max-width:280px">${userPickerOptions(row?.manager_id)}</select></td>
+      <td><button class="btn btn-primary btn-sm" onclick="saveDeptRouting('${rf}','${disc}')">Save</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('antunesRoutingBody').innerHTML=ROUTING_COMBOS.map(([rf,disc])=>{
+    const row=antunesRouting.find(r=>r.request_for===rf&&r.discipline===disc);
+    return `<tr>
+      <td>${rf==='npd'?'NPD':'Production'}</td>
+      <td>${disc==='elec'?'Elec':'Mechanical'}</td>
+      <td><select class="form-control" id="ar-${rf}-${disc}" style="max-width:280px">${userPickerOptions(row?.manager_id)}</select></td>
+      <td><button class="btn btn-primary btn-sm" onclick="saveAntunesRouting('${rf}','${disc}')">Save</button></td>
+    </tr>`;
+  }).join('');
+
+  renderReassignQueue();
+}
+
+async function saveDeptRouting(requestFor,discipline) {
+  const managerId=document.getElementById(`dr-${requestFor}-${discipline}`).value;
+  let error;
+  if(!managerId){
+    ({error}=await db.from('department_routing').delete().eq('request_for',requestFor).eq('discipline',discipline));
+  } else {
+    ({error}=await db.from('department_routing').upsert({request_for:requestFor,discipline,manager_id:managerId},{onConflict:'request_for,discipline'}));
+  }
+  if(error){ console.error('saveDeptRouting failed:',error); showToast('Failed to save routing: '+error.message,'error'); return; }
+  showToast('Routing updated','success');
+  await loadRoutingConfig(); renderRoutingTab();
+}
+
+async function saveAntunesRouting(requestFor,discipline) {
+  const managerId=document.getElementById(`ar-${requestFor}-${discipline}`).value;
+  let error;
+  if(!managerId){
+    ({error}=await db.from('antunes_routing').delete().eq('request_for',requestFor).eq('discipline',discipline));
+  } else {
+    ({error}=await db.from('antunes_routing').upsert({request_for:requestFor,discipline,manager_id:managerId},{onConflict:'request_for,discipline'}));
+  }
+  if(error){ console.error('saveAntunesRouting failed:',error); showToast('Failed to save override: '+error.message,'error'); return; }
+  showToast('Antunes override updated','success');
+  await loadRoutingConfig(); renderRoutingTab();
+}
+
+function renderReassignQueue() {
+  const pending=allRequests.filter(r=>r.phase==='pending_master_reassignment');
+  const body=document.getElementById('reassignBody');
+  if(!pending.length){ body.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--gray-4)">Nothing waiting on assignment</td></tr>'; return; }
+  body.innerHTML=pending.map(r=>`<tr>
+    <td>PR-${String(r.request_number).padStart(4,'0')}</td>
+    <td>${r.project_name}</td>
+    <td>${r.request_category}${r.discipline?` · ${r.discipline==='elec'?'Elec':'Mechanical'}`:''}</td>
+    <td>${r.users?.name||r.team_member_name||'—'}</td>
+    <td>${new Date(r.created_at).toLocaleDateString()}</td>
+    <td><select class="form-control" id="reassign-${r.id}" style="max-width:260px">${userPickerOptions(null)}</select></td>
+    <td><button class="btn btn-primary btn-sm" onclick="assignApprover('${r.id}')">Assign &amp; Forward</button></td>
+  </tr>`).join('');
+}
+
+async function assignApprover(prId) {
+  const managerId=document.getElementById(`reassign-${prId}`).value;
+  if(!managerId){ showToast('Pick a person to assign this to','error'); return; }
+  showLoader(true);
+  const pr=allRequests.find(r=>r.id===prId);
+  const ts={...(pr?.phase_timestamps||{}), pending_initial_pm_approval:new Date().toISOString()};
+  const{error}=await db.from('procurement_requests').update({
+    initial_approver_id:managerId, phase:'pending_initial_pm_approval', phase_timestamps:ts
+  }).eq('id',prId);
+  showLoader(false);
+  if(error){ showToast('Failed: '+error.message,'error'); return; }
+  await postComment(prId,currentUser.id,`🧭 Master Admin assigned this request to a clearance approver`);
+  notifyPhaseChange(prId,'pending_initial_pm_approval',currentUser.id);
+  showToast('Assigned and forwarded','success');
+  await loadRequests();
+  renderReassignQueue();
+}
+
 function updateStats() {
   document.getElementById('sTotal').textContent=allRequests.length;
   document.getElementById('sActive').textContent=allRequests.filter(r=>!['accepted','rejected'].includes(r.phase)).length;
@@ -358,11 +517,15 @@ function updateStats() {
   const directorPending=allRequests.filter(r=>['pending_sandy_approval','deviation_approval','pending_decline_approval'].includes(r.phase));
   const badge=document.getElementById('directorBadge');
   if(badge){badge.textContent=directorPending.length;badge.style.display=directorPending.length?'':'none';}
+  // Reassignment badge
+  const reassignPending=allRequests.filter(r=>r.phase==='pending_master_reassignment');
+  const rBadge=document.getElementById('reassignBadge');
+  if(rBadge){rBadge.textContent=reassignPending.length;rBadge.style.display=reassignPending.length?'':'none';}
 }
 
 function switchTab(tab) {
   activeTab=tab;
-  ['requests','director','users','vendors','analytics'].forEach((t,i)=>{
+  ['requests','director','routing','users','vendors','analytics'].forEach((t,i)=>{
     const el=document.getElementById(`tab-${t}`);
     if(el) el.style.display=t===tab?'':'none';
     document.querySelectorAll('.tab-btn')[i].classList.toggle('active',t===tab);
@@ -371,6 +534,7 @@ function switchTab(tab) {
     requestAnimationFrame(() => requestAnimationFrame(renderAnalytics));
   }
   if(tab==='director') renderDirectorApprovals();
+  if(tab==='routing') renderRoutingTab();
 }
 
 function clearFilters() {
@@ -437,14 +601,50 @@ async function viewPR(id) {
         </div>`).join('')}
       </div>
     </div>` : '';
+  const reassignHTML = `
+    <div style="margin-top:16px;padding:14px;background:rgba(220,38,38,0.03);border:1.5px solid rgba(220,38,38,0.2);border-radius:var(--radius)">
+      <div class="detail-key" style="color:#dc2626;margin-bottom:10px">🧭 Master Override — Reassign Approvers</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Requirement Clearance Approver</label>
+          <select class="form-control" id="ovInitialApprover">${userPickerOptions(pr.initial_approver_id)}</select>
+        </div>
+        <div class="form-group"><label class="form-label">Final Quote Approver (Project PM)</label>
+          <select class="form-control" id="ovFinalApprover">${userPickerOptions(pr.assigned_pm_id)}</select>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveOverride('${pr.id}')">Save Reassignment</button>
+    </div>`;
   document.getElementById('prDetailBody').innerHTML=
     buildPRDetailHTML(pr,quotations,vd?.data?.name||'')+
+    reassignHTML+
     attachmentsHTML+
     `<div style="margin-top:24px;border-top:1.5px solid var(--border);padding-top:18px">
       <div class="section-title" style="margin-bottom:12px">💬 Comments</div>
       ${renderComments(comments)}
     </div>`;
   openModal('prDetailModal');
+}
+
+async function saveOverride(prId) {
+  const initialApproverId=document.getElementById('ovInitialApprover').value||null;
+  const finalApproverId=document.getElementById('ovFinalApprover').value||null;
+  const pr=allRequests.find(r=>r.id===prId);
+  if(!pr) return;
+  const updates={ initial_approver_id: initialApproverId, assigned_pm_id: finalApproverId };
+  // If it was sitting in the reassignment queue and we just gave it an approver, forward it
+  if(pr.phase==='pending_master_reassignment' && initialApproverId){
+    updates.phase='pending_initial_pm_approval';
+    updates.phase_timestamps={...(pr.phase_timestamps||{}), pending_initial_pm_approval:new Date().toISOString()};
+  }
+  showLoader(true);
+  const{error}=await db.from('procurement_requests').update(updates).eq('id',prId);
+  showLoader(false);
+  if(error){showToast('Failed: '+error.message,'error');return;}
+  await postComment(prId,currentUser.id,`🧭 Master Admin manually reassigned the approver(s) for this request`);
+  if(updates.phase) notifyPhaseChange(prId,updates.phase,currentUser.id);
+  showToast('Reassignment saved','success');
+  closeModal('prDetailModal');
+  await loadRequests();
 }
 
 async function deletePR() {
@@ -878,6 +1078,8 @@ function openAddUser() {
   ['uName','uEmail','uRole','uDept'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('uPassword').value='12345';
   document.getElementById('uPMType').value='npd';
+  document.getElementById('uManualRouting').checked=false;
+  document.getElementById('uOverrideApprover').innerHTML=userPickerOptions(null);
   onUserRoleChange();
   openModal('userModal');
 }
@@ -893,6 +1095,8 @@ function editUser(id) {
   document.getElementById('uRole').value=u.role;
   document.getElementById('uDept').value=u.department||'';
   document.getElementById('uPMType').value=u.pm_type||'npd';
+  document.getElementById('uManualRouting').checked=!!u.manual_routing;
+  document.getElementById('uOverrideApprover').innerHTML=userPickerOptions(u.override_approver_id, u.id);
   onUserRoleChange();
   openModal('userModal');
 }
@@ -904,11 +1108,13 @@ async function saveUser() {
   const role=document.getElementById('uRole').value;
   const department=document.getElementById('uDept').value||null;
   const pm_type=role==='project_manager'?(document.getElementById('uPMType').value||'npd'):null;
+  const manual_routing=document.getElementById('uManualRouting').checked;
+  const override_approver_id=document.getElementById('uOverrideApprover').value||null;
   if(!name||!email||!role){showToast('Please fill all required fields','error');return;}
   showLoader(true);
   let error;
-  if(editingUserId){({error}=await db.from('users').update({name,email,password,role,department,pm_type}).eq('id',editingUserId));}
-  else{({error}=await db.from('users').insert({name,email,password,role,department,pm_type}));}
+  if(editingUserId){({error}=await db.from('users').update({name,email,password,role,department,pm_type,manual_routing,override_approver_id}).eq('id',editingUserId));}
+  else{({error}=await db.from('users').insert({name,email,password,role,department,pm_type,manual_routing,override_approver_id}));}
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
   showToast(editingUserId?'User updated!':'User created!','success');

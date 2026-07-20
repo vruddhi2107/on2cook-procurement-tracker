@@ -68,6 +68,7 @@ const Session = {
 // ============================================================
 const PHASES = {
   submitted:                    { label: 'Submitted',                color: '#6366f1', icon: '📋' },
+  pending_master_reassignment:  { label: 'Awaiting Approver Assignment', color: '#dc2626', icon: '🧭' },
   pending_initial_pm_approval:  { label: 'Awaiting PM Clearance',   color: '#f59e0b', icon: '🔐' },
   procurement_active:           { label: 'Procurement Active',       color: '#3b82f6', icon: '⚙️'  },
   vendor_info_shared:           { label: 'Vendor Info Shared',       color: '#8b5cf6', icon: '🏢' },
@@ -120,6 +121,7 @@ const PIPELINES = {
     color: '#6366f1',
     phases: [
       'submitted',
+      'pending_master_reassignment',
       'pending_initial_pm_approval',
       'procurement_active',
       'quotations_shared',
@@ -235,6 +237,13 @@ const ORDER_TYPES = {
   inventory:    'Inventory Item (Available in Inventory)'
 };
 
+// Elec / Mechanical split, combined with request_for (npd/production) to give
+// 4 routing categories: npd-elec, npd-mechanical, production-elec, production-mechanical
+const DISCIPLINES = {
+  elec:       'Electronics',
+  mechanical: 'Mechanical'
+};
+
 const DEPARTMENTS = {
   // Legacy keys (backward-compat for existing records)
   mech:        'Mechanical Design Engineering',
@@ -253,6 +262,7 @@ const DEPARTMENTS = {
 // Ordered for workflow timeline
 const PHASE_ORDER = [
   'submitted',
+  'pending_master_reassignment',
   'pending_initial_pm_approval',
   'procurement_active',
   'quotations_shared',

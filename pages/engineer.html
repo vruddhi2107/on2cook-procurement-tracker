@@ -200,6 +200,14 @@
             <option value="production">Production</option>
           </select>
         </div>
+        <div class="form-group">
+          <label class="form-label">Discipline *</label>
+          <select class="form-control" id="fDiscipline">
+            <option value="">Select</option>
+            <option value="elec">Elec</option>
+            <option value="mechanical">Mechanical</option>
+          </select>
+        </div>
         <!-- Project name — dropdown from DB -->
         <div class="form-group">
           <label class="form-label">Project Name *</label>
@@ -762,7 +770,7 @@ async function handleBOMFile(e) {
   document.getElementById('bomStatus').innerHTML='';
   document.getElementById('pmOptYes').classList.remove('selected');
   document.getElementById('pmOptNo').classList.remove('selected');
-  ['fCategory','fProjectSelect','fPhaseSelect','fPMSelect','fOrderType','fVendor','fItemNote','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['fCategory','fDiscipline','fProjectSelect','fPhaseSelect','fPMSelect','fOrderType','fVendor','fItemNote','fDesc','fProductLink','fQcColor','fQcMaterial','fQcCustom'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   const urgEl=document.getElementById('fUrgency');if(urgEl)urgEl.value='normal';
   const reqForEl=document.getElementById('fRequestFor');if(reqForEl)reqForEl.value='npd';
   document.getElementById('fTeam').value=currentUser.name;
@@ -781,6 +789,8 @@ async function submitPR() {
   if(!isEditMode&&!isVI&&!isLP&&!selectedPMApproval){showToast('Please indicate Project Manager approval status','error');return;}
   if(!isEditMode&&!isVI&&!isLP&&selectedPMApproval==='already_approved'&&!pmScreenshotBase64){showToast('Please upload Project Manager approval screenshot','error');return;}
   const requestFor=document.getElementById('fRequestFor')?.value||'npd';
+  const discipline=document.getElementById('fDiscipline')?.value||'';
+  if(!isVI&&!isLP&&!discipline){showToast('Please select a Discipline (Elec / Mechanical)','error');return;}
   const pmId=document.getElementById('fPMSelect').value;
   if(!pmId){showToast(requestFor==='production'?'Please select a Project Manager-Production (add one in Master Admin if none listed)':'Please select a Project Manager','error');return;}
   const projectId=document.getElementById('fProjectSelect').value;
@@ -808,12 +818,35 @@ async function submitPR() {
     preferred_material:document.getElementById('fQcMaterial').value.trim()||null,
     custom:document.getElementById('fQcCustom').value.trim()||null
   };
+
+  // ── Resolve WHO grants initial requirement clearance. This is independent
+  //    of assigned_pm_id (the project's linked PM), which still owns final
+  //    quote approval below and is untouched by this routing step. ──
+  let initialApproverId=null, needsReassignment=false;
+  const willNeedClearance=!isEditMode&&!isVI&&!isLP&&selectedPMApproval==='needs_approval';
+  if(willNeedClearance){
+    showLoader(true);
+    try {
+      ({approverId:initialApproverId, needsReassignment}=await resolveApproverForSubmission(currentUser,projectId,requestFor,discipline));
+    } catch(e) {
+      showLoader(false);
+      console.error('Approver resolution failed:',e);
+      showToast('Could not resolve an approver ('+e.message+'). Request not submitted — please try again or contact Master Admin.','error');
+      return;
+    }
+    showLoader(false);
+  }
+
+  const basePhase=isLP?'lp_submitted':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':(needsReassignment?'pending_master_reassignment':'pending_initial_pm_approval');
+
   const vals={
     request_category:cat,
     request_for:requestFor,
+    discipline:(!isVI&&!isLP)?discipline:null,
     project_name:projectName,
     project_phase:projectPhase,
     assigned_pm_id:pmId,
+    initial_approver_id:(willNeedClearance&&!needsReassignment)?initialApproverId:null,
     project_manager_name:pmUser?.name||'',
     team_member_name:currentUser.name,
     department:dept,
@@ -828,21 +861,19 @@ async function submitPR() {
     parts,
     attachments:attachedFiles.map(f=>({name:f.name,type:f.type,data:f.data})),
     created_by:currentUser.id,
-    phase:isLP?'lp_submitted':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval',
+    phase:basePhase,
     initial_pm_approval:isEditMode?'already_approved':(isLP?'needs_approval':isVI?null:selectedPMApproval),
     is_modification:isEditMode,
     parent_request_id:isEditMode?editingParentId:null,
-    phase_timestamps:(function(){var ts={'submitted':new Date().toISOString()};var ph=isLP?'lp_submitted':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':'pending_initial_pm_approval';if(ph!=='submitted')ts[ph]=new Date().toISOString();return ts;})()
+    phase_timestamps:(function(){var ts={'submitted':new Date().toISOString()};if(basePhase!=='submitted')ts[basePhase]=new Date().toISOString();return ts;})()
   };
   if(!isVI&&!isLP) vals.order_type=orderType;
   showLoader(true);
   const{error,data}=await db.from('procurement_requests').insert(vals).select().single();
-  if(!error&&isEditMode&&editingParentId){
-  }
   showLoader(false);
   if(error){showToast('Submit failed: '+error.message,'error');return;}
-  showToast(isLP?'Local Purchase request submitted!':isVI?'Vendor Info request sent to Procurement Manager!':'Request submitted!','success');
-  if(newPR?.id) notifyPhaseChange(newPR.id, newPR.phase||'submitted', currentUser?.id);
+  showToast(isLP?'Local Purchase request submitted!':isVI?'Vendor Info request sent to Procurement Manager!':needsReassignment?'Request submitted — Master Admin will assign an approver.':'Request submitted!','success');
+  if(data?.id) notifyPhaseChange(data.id, data.phase||'submitted', currentUser?.id);
   closeModal('prFormModal');
   await loadRequests();
 }

@@ -194,7 +194,7 @@ function buildNavbar(user) {
       </div>
       <div><div class="nav-logo-text">Procure<span>X</span></div></div>
     </a>
-    <div class="nav-links" style="display:flex;gap:4px;margin-left:18px">
+    <div class="nav-links" style="display:flex;gap:4px;margin-left:18px;color:#000;">
       ${links.map(l=>`<a href="${l.href}" class="nav-link ${window.location.pathname.includes(l.href)?'active':''}" style="font-size:0.78rem;padding:5px 12px;border-radius:5px;color:rgba(255,255,255,0.8);text-decoration:none;transition:background 0.15s;${window.location.pathname.includes(l.href)?'background:rgba(255,255,255,0.15);color:white':''}" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='${window.location.pathname.includes(l.href)?'rgba(255,255,255,0.15)':'transparent'}'">${l.label}</a>`).join('')}
     </div>
     <div class="nav-spacer"></div>
