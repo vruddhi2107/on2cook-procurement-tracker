@@ -556,10 +556,13 @@ async function openLPModal(id) {
   document.getElementById('lpModalTitle').textContent = `LP PR-${String(currentLPPR.request_number).padStart(4,'0')} — ${currentLPPR.project_name}`;
   document.getElementById('lpModalSub').textContent = `${DEPARTMENTS[currentLPPR.department]||''} · Submitted by ${currentLPPR.team_member_name}`;
   showLoader(true);
-  const { data: quotations } = await db.from('pr_quotations').select('*').eq('pr_id', id);
+  const [{ data: quotations }, clearanceManagerName] = await Promise.all([
+    db.from('pr_quotations').select('*').eq('pr_id', id),
+    getUserName(currentLPPR.initial_approver_id)
+  ]);
   showLoader(false);
   document.getElementById('lpModalBody').innerHTML =
-    buildPRDetailHTML(currentLPPR, quotations||[], '', currentLPPR.project_manager_name||'', {}) +
+    buildPRDetailHTML(currentLPPR, quotations||[], '', currentLPPR.project_manager_name||'', {clearanceManagerName}) +
     `<div class="action-section" style="border-color:#15803d;background:rgba(34,197,94,0.04);margin-top:16px">
       <div class="action-section-title" style="color:#15803d">🔑 Master Admin — LP Decision <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">You are acting as Master Admin, overriding the Project Manager approval step.</p>

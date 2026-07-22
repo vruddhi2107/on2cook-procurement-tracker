@@ -311,11 +311,17 @@
           <label class="form-label" for="uManualRouting" style="margin:0">Send this user's own requests to Master for manual approver assignment each time (managers, or any exception you want reviewed by hand)</label>
         </div>
         <div class="form-group full" style="margin-top:8px">
-          <label class="form-label">Always forward this user's requests to (optional — overrides everything above, any role)</label>
-          <select class="form-control" id="uOverrideApprover">
+          <label class="form-label">Always forward this user's NPD requests to (optional — overrides department/Antunes routing)</label>
+          <select class="form-control" id="uOverrideApproverNPD">
             <option value="">— No fixed override —</option>
           </select>
-          <div style="font-size:0.72rem;color:var(--gray-4);margin-top:4px">If set, this user's requests skip the department/Antunes routing entirely and go straight to the person picked here — no queue, no manual step each time.</div>
+        </div>
+        <div class="form-group full" style="margin-top:8px">
+          <label class="form-label">Always forward this user's Production requests to (optional — overrides department/Antunes routing)</label>
+          <select class="form-control" id="uOverrideApproverProduction">
+            <option value="">— No fixed override —</option>
+          </select>
+          <div style="font-size:0.72rem;color:var(--gray-4);margin-top:4px">If set, this user's requests of that type skip the department/Antunes routing entirely and go straight to the person picked here — no queue, no manual step each time. NPD and Production can be routed to different people.</div>
         </div>
       </div>
     </div>
@@ -615,7 +621,7 @@ async function viewPR(id) {
       <button class="btn btn-primary btn-sm" onclick="saveOverride('${pr.id}')">Save Reassignment</button>
     </div>`;
   document.getElementById('prDetailBody').innerHTML=
-    buildPRDetailHTML(pr,quotations,vd?.data?.name||'')+
+    buildPRDetailHTML(pr,quotations,vd?.data?.name||'','',{clearanceManagerName:allUsers.find(u=>u.id===pr.initial_approver_id)?.name||''})+
     reassignHTML+
     attachmentsHTML+
     `<div style="margin-top:24px;border-top:1.5px solid var(--border);padding-top:18px">
@@ -723,6 +729,7 @@ async function openDirectorModal(prId, isOverride = false) {
   const existingSelectedQ = directorQuotations.find(q => q.is_selected) || directorQuotations.find(q => q.id === directorCurrentPR.selected_quotation_id);
   directorSelectedQuotationId = existingSelectedQ?.id || null;
   showLoader(false);
+  const directorClearanceManagerName = allUsers.find(u=>u.id===directorCurrentPR.initial_approver_id)?.name||'';
 
   const prLabel = `PR-${String(directorCurrentPR.request_number).padStart(4,'0')}`;
 
@@ -733,7 +740,7 @@ async function openDirectorModal(prId, isOverride = false) {
     const devAtts = directorCurrentPR.qc_criteria?.qc_attachments || [];
     document.getElementById('modalTitle').textContent = `QC Deviation Review — PR-${String(directorCurrentPR.request_number).padStart(4,'0')}`;
     document.getElementById('modalBody').innerHTML = `
-      <div style="margin-bottom:16px">${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {})}</div>
+      <div style="margin-bottom:16px">${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {clearanceManagerName:directorClearanceManagerName})}</div>
       <div class="action-section" style="border-color:#7c3aed;background:rgba(124,58,237,0.04)">
         <div class="action-section-title" style="color:#7c3aed">↗ QC Deviation — Director Review <span class="action-badge" style="background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35">ACTION REQUIRED</span></div>
         <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:10px">The <strong>QC Inspector (${qcInspector})</strong> has deviated this QC request to you for review.</p>
@@ -768,7 +775,7 @@ async function openDirectorModal(prId, isOverride = false) {
   document.getElementById('modalTitle').textContent = `Director Review — ${prLabel}`;
   document.getElementById('modalBody').innerHTML = `
     <div style="margin-bottom:16px">
-      ${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {})}
+      ${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {clearanceManagerName:directorClearanceManagerName})}
     </div>
     <div class="action-section" style="border-color:#7c3aed33;background:rgba(124,58,237,0.04)">
       ${headerLabel}
@@ -1079,7 +1086,8 @@ function openAddUser() {
   document.getElementById('uPassword').value='12345';
   document.getElementById('uPMType').value='npd';
   document.getElementById('uManualRouting').checked=false;
-  document.getElementById('uOverrideApprover').innerHTML=userPickerOptions(null);
+  document.getElementById('uOverrideApproverNPD').innerHTML=userPickerOptions(null);
+  document.getElementById('uOverrideApproverProduction').innerHTML=userPickerOptions(null);
   onUserRoleChange();
   openModal('userModal');
 }
@@ -1096,7 +1104,10 @@ function editUser(id) {
   document.getElementById('uDept').value=u.department||'';
   document.getElementById('uPMType').value=u.pm_type||'npd';
   document.getElementById('uManualRouting').checked=!!u.manual_routing;
-  document.getElementById('uOverrideApprover').innerHTML=userPickerOptions(u.override_approver_id, u.id);
+  // Legacy single override_approver_id (pre-split) is shown as the starting
+  // value for both, only where the specific NPD/Production field isn't set.
+  document.getElementById('uOverrideApproverNPD').innerHTML=userPickerOptions(u.override_approver_npd_id||u.override_approver_id, u.id);
+  document.getElementById('uOverrideApproverProduction').innerHTML=userPickerOptions(u.override_approver_production_id||u.override_approver_id, u.id);
   onUserRoleChange();
   openModal('userModal');
 }
@@ -1109,12 +1120,16 @@ async function saveUser() {
   const department=document.getElementById('uDept').value||null;
   const pm_type=role==='project_manager'?(document.getElementById('uPMType').value||'npd'):null;
   const manual_routing=document.getElementById('uManualRouting').checked;
-  const override_approver_id=document.getElementById('uOverrideApprover').value||null;
+  const override_approver_npd_id=document.getElementById('uOverrideApproverNPD').value||null;
+  const override_approver_production_id=document.getElementById('uOverrideApproverProduction').value||null;
   if(!name||!email||!role){showToast('Please fill all required fields','error');return;}
   showLoader(true);
   let error;
-  if(editingUserId){({error}=await db.from('users').update({name,email,password,role,department,pm_type,manual_routing,override_approver_id}).eq('id',editingUserId));}
-  else{({error}=await db.from('users').insert({name,email,password,role,department,pm_type,manual_routing,override_approver_id}));}
+  // override_approver_id (legacy single field) is cleared going forward —
+  // the two split fields above are now the source of truth.
+  const payload={name,email,password,role,department,pm_type,manual_routing,override_approver_id:null,override_approver_npd_id,override_approver_production_id};
+  if(editingUserId){({error}=await db.from('users').update(payload).eq('id',editingUserId));}
+  else{({error}=await db.from('users').insert(payload));}
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
   showToast(editingUserId?'User updated!':'User created!','success');

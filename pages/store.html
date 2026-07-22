@@ -78,7 +78,7 @@
 <script src="../js/supabase-config.js"></script>
 <script src="../js/shared.js"></script>
 <script>
-let currentUser=null, allRequests=[], myRequests=[], currentPR=null, activeTab='action';
+let currentUser=null, allRequests=[], myRequests=[], currentPR=null, currentPRClearanceManagerName='', activeTab='action';
 
 function addPhaseTimestamp(pr, phaseName) {
   var existing = (pr && pr.phase_timestamps) ? pr.phase_timestamps : {};
@@ -175,9 +175,10 @@ function renderTable() {
 async function openPR(id) {
   showLoader(true);
   const {data,error} = await db.from('procurement_requests').select('*').eq('id',id).single();
-  showLoader(false);
-  if (error) { showToast('Error loading PR','error'); return; }
+  if (error) { showLoader(false); showToast('Error loading PR','error'); return; }
   currentPR = data;
+  currentPRClearanceManagerName = await getUserName(currentPR.initial_approver_id);
+  showLoader(false);
   renderModal();
   openModal('prModal');
 }
@@ -370,7 +371,7 @@ function renderModal() {
 
   document.getElementById('modalTitle').innerHTML = `${prNum} — ${pr.project_name} ${getPhaseBadge(pr.phase)}`;
   document.getElementById('modalBody').innerHTML = `
-    ${buildPRDetailHTML(pr)}
+    ${buildPRDetailHTML(pr,[],'','',{clearanceManagerName:currentPRClearanceManagerName})}
     ${actionSection}
     <div style="margin-top:18px">
       <div style="font-size:0.8rem;font-weight:600;color:var(--gray-3);margin-bottom:8px">Comments</div>

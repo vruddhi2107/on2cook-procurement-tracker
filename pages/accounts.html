@@ -398,6 +398,7 @@ async function openAdvancePRDetail(prId) {
 
   const pr = prRes.data;
   if (!pr) { showToast('Could not load PR details', 'error'); return; }
+  const clearanceManagerName = await getUserName(pr.initial_approver_id);
 
   let ov = document.getElementById('_advPRDetailModal');
   if (!ov) {
@@ -421,7 +422,7 @@ async function openAdvancePRDetail(prId) {
       <button class="modal-close" onclick="document.getElementById('_advPRDetailModal').classList.remove('active')">✕</button>
     </div>
     <div class="modal-body" style="max-height:78vh;overflow-y:auto">
-      ${buildPRDetailHTML(pr, quotes, '', pr.project_manager_name||'', {poData:po||null, advPayRec:advRes.data||null, payRec:payRes.data||null})}
+      ${buildPRDetailHTML(pr, quotes, '', pr.project_manager_name||'', {poData:po||null, advPayRec:advRes.data||null, payRec:payRes.data||null, clearanceManagerName})}
       ${po ? `<div class="detail-section">
         <div class="detail-section-title">📄 Purchase Order</div>
         <div class="po-summary-card">

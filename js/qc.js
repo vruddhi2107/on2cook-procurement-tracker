@@ -3,6 +3,7 @@ var currentUser = null;
 var allRequests  = [];
 var myRequests   = [];
 var currentPR    = null;
+var currentPRClearanceManagerName = '';
 var activeTab    = 'action';
 var qcSelection  = null;
 var deviationTargetId = null;
@@ -138,9 +139,10 @@ function renderMyRequestsTable() {
 window.openPR = async function openPR(id) {
   showLoader(true);
   var result = await db.from('procurement_requests').select('*').eq('id', id).single();
-  showLoader(false);
-  if (result.error) { showToast('Error loading request', 'error'); return; }
+  if (result.error) { showLoader(false); showToast('Error loading request', 'error'); return; }
   currentPR        = result.data;
+  currentPRClearanceManagerName = await getUserName(currentPR.initial_approver_id);
+  showLoader(false);
   qcSelection      = null;
   reworkQCSelection = null;
   renderModal();
@@ -403,7 +405,7 @@ function renderModal() {
 
   document.getElementById('modalTitle').innerHTML = prNum + ' — ' + pr.project_name + ' ' + getPhaseBadge(pr.phase);
   document.getElementById('modalBody').innerHTML  =
-    buildPRDetailHTML(pr)
+    buildPRDetailHTML(pr, [], '', '', {clearanceManagerName: currentPRClearanceManagerName})
     + actionSection
     + '<div style="margin-top:18px">'
       + '<div style="font-size:0.8rem;font-weight:600;color:var(--gray-3);margin-bottom:8px">Comments</div>'

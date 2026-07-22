@@ -14,7 +14,8 @@ const _fileRegistry = [];
 // INITIAL-CLEARANCE APPROVAL ROUTING
 // Resolves who must grant "requirement clearance" (pending_initial_pm_approval)
 // for a new RFQ, based on request_for (npd/production) x discipline
-// (elec/mechanical), with a per-project override for Antunes projects.
+// (elec/mechanical) — 4 standing combos — with a per-project override for
+// Antunes projects.
 // This is INDEPENDENT of assigned_pm_id, which still drives final quote
 // approval and stays tied to the project's linked Project Manager.
 // ══════════════════════════════════════════════════════════════
@@ -72,12 +73,12 @@ window.needsManualReassignment = needsManualReassignment;
 // users table here rather than trusting whatever's cached, to avoid acting
 // on a stale override/flag.
 async function resolveApproverForSubmission(requesterUser, projectId, requestFor, discipline) {
-  console.log('%c[ROUTING] resolveApproverForSubmission called — build v2 (live-refetch)', 'color:#7c3aed;font-weight:bold', { requesterId: requesterUser?.id, requesterName: requesterUser?.name, projectId, requestFor, discipline });
+  console.log('%c[ROUTING] resolveApproverForSubmission called — build v3 (npd/production split override)', 'color:#7c3aed;font-weight:bold', { requesterId: requesterUser?.id, requesterName: requesterUser?.name, projectId, requestFor, discipline });
 
   let liveUser = requesterUser;
   try {
     const { data, error } = await db.from('users')
-      .select('id, manual_routing, override_approver_id')
+      .select('id, manual_routing, override_approver_id, override_approver_npd_id, override_approver_production_id')
       .eq('id', requesterUser.id).maybeSingle();
     if (error) throw error;
     if (data) liveUser = { ...requesterUser, ...data };
@@ -86,17 +87,77 @@ async function resolveApproverForSubmission(requesterUser, projectId, requestFor
     console.warn('[ROUTING] Could not refresh live routing flags for user, falling back to cached session:', e.message);
   }
 
-  if (liveUser?.override_approver_id && liveUser.override_approver_id !== liveUser.id) {
-    console.log('%c[ROUTING] DECISION: fixed override applies -> '+liveUser.override_approver_id, 'color:#059669;font-weight:bold');
-    return { approverId: liveUser.override_approver_id, needsReassignment: false };
+  // Fixed override, split by request_for: an NPD-specific target and a
+  // Production-specific target. Falls back to the legacy single
+  // override_approver_id (pre-split) only if neither specific field is set,
+  // so existing configurations keep working until re-set explicitly.
+  const overrideId = requestFor === 'production'
+    ? (liveUser?.override_approver_production_id || (!liveUser?.override_approver_npd_id ? liveUser?.override_approver_id : null))
+    : (liveUser?.override_approver_npd_id || (!liveUser?.override_approver_production_id ? liveUser?.override_approver_id : null));
+
+  if (overrideId && overrideId !== liveUser.id) {
+    console.log('%c[ROUTING] DECISION: fixed override applies ('+requestFor+') -> '+overrideId, 'color:#059669;font-weight:bold');
+    return { approverId: overrideId, needsReassignment: false };
   }
-  console.log('%c[ROUTING] DECISION: no override in effect (override_approver_id='+liveUser?.override_approver_id+'), falling back to department/Antunes routing', 'color:#b45309;font-weight:bold');
+  console.log('%c[ROUTING] DECISION: no override in effect for '+requestFor+', falling back to department/Antunes routing', 'color:#b45309;font-weight:bold');
   const resolved = await resolveInitialApprover(projectId, requestFor, discipline);
   const needsReassignment = needsManualReassignment(liveUser, resolved);
   console.log('%c[ROUTING] department/Antunes result:', 'color:#7c3aed', { resolved, needsReassignment });
   return { approverId: resolved, needsReassignment };
 }
 window.resolveApproverForSubmission = resolveApproverForSubmission;
+
+// ── USER NAME LOOKUP CACHE ───────────────────────────────────
+// Lightweight, page-agnostic id → name lookup used to display Clearance
+// Manager / Quote Approver names without every page having to preload a
+// full user list. Cached for the lifetime of the page.
+let _userNameCache = null;
+async function _loadUserNameCache() {
+  if (_userNameCache) return _userNameCache;
+  try {
+    const { data, error } = await db.from('users').select('id,name');
+    if (error) throw error;
+    _userNameCache = new Map((data || []).map(u => [u.id, u.name]));
+  } catch (e) {
+    console.warn('_loadUserNameCache failed:', e.message);
+    _userNameCache = new Map();
+  }
+  return _userNameCache;
+}
+async function getUserName(userId) {
+  if (!userId) return '';
+  const cache = await _loadUserNameCache();
+  return cache.get(userId) || '';
+}
+window.getUserName = getUserName;
+
+// ── LOCAL PURCHASE FIXED-ROUTING OVERRIDE ────────────────────
+// Local Purchase has a single approval step (assigned_pm_id acts as both
+// Clearance Manager and Quote Approver — there is no separate discipline
+// routing). Some users are flagged with standing overrides ("everything
+// User A submits as NPD is routed to X, everything as Production to Y");
+// this resolves that override for LP submissions specifically (live-
+// refetched, same split as resolveApproverForSubmission). Returns the
+// override user id, or null if no override is in effect for this requester
+// + request_for combination.
+async function resolveLPFixedOverride(requesterUser, requestFor) {
+  try {
+    const { data, error } = await db.from('users')
+      .select('id, override_approver_id, override_approver_npd_id, override_approver_production_id')
+      .eq('id', requesterUser.id).maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const overrideId = requestFor === 'production'
+      ? (data.override_approver_production_id || (!data.override_approver_npd_id ? data.override_approver_id : null))
+      : (data.override_approver_npd_id || (!data.override_approver_production_id ? data.override_approver_id : null));
+    if (overrideId && overrideId !== requesterUser.id) return overrideId;
+    return null;
+  } catch (e) {
+    console.warn('resolveLPFixedOverride failed:', e.message);
+    return null;
+  }
+}
+window.resolveLPFixedOverride = resolveLPFixedOverride;
 
 // ── EMAIL NOTIFICATION HELPER ────────────────────────────────
 async function notifyPhaseChange(prId, phase, triggerUserId) {
@@ -660,7 +721,8 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       <div class="detail-item"><div class="detail-key">Category</div><div class="detail-value">${pr.request_category==='vendor_info'?'Vendor Info Request':'RFQ'}</div></div>
       <div class="detail-item"><div class="detail-key">Project</div><div class="detail-value">${pr.project_name}</div></div>
       <div class="detail-item"><div class="detail-key">Phase</div><div class="detail-value">${pr.project_phase}</div></div>
-      <div class="detail-item"><div class="detail-key">Project Manager</div><div class="detail-value">${pmName||pr.project_manager_name||'—'}</div></div>
+      <div class="detail-item"><div class="detail-key">Project Manager (Quote Approver)</div><div class="detail-value">${pmName||pr.project_manager_name||'—'}</div></div>
+      <div class="detail-item"><div class="detail-key">Clearance Manager</div><div class="detail-value">${extras.clearanceManagerName||pr.clearance_manager_name||'—'}</div></div>
       <div class="detail-item"><div class="detail-key">Team Member</div><div class="detail-value">${pr.team_member_name}</div></div>
       <div class="detail-item"><div class="detail-key">Department</div><div class="detail-value">${DEPARTMENTS[pr.department]||pr.department}</div></div>
       ${pr.request_for?`<div class="detail-item"><div class="detail-key">Request For</div><div class="detail-value">${pr.request_for==='npd'?'NPD':'Production'}${pr.discipline?' · '+(DISCIPLINES[pr.discipline]||pr.discipline):''}</div></div>`:''}

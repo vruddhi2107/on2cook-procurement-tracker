@@ -202,7 +202,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Discipline *</label>
-          <select class="form-control" id="fDiscipline">
+          <select class="form-control" id="fDiscipline" onchange="updateClearanceManagerPreview()">
             <option value="">Select</option>
             <option value="elec">Elec</option>
             <option value="mechanical">Mechanical</option>
@@ -233,6 +233,11 @@
           <select class="form-control" id="fPMSelect" style="display:block">
             <option value="">Loading PMs...</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Clearance Manager</label>
+          <div id="clearanceManagerPreview" style="padding:8px 12px;background:var(--off-white);border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:0.85rem;font-weight:600;color:var(--gray-3)">—</div>
+          <span style="font-size:0.71rem;color:var(--gray-4)">Grants requirement clearance for this NPD/Production request</span>
         </div>
         <div class="form-group">
           <label class="form-label">Your Name</label>
@@ -454,6 +459,29 @@ function refreshPMOptions() {
 function onRequestForChange() {
   refreshPMOptions();
   onProjectChange();
+  updateClearanceManagerPreview();
+}
+
+// Live preview of who will grant requirement clearance (NPD/Production
+// designated approver, or the Antunes override for Antunes-flagged projects).
+// Not shown for Vendor Info / Local Purchase — LP mirrors the Quote Approver
+// instead (see submitPR), and VI needs no clearance step.
+async function updateClearanceManagerPreview() {
+  const el=document.getElementById('clearanceManagerPreview');
+  if(!el) return;
+  const cat=document.getElementById('fCategory')?.value;
+  if(cat==='vendor_info'||cat==='local_purchase'){ el.textContent='— (not required for this category)'; return; }
+  const requestFor=document.getElementById('fRequestFor')?.value||'npd';
+  const discipline=document.getElementById('fDiscipline')?.value||'';
+  const projectId=document.getElementById('fProjectSelect')?.value||'';
+  if(!discipline){ el.textContent='Select a discipline to preview'; return; }
+  el.textContent='Resolving…';
+  try {
+    const approverId=await resolveInitialApprover(projectId,requestFor,discipline);
+    el.textContent=approverId?(await getUserName(approverId)||'Unknown user'):'Not yet configured — will route to Master Admin for assignment';
+  } catch(e) {
+    el.textContent='Could not resolve (will be assigned by Master Admin if needed)';
+  }
 }
 
 async function loadProjects() {
@@ -479,6 +507,7 @@ function onProjectChange() {
     // Clear PM lock
     if(pmLockedDisplay){pmLockedDisplay.style.display='none';}
     if(pmSelect){pmSelect.style.display='block'; pmSelect.disabled=false;}
+    updateClearanceManagerPreview();
     return;
   }
   const phases=project.project_phases||[];
@@ -498,6 +527,7 @@ function onProjectChange() {
     if(pmSelect){pmSelect.style.display='block'; pmSelect.disabled=false;}
     refreshPMOptions();
   }
+  updateClearanceManagerPreview();
   // Trigger phase-change check in case a phase is already selected
   onPhaseChange();
 }
@@ -662,6 +692,7 @@ function onCategoryChange() {
   document.getElementById('localPurchaseNote').style.display=isLP?'block':'none';
   document.getElementById('orderTypeGroup').style.display=(isVI||isLP)?'none':'flex';
   if(isVI||isLP){document.getElementById('pmScreenshotSection').style.display='none';}
+  updateClearanceManagerPreview();
 }
 
 function selectPMApproval(v) {
@@ -819,6 +850,21 @@ async function submitPR() {
     custom:document.getElementById('fQcCustom').value.trim()||null
   };
 
+  // ── LOCAL PURCHASE: single-approver flow. If this requester has a standing
+  //    "always route to X" override, that override IS the Quote Approver for
+  //    this LP request — and the Clearance Manager must be the same person
+  //    (there's no separate clearance step for LP). ──
+  let lpFinalPmId=pmId, lpFinalPmName=pmUser?.name||'';
+  if(isLP){
+    try {
+      const overrideId=await resolveLPFixedOverride(currentUser,requestFor);
+      if(overrideId){
+        lpFinalPmId=overrideId;
+        lpFinalPmName=await getUserName(overrideId)||lpFinalPmName;
+      }
+    } catch(e){ console.warn('LP override check failed:',e.message); }
+  }
+
   // ── Resolve WHO grants initial requirement clearance. This is independent
   //    of assigned_pm_id (the project's linked PM), which still owns final
   //    quote approval below and is untouched by this routing step. ──
@@ -845,9 +891,9 @@ async function submitPR() {
     discipline:(!isVI&&!isLP)?discipline:null,
     project_name:projectName,
     project_phase:projectPhase,
-    assigned_pm_id:pmId,
-    initial_approver_id:(willNeedClearance&&!needsReassignment)?initialApproverId:null,
-    project_manager_name:pmUser?.name||'',
+    assigned_pm_id:isLP?lpFinalPmId:pmId,
+    initial_approver_id:isLP?lpFinalPmId:((willNeedClearance&&!needsReassignment)?initialApproverId:null),
+    project_manager_name:isLP?lpFinalPmName:(pmUser?.name||''),
     team_member_name:currentUser.name,
     department:dept,
     urgency,
@@ -885,13 +931,14 @@ async function openPR(id) {
   document.getElementById('prModalTitle').textContent=`PR-${String(currentPR.request_number).padStart(4,'0')} — ${currentPR.project_name}`;
   document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':currentPR.request_category==='local_purchase'?'Local Purchase':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${fmtDate(currentPR.created_at)}`;
   showLoader(true);
-  const[comments,quotations,vd,poRes,advRes,payRes]=await Promise.all([
+  const[comments,quotations,vd,poRes,advRes,payRes,clearanceManagerName]=await Promise.all([
     loadComments(id),
     db.from('pr_quotations').select('*').eq('pr_id',id).order('created_at').then(r=>r.data||[]),
     currentPR.assigned_vendor_id?db.from('vendors').select('name').eq('id',currentPR.assigned_vendor_id).single():Promise.resolve({data:null}),
     db.from('purchase_orders').select('*').eq('pr_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
     db.from('advance_payment_requests').select('*').eq('pr_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
-    db.from('payment_requests').select('*').eq('pr_id',id).order('request_date',{ascending:false}).limit(1).maybeSingle()
+    db.from('payment_requests').select('*').eq('pr_id',id).order('request_date',{ascending:false}).limit(1).maybeSingle(),
+    getUserName(currentPR.initial_approver_id)
   ]);
   prQuotations=quotations;
   showLoader(false);
@@ -1034,7 +1081,7 @@ async function openPR(id) {
   }
 
   document.getElementById('prModalBody').innerHTML=
-    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',pmName,{poData:poRes.data||null,advPayRec:advRes.data||null,payRec:payRes.data||null})+actionSection+
+    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',pmName,{poData:poRes.data||null,advPayRec:advRes.data||null,payRec:payRes.data||null,clearanceManagerName})+actionSection+
     `<div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
       <div class="section-title" style="margin-bottom:10px">💬 Comments</div>
       <div id="commentsList">${renderComments(comments)}</div>
