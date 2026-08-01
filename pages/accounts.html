@@ -219,22 +219,24 @@ async function init() {
 
 // ── DATA LOAD ────────────────────────────────────────────────
 async function loadPayments() {
-  const{data,error}=await db.from('payment_requests').select('*').order('request_date',{ascending:false});
-  if(error){showToast('Error loading payments: '+error.message,'error');return;}
-  allPayments=data||[];
+  allPayments = await dbFetch(() => db.from('payment_requests').select('*').order('request_date',{ascending:false}), 'payments');
   updateStats();
   filterPayments();
 }
 
 async function loadAdvances() {
-  const{data,error}=await db.from('advance_payment_requests')
+  // Falls back to the un-joined query (no retry) if the embedded-join query
+  // exhausts its own retries — the join can fail independently of a plain
+  // select, e.g. if RLS blocks reading the joined `users`/`procurement_requests`
+  // rows for a particular record. Getting rows without names is better than
+  // silently showing an empty tab.
+  const data = await dbFetch(() => db.from('advance_payment_requests')
     .select('*, users!advance_payment_requests_requested_by_fkey(name), procurement_requests(project_name,request_number,project_phase)')
-    .order('created_at',{ascending:false});
-  if(error){
-    const{data:d2}=await db.from('advance_payment_requests').select('*').order('created_at',{ascending:false});
-    allAdvances=d2||[];
+    .order('created_at',{ascending:false}), 'advances', { retries: 1 });
+  if (data.length === 0) {
+    allAdvances = await dbFetch(() => db.from('advance_payment_requests').select('*').order('created_at',{ascending:false}), 'advances (fallback)');
   } else {
-    allAdvances=data||[];
+    allAdvances = data;
   }
   const pendingCount=allAdvances.filter(a=>a.status==='pending').length;
   document.getElementById('sAdvance').textContent=pendingCount;
@@ -411,7 +413,7 @@ async function openAdvancePRDetail(prId) {
   const po = poRes.data;
   const quotes = quotesRes.data || [];
   const jsonbAtts1 = (pr?.attachments || []).map(a => ({
-    file_name: a.name || 'Attachment', file_url: a.data,
+    file_name: a.name || 'Attachment', file_url: a.url || a.data,
     attachment_type: 'engineer_upload', file_type: a.type
   }));
   const attachments = [...jsonbAtts1, ...(attRes.data || [])];
@@ -585,7 +587,7 @@ async function openPayDetail(id) {
     prQuotes = quotesRes.data || [];
     prPO = poRes.data;
     const jsonbAtts2 = (prData?.attachments || []).map(a => ({
-      file_name: a.name || 'Attachment', file_url: a.data,
+      file_name: a.name || 'Attachment', file_url: a.url || a.data,
       attachment_type: 'engineer_upload', file_type: a.type
     }));
     prAttachments = [...jsonbAtts2, ...(attRes.data || [])];

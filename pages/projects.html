@@ -147,12 +147,10 @@ let selectedProjectPhases = [];
 // ── PHASE LIBRARY (Supabase) ─────────────────────────────────
 
 async function loadPhaseLibrary() {
-  const { data, error } = await db
+  phaseLibrary = await dbFetch(() => db
     .from('phase_library')
     .select('id, name')
-    .order('name');
-  if (error) { console.error('Phase library load error:', error); return; }
-  phaseLibrary = data || [];
+    .order('name'), 'phase library');
   renderPhaseLibraryChips();
 }
 
@@ -317,18 +315,15 @@ async function init() {
 }
 
 async function loadProjects() {
-  const { data, error } = await db
+  allProjects = await dbFetch(() => db
     .from('projects')
     .select('*,project_phases(id,name),users:default_pm_id(id,name)')
-    .order('name');
-  if (error) { showToast('Failed to load projects', 'error'); return; }
-  allProjects = data || [];
+    .order('name'), 'projects');
   filterProjects();
 }
 
 async function loadPMs() {
-  const { data } = await db.from('users').select('id,name,role').in('role',['project_manager','master','director']).order('name');
-  allPMs = data || [];
+  allPMs = await dbFetch(() => db.from('users').select('id,name,role').in('role',['project_manager','master','director']).order('name'), 'PM list');
   const sel = document.getElementById('pDefaultPM');
   sel.innerHTML = '<option value="">Select PM (optional)</option>' +
     allPMs.map(p => `<option value="${p.id}">${p.name}${p.role!=='project_manager'?' ('+({'master':'Master Admin','director':'Director'}[p.role]||p.role)+')':''}</option>`).join('');

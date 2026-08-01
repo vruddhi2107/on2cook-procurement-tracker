@@ -394,6 +394,7 @@ let activeTab='all', selectedPMApproval=null, currentPR=null;
 let selectedQuotationId=null;
 let isEditMode=false, editingParentId=null;
 let pmScreenshotBase64=null, selectedSourcing=[], attachedFiles=[];
+let attachSessionId=null; // namespaces Storage uploads for this form session, before the PR row exists
 
 function handleAttachmentDownload(e, url, fileName) {
   if (!url) return;
@@ -430,14 +431,12 @@ async function init() {
 }
 
 async function loadRequests() {
-  const{data}=await db.from('procurement_requests').select('*, users!procurement_requests_assigned_pm_id_fkey(name)').eq('created_by',currentUser.id).order('updated_at',{ascending:false});
-  myRequests=data||[];
+  myRequests = await dbFetch(() => db.from('procurement_requests').select(PR_LIST_COLUMNS + ', users!procurement_requests_assigned_pm_id_fkey(name)').eq('created_by',currentUser.id).order('updated_at',{ascending:false}), 'requests');
   updateStats(); renderBanner(); filterTable();
 }
 
 async function loadPMs() {
-  const{data}=await db.from('users').select('id,name,pm_type').eq('role','project_manager').order('name');
-  allPMs=data||[];
+  allPMs = await dbFetch(() => db.from('users').select('id,name,pm_type').eq('role','project_manager').order('name'), 'PM list');
   refreshPMOptions();
 }
 
@@ -485,8 +484,7 @@ async function updateClearanceManagerPreview() {
 }
 
 async function loadProjects() {
-  const{data}=await db.from('projects').select('*,project_phases(id,name)').eq('is_active',true).order('name');
-  allProjects=data||[];
+  allProjects = await dbFetch(() => db.from('projects').select('*,project_phases(id,name)').eq('is_active',true).order('name'), 'projects');
   populateProjectDropdown();
 }
 
@@ -730,10 +728,15 @@ function toggleSourcing(val) {
 // ── ATTACHMENT HANDLING ──────────────────────────────────────
 function handleAttachDrop(e){e.preventDefault();document.getElementById('attachZone').classList.remove('dragover');handleAttachFiles({target:{files:e.dataTransfer.files}});}
 async function handleAttachFiles(e) {
+  if(!attachSessionId) attachSessionId=crypto.randomUUID();
   for(const file of [...e.target.files]){
     if(file.size>5*1024*1024){showToast(`${file.name} too large`,'error');continue;}
-    const b64=await fileToBase64(file);
-    attachedFiles.push({name:file.name,type:file.type,data:b64});
+    try{
+      const uploaded=await uploadFileToStorage(file, `pr-new/${attachSessionId}`);
+      attachedFiles.push(uploaded);
+    }catch(err){
+      showToast(`${file.name}: ${err.message}`,'error');
+    }
   }
   document.getElementById('attachFile').value='';
   renderAttachList();
@@ -787,7 +790,7 @@ async function handleBOMFile(e) {
 // ── NEW / EDIT PR ─────────────────────────────────────────────
  function openNewPR() {
   isEditMode=false; editingParentId=null;
-  selectedPMApproval=null; selectedSourcing=[]; attachedFiles=[]; pmScreenshotBase64=null;
+  selectedPMApproval=null; selectedSourcing=[]; attachedFiles=[]; pmScreenshotBase64=null; attachSessionId=null;
   document.getElementById('prFormTitle').textContent='New Procurement Request';
   document.getElementById('prFormSub').textContent='All starred fields are required';
   document.getElementById('prFormSubmitBtn').textContent='Submit Request →';
@@ -905,7 +908,7 @@ async function submitPR() {
     qc_criteria:qcCriteria,
     pm_approval_screenshot:selectedPMApproval==='already_approved'?pmScreenshotBase64:null,
     parts,
-    attachments:attachedFiles.map(f=>({name:f.name,type:f.type,data:f.data})),
+    attachments:attachedFiles.map(f=>({name:f.name,type:f.type,url:f.url})),
     created_by:currentUser.id,
     phase:basePhase,
     initial_pm_approval:isEditMode?'already_approved':(isLP?'needs_approval':isVI?null:selectedPMApproval),

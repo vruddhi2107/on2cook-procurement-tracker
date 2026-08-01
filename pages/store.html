@@ -125,14 +125,16 @@ async function init() {
 
 async function loadRequests() {
   showLoader(true);
-  const [{data,error}, myPRsRes] = await Promise.all([
-    db.from('procurement_requests').select('*').order('created_at',{ascending:false}),
-    db.from('procurement_requests').select('*').eq('created_by',currentUser.id).order('updated_at',{ascending:false})
+  // FIX: previously only the first query's error was checked; the second
+  // ("myRequests") silently discarded its error, so a failure there just
+  // looked like an empty "My Requests" tab. Both now retry via dbFetch.
+  const [data, myPRs] = await Promise.all([
+    dbFetch(() => db.from('procurement_requests').select(PR_LIST_COLUMNS).order('created_at',{ascending:false}), 'requests'),
+    dbFetch(() => db.from('procurement_requests').select(PR_LIST_COLUMNS).eq('created_by',currentUser.id).order('updated_at',{ascending:false}), 'my requests')
   ]);
-  myRequests = myPRsRes.data || [];
+  myRequests = myPRs;
   showLoader(false);
-  if (error) { showToast('Error loading requests','error'); return; }
-  allRequests = data || [];
+  allRequests = data;
   updateStats();
   renderTable();
   renderMyRequestsTable();

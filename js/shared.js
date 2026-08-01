@@ -5,6 +5,43 @@ function escHtml(str) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// RESILIENT QUERY HELPER
+// FIX: every loadRequests()-style function across the app used to do
+// `const {data} = await db.from(...)` and threw the `error` away. Supabase
+// never throws on a failed SELECT — it resolves with `{data: null, error}`.
+// So any transient failure (RLS/header hiccup, a cold connection from
+// Supabase's pooler after idle, a brief network blip, a PostgREST timeout)
+// silently rendered as "zero rows" with no console message and no retry.
+// The ONLY recovery mechanism was a manual page refresh, which is exactly
+// the "have to refresh 100 times" symptom. This wraps a query with logging,
+// a visible toast if it never recovers, and automatic retry with backoff —
+// `queryFn` must be a function that returns a FRESH query builder each call
+// (a Supabase query builder is single-use once awaited, so retrying
+// requires re-invoking `() => db.from(...)`, not re-awaiting the same one).
+// ══════════════════════════════════════════════════════════════
+async function dbFetch(queryFn, label = 'data', { retries = 2, retryDelayMs = 500 } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    let data, error;
+    try {
+      ({ data, error } = await queryFn());
+    } catch (e) {
+      error = e;
+    }
+    if (!error) return data || [];
+    lastError = error;
+    console.error(`[dbFetch] "${label}" failed (attempt ${attempt + 1}/${retries + 1}):`, error.message || error, error);
+    if (attempt < retries) await new Promise(r => setTimeout(r, retryDelayMs * (attempt + 1)));
+  }
+  console.error(`[dbFetch] "${label}" gave up after ${retries + 1} attempts.`, lastError);
+  if (typeof showToast === 'function') {
+    showToast(`Couldn't load ${label}: ${lastError?.message || 'unknown error'} — check console`, 'error');
+  }
+  return [];
+}
+window.dbFetch = dbFetch;
+
+// ══════════════════════════════════════════════════════════════
 // SAFE FILE REGISTRY — eliminates base64-in-HTML-attribute bugs
 // All large file URLs are stored here; buttons reference by index only.
 // ══════════════════════════════════════════════════════════════
@@ -1024,7 +1061,7 @@ async function openVendorHistory(vendorId) {
   const [vendorRes, ratingsRes, ordersRes] = await Promise.all([
     db.from('vendors').select('*').eq('id',vendorId).single(),
     db.from('vendor_ratings').select('*,users(name),procurement_requests(project_name,request_number)').eq('vendor_id',vendorId).order('created_at',{ascending:false}),
-    db.from('procurement_requests').select('*').eq('assigned_vendor_id',vendorId).order('created_at',{ascending:false})
+    db.from('procurement_requests').select(PR_LIST_COLUMNS).eq('assigned_vendor_id',vendorId).order('created_at',{ascending:false})
   ]);
 
   const v = vendorRes.data||{};
@@ -1418,12 +1455,9 @@ window.initPartsEditor = initPartsEditor;
 
 // Pre-fetch parts catalog so autocomplete feels instant
 async function _preloadPartsCatalog() {
-  try {
-    const { data } = await db.from('parts_catalog')
-      .select('id,part_number,part_name,category,unit,description')
-      .order('part_number');
-    _partsCatalogCache = data || [];
-  } catch(e) { _partsCatalogCache = []; }
+  _partsCatalogCache = await dbFetch(() => db.from('parts_catalog')
+    .select('id,part_number,part_name,category,unit,description')
+    .order('part_number'), 'parts catalog');
 }
 const DEPT_OPTIONS = [
   {val:'',label:'— Dept —'},

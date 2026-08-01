@@ -293,27 +293,32 @@ async function loadRequests() {
   // routed to this user as the initial-clearance approver (department manager
   // for a request_for x discipline combo, or an Antunes override) OR created
   // by this user OR deviated to this user.
+  // FIX: these used to be 4 raw Promise.all queries with the error thrown
+  // away — if even ONE of the 4 failed (RLS hiccup, cold pooler connection,
+  // etc.) that entire bucket silently vanished and you'd see a partial list
+  // with no indication anything was missing. dbFetch logs + retries each
+  // one independently and returns [] only after genuinely exhausting retries.
   const[assigned, clearance, deviatedToMe, created]=await Promise.all([
-    db.from('procurement_requests')
-      .select('*, users!procurement_requests_created_by_fkey(name,email)')
+    dbFetch(() => db.from('procurement_requests')
+      .select(PR_LIST_COLUMNS + ', users!procurement_requests_created_by_fkey(name,email)')
       .eq('assigned_pm_id', currentUser.id)
-      .order('updated_at',{ascending:false}),
-    db.from('procurement_requests')
-      .select('*, users!procurement_requests_created_by_fkey(name,email)')
+      .order('updated_at',{ascending:false}), 'assigned requests'),
+    dbFetch(() => db.from('procurement_requests')
+      .select(PR_LIST_COLUMNS + ', users!procurement_requests_created_by_fkey(name,email)')
       .eq('initial_approver_id', currentUser.id)
-      .order('updated_at',{ascending:false}),
-    db.from('procurement_requests')
-      .select('*, users!procurement_requests_created_by_fkey(name,email)')
+      .order('updated_at',{ascending:false}), 'clearance requests'),
+    dbFetch(() => db.from('procurement_requests')
+      .select(PR_LIST_COLUMNS + ', users!procurement_requests_created_by_fkey(name,email)')
       .eq('deviation_target_id', currentUser.id)
-      .order('updated_at',{ascending:false}),
-    db.from('procurement_requests')
-      .select('*, users!procurement_requests_created_by_fkey(name,email)')
+      .order('updated_at',{ascending:false}), 'deviation requests'),
+    dbFetch(() => db.from('procurement_requests')
+      .select(PR_LIST_COLUMNS + ', users!procurement_requests_created_by_fkey(name,email)')
       .eq('created_by', currentUser.id)
-      .order('updated_at',{ascending:false})
+      .order('updated_at',{ascending:false}), 'created requests')
   ]);
   // Merge and deduplicate by id
   const map=new Map();
-  for(const r of [...(assigned.data||[]),...(clearance.data||[]),...(created.data||[]),...(deviatedToMe.data||[])]) map.set(r.id,r);
+  for(const r of [...assigned,...clearance,...created,...deviatedToMe]) map.set(r.id,r);
   allRequests=[...map.values()].sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
   updateStats(); renderBanner(); filterTable();
 }
@@ -869,10 +874,10 @@ function goToProjects() {
 let allProjects=[], allPMs=[];
 let isEditMode=false, editingParentId=null;
 let selectedSourcing=[], attachedFiles=[], pmSelectedForNewPR=null;
+let attachSessionId=null; // namespaces Storage uploads for this form session, before the PR row exists
 
 async function loadPMs() {
-  const{data}=await db.from('users').select('id,name,role,pm_type').in('role',['project_manager','master','director']).order('name');
-  allPMs=data||[];
+  allPMs = await dbFetch(() => db.from('users').select('id,name,role,pm_type').in('role',['project_manager','master','director']).order('name'), 'PM list');
 }
 
 function onProdPMPick() {
@@ -911,8 +916,7 @@ async function updateClearanceManagerPreview() {
 }
 
 async function loadProjects() {
-  const{data}=await db.from('projects').select('*,project_phases(id,name)').eq('is_active',true).order('name');
-  allProjects=data||[];
+  allProjects = await dbFetch(() => db.from('projects').select('*,project_phases(id,name)').eq('is_active',true).order('name'), 'projects');
   populateProjectDropdown();
 }
 
@@ -1001,10 +1005,15 @@ function toggleSourcing(val) {
 
 function handleAttachDrop(e){e.preventDefault();document.getElementById('attachZone').classList.remove('dragover');handleAttachFiles({target:{files:e.dataTransfer.files}});}
 async function handleAttachFiles(e) {
+  if(!attachSessionId) attachSessionId=crypto.randomUUID();
   for(const file of [...e.target.files]){
     if(file.size>5*1024*1024){showToast(`${file.name} too large`,'error');continue;}
-    const b64=await fileToBase64(file);
-    attachedFiles.push({name:file.name,type:file.type,data:b64});
+    try{
+      const uploaded=await uploadFileToStorage(file, `pr-new/${attachSessionId}`);
+      attachedFiles.push(uploaded);
+    }catch(err){
+      showToast(`${file.name}: ${err.message}`,'error');
+    }
   }
   document.getElementById('attachFile').value='';
   renderAttachList();
@@ -1050,7 +1059,7 @@ async function handleBOMFile(e) {
 
 function openNewPR() {
   isEditMode=false; editingParentId=null;
-  selectedSourcing=[]; attachedFiles=[];
+  selectedSourcing=[]; attachedFiles=[]; attachSessionId=null;
   document.getElementById('prFormTitle').textContent='New Procurement Request';
   document.getElementById('prFormSub').textContent='All starred fields are required — you are the assigned Project Manager';
   document.getElementById('prFormSubmitBtn').textContent='Submit Request →';
@@ -1156,7 +1165,7 @@ async function submitPR() {
     qc_criteria:qcCriteria,
     pm_approval_screenshot:null,
     parts,
-    attachments:attachedFiles.map(f=>({name:f.name,type:f.type,data:f.data})),
+    attachments:attachedFiles.map(f=>({name:f.name,type:f.type,url:f.url})),
     created_by:currentUser.id,
     phase:basePhase,
     initial_pm_approval:isLP?'needs_approval':(isVI?null:(needsReassignment?'needs_approval':'needs_approval')),

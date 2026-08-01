@@ -318,6 +318,14 @@ function starRating(rating, count) {
 }
 
 // File → base64 helper
+// Column list for LIST/dashboard views of procurement_requests.
+// Excludes attachments, client_approval_screenshot, pm_approval_screenshot,
+// lp_bill_url — these can carry multi-MB base64 blobs (legacy rows) or
+// growing Storage-URL arrays, and are only ever read off a single fetched
+// PR in detail modals, never off list rows. Use select('*') only for
+// single-PR detail queries (.eq('id', id).single()).
+const PR_LIST_COLUMNS = 'id,request_number,request_category,department,order_type,project_name,project_phase,project_manager_name,team_member_name,assigned_pm_id,vendor_suggestion,assigned_vendor_id,selected_quotation_id,sourcing,description,product_link,parts,phase,initial_pm_approval,approval_path,client_approval_notes,pm_final_approval_status,pm_final_approval_notes,rejection_reason,needs_more_vendors,vendor_info_details,is_modification,parent_request_id,modification_note,order_notes,advance_option,qc_result,qc_notes,qc_criteria,phase_timestamps,created_by,created_at,updated_at,urgency,lp_bill_name,deviation_target_id,deviation_approval_status,is_closed,closed_at,item_note,request_for,discipline,initial_approver_id';
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     if (file.size > 5 * 1024 * 1024) { reject(new Error('File too large. Max 5MB.')); return; }
@@ -326,6 +334,23 @@ function fileToBase64(file) {
     reader.onerror = () => reject(new Error('File read failed'));
     reader.readAsDataURL(file);
   });
+}
+
+// File → Supabase Storage upload helper.
+// Uploads to the shared 'attachments' bucket and returns {name, type, url}.
+// Use this instead of fileToBase64() for anything saved into a jsonb/text
+// column — base64 in the DB is what bloated procurement_requests to 34MB
+// on 77 rows. Storage + a URL string keeps row size trivial.
+async function uploadFileToStorage(file, folder) {
+  if (file.size > 5 * 1024 * 1024) throw new Error('File too large. Max 5MB.');
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${folder}/${Date.now()}_${safeName}`;
+  const { error: uploadErr } = await db.storage
+    .from('attachments')
+    .upload(path, file, { contentType: file.type, upsert: true });
+  if (uploadErr) throw new Error('Upload failed: ' + uploadErr.message);
+  const { data: urlData } = db.storage.from('attachments').getPublicUrl(path);
+  return { name: file.name, type: file.type, url: urlData?.publicUrl };
 }
 
 function getFileType(file) {

@@ -43,8 +43,7 @@ async function init() {
   document.getElementById('footerMount').innerHTML = buildFooter();
   initNavbar(currentUser);
   // Load PMs + Director for the deviation dropdown
-  var usersRes = await db.from('users').select('id,name,role').in('role',['project_manager','director']).order('name');
-  allPMsAndDirector = usersRes.data || [];
+  allPMsAndDirector = await dbFetch(function(){ return db.from('users').select('id,name,role').in('role',['project_manager','director']).order('name'); }, 'PM/director list');
   await loadRequests();
 }
 
@@ -52,18 +51,13 @@ async function init() {
 async function loadRequests() {
   showLoader(true);
   var results = await Promise.all([
-    db.from('procurement_requests').select('*').order('created_at', {ascending: false}),
-    db.from('procurement_requests').select('*').eq('created_by', currentUser.id).order('updated_at', {ascending: false})
+    dbFetch(function(){ return db.from('procurement_requests').select(PR_LIST_COLUMNS).order('created_at', {ascending: false}); }, 'requests'),
+    dbFetch(function(){ return db.from('procurement_requests').select(PR_LIST_COLUMNS).eq('created_by', currentUser.id).order('updated_at', {ascending: false}); }, 'my requests')
   ]);
   showLoader(false);
 
-  var allRes = results[0];
-  var myRes  = results[1];
-
-  if (allRes.error) { showToast('Error loading requests', 'error'); return; }
-
-  allRequests = allRes.data  || [];
-  myRequests  = myRes.data   || [];
+  allRequests = results[0];
+  myRequests  = results[1];
 
   updateStats();
   renderTable();

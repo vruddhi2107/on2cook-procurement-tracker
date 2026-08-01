@@ -378,13 +378,12 @@ async function init() {
 }
 
 async function loadRequests() {
-  const{data}=await db.from('procurement_requests')
-    .select('*, users!procurement_requests_created_by_fkey(name,email), vendors(name)')
-    .order('updated_at',{ascending:false});
-  allRequests=data||[];
+  allRequests = await dbFetch(() => db.from('procurement_requests')
+    .select(PR_LIST_COLUMNS + ', users!procurement_requests_created_by_fkey(name,email), vendors(name)')
+    .order('updated_at',{ascending:false}), 'requests');
   // Also merge deviation_approval requests targeted at this director
   if(currentUser?.role==='director'||currentUser?.role==='master') {
-    const {data:devData}=await db.from('procurement_requests').select('*, users!procurement_requests_created_by_fkey(name,email)').eq('deviation_target_id',currentUser.id).order('updated_at',{ascending:false});
+    const devData = await dbFetch(() => db.from('procurement_requests').select(PR_LIST_COLUMNS + ', users!procurement_requests_created_by_fkey(name,email)').eq('deviation_target_id',currentUser.id).order('updated_at',{ascending:false}), 'deviation queue');
     if(devData?.length) {
       const map=new Map(); for(const r of [...allRequests,...devData]) map.set(r.id,r);
       allRequests=[...map.values()].sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
@@ -396,15 +395,13 @@ async function loadRequests() {
 }
 
 async function loadUsers() {
-  const{data}=await db.from('users').select('*').order('created_at');
-  allUsers=data||[];
+  allUsers = await dbFetch(() => db.from('users').select('*').order('created_at'), 'users');
   document.getElementById('sUsers').textContent=allUsers.length;
   renderUsers();
 }
 
 async function loadVendors() {
-  const{data}=await db.from('vendors').select('*').order('name');
-  allVendors=data||[];
+  allVendors = await dbFetch(() => db.from('vendors').select('*').order('name'), 'vendors');
   document.getElementById('sVendors').textContent=allVendors.length;
   renderVendorGrid(allVendors);
 }

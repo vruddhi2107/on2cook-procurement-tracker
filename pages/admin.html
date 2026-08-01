@@ -278,10 +278,9 @@ async function init() {
 }
 
 async function loadAllRequests() {
-  const { data } = await db.from('procurement_requests')
-    .select('*, users!procurement_requests_created_by_fkey(name)')
-    .order('updated_at', { ascending: false });
-  allRequests = data || [];
+  allRequests = await dbFetch(() => db.from('procurement_requests')
+    .select(PR_LIST_COLUMNS + ', users!procurement_requests_created_by_fkey(name)')
+    .order('updated_at', { ascending: false }), 'requests');
   closedRequests = allRequests.filter(r => CLOSED_PHASES.has(r.phase) || r.is_closed);
 
   // Stats

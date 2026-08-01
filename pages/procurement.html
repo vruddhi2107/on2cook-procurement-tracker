@@ -809,7 +809,7 @@ async function openVendorHistory(vendorId) {
   const [vendorRes, ratingsRes, ordersRes] = await Promise.all([
     db.from('vendors').select('*').eq('id',vendorId).single(),
     db.from('vendor_ratings').select('*,users(name),procurement_requests(project_name,request_number)').eq('vendor_id',vendorId).order('created_at',{ascending:false}),
-    db.from('procurement_requests').select('*').eq('assigned_vendor_id',vendorId).order('created_at',{ascending:false})
+    db.from('procurement_requests').select(PR_LIST_COLUMNS).eq('assigned_vendor_id',vendorId).order('created_at',{ascending:false})
   ]);
 
   const v = vendorRes.data||{};
@@ -863,16 +863,14 @@ async function openVendorHistory(vendorId) {
 }
 
 async function loadRequests() {
-  const{data}=await db.from('procurement_requests')
-    .select('*, users!procurement_requests_created_by_fkey(name)')
-    .order('updated_at',{ascending:false});
-  allRequests=data||[];
+  allRequests = await dbFetch(() => db.from('procurement_requests')
+    .select(PR_LIST_COLUMNS + ', users!procurement_requests_created_by_fkey(name)')
+    .order('updated_at',{ascending:false}), 'requests');
   updateStats(); filterTable();
 }
 
 async function loadVendors() {
-  const{data}=await db.from('vendors').select('*').order('name');
-  allVendors=data||[];
+  allVendors = await dbFetch(() => db.from('vendors').select('*').order('name'), 'vendors');
   // Populate vendor filter with vendors that actually appear on requests
   const vendorFilterEl = document.getElementById('filterVendor');
   if (vendorFilterEl) {
@@ -969,8 +967,7 @@ let _vendorPartSearchCache = null;
 
 async function _loadVendorPartsLookup() {
   if (_vendorPartSearchCache) return _vendorPartSearchCache;
-  const { data } = await db.from('vendor_parts_lookup').select('*').order('part_number');
-  _vendorPartSearchCache = data || [];
+  _vendorPartSearchCache = await dbFetch(() => db.from('vendor_parts_lookup').select('*').order('part_number'), 'vendor parts lookup');
   return _vendorPartSearchCache;
 }
 
@@ -1164,7 +1161,7 @@ async function openPR(id) {
   // into the same shape as pr_attachments table rows so they render identically
   const jsonbAttachments = (currentPR.attachments || []).map(a => ({
     file_name: a.name || 'Attachment',
-    file_url: a.data,
+    file_url: a.url || a.data,
     attachment_type: 'engineer_upload',
     file_type: a.type
   }));
