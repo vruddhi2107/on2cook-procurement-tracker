@@ -177,7 +177,7 @@ function renderModal() {
       : '';
 
     grnSummary = '<div class="grn-summary">'
-      + '<div style="font-size:0.8rem;font-weight:700;color:var(--gray-3);margin-bottom:2px">📋 GRN Details — ' + grn.grn_number + '</div>'
+      + '<div style="font-size:0.8rem;font-weight:700;color:var(--gray-3);margin-bottom:2px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></svg> GRN Details — ' + grn.grn_number + '</div>'
       + '<div style="font-size:0.75rem;color:var(--gray-4)">' + (grn.grn_date || '') + ' | Received by: ' + (grn.received_by || '—') + ' | Transporter: ' + (grn.transporter || '—') + '</div>'
       + '<div class="grn-summary-grid">'
         + '<div class="grn-stat"><div class="grn-stat-val">' + totRcvd  + '</div><div class="grn-stat-lbl">Received</div></div>'
@@ -196,7 +196,7 @@ function renderModal() {
     var qcCriteriaHTML = '';
     if (pr.qc_criteria && (pr.qc_criteria.preferred_color || pr.qc_criteria.preferred_material || pr.qc_criteria.custom)) {
       qcCriteriaHTML = '<div style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius);padding:10px;margin-bottom:12px">'
-        + '<div style="font-size:0.75rem;font-weight:700;color:#6366f1;margin-bottom:4px">🔍 Expected QC Criteria</div>'
+        + '<div style="font-size:0.75rem;font-weight:700;color:#6366f1;margin-bottom:4px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></svg> Expected QC Criteria</div>'
         + (pr.qc_criteria.preferred_color    ? '<div style="font-size:0.78rem">Color/Finish: <strong>' + pr.qc_criteria.preferred_color    + '</strong></div>' : '')
         + (pr.qc_criteria.preferred_material ? '<div style="font-size:0.78rem">Material: <strong>'     + pr.qc_criteria.preferred_material + '</strong></div>' : '')
         + (pr.qc_criteria.custom             ? '<div style="font-size:0.78rem">Other: '                + pr.qc_criteria.custom             + '</div>'          : '')
@@ -204,26 +204,26 @@ function renderModal() {
     }
 
     actionSection = '<div class="action-section">'
-      + '<div class="action-section-title">🔍 Quality Check <span class="action-badge">ACTION REQUIRED</span></div>'
+      + '<div class="action-section-title"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></svg> Quality Check <span class="action-badge">ACTION REQUIRED</span></div>'
       + grnSummary
       + qcCriteriaHTML
       + '<div class="qc-result-row" style="grid-template-columns:1fr 1fr 1fr 1fr">'
         + '<div class="qc-option pass" id="optPass" onclick="selectQC(\'pass\')">'
-          + '<div class="qc-icon">✅</div><div class="qc-label">QC Passed</div>'
+          + '<div class="qc-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg></div><div class="qc-label">QC Passed</div>'
           + '<div class="qc-desc">All goods meet quality specs</div></div>'
         + '<div class="qc-option fail" id="optFail" onclick="selectQC(\'fail\')">'
-          + '<div class="qc-icon">🔄</div><div class="qc-label">QC Failed — Jobwork</div>'
+          + '<div class="qc-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></svg></div><div class="qc-label">QC Failed — Jobwork</div>'
           + '<div class="qc-desc">Raise JWC — send for rework</div></div>'
         + '<div class="qc-option reject" id="optReject" onclick="selectQC(\'reject\')">'
-          + '<div class="qc-icon">🚫</div><div class="qc-label">QC Rejected</div>'
+          + '<div class="qc-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></svg></div><div class="qc-label">QC Rejected</div>'
           + '<div class="qc-desc">Outright rejection — no rework</div></div>'
         + '<div class="qc-option" id="optDeviate" onclick="selectQC(\'deviate\')" style="border-color:rgba(124,58,237,0.3)">'
-          + '<div class="qc-icon">↗</div><div class="qc-label" style="color:#7c3aed">Deviate</div>'
+          + '<div class="qc-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /> <path d="M7 17 17 7" /></svg></div><div class="qc-label" style="color:#7c3aed">Deviate</div>'
           + '<div class="qc-desc">Escalate to Project Manager / Director</div></div>'
       + '</div>'
 
       + '<div id="deviationSection" style="display:none;margin:10px 0;padding:14px;background:rgba(124,58,237,0.05);border:1px solid rgba(124,58,237,0.2);border-radius:var(--radius)">'
-        + '<div style="font-size:0.84rem;font-weight:700;color:#7c3aed;margin-bottom:8px">↗ Deviation — Select Recipient</div>'
+        + '<div style="font-size:0.84rem;font-weight:700;color:#7c3aed;margin-bottom:8px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /> <path d="M7 17 17 7" /></svg> Deviation — Select Recipient</div>'
         + '<p style="font-size:0.78rem;color:var(--gray-3);margin-bottom:10px">Select who to send this deviation to. They will review and accept or reject it.</p>'
         + '<div class="form-group" style="margin-bottom:10px"><label class="form-label" style="font-size:0.75rem">Send deviation to *</label>'
         + ('<select class="form-control" id="deviationTargetSelect" style="font-size:0.82rem" onchange="onDeviationTargetChange()"><option value="">— Select Project Manager or Director —</option>'          + allPMsAndDirector.map(function(u){ return '<option value="' + u.id + '">' + u.name + ' (' + (u.role==='director'?'Director':'Project Manager') + ')</option>'; }).join('')          + '</select>')        + '</div>'
@@ -233,11 +233,11 @@ function renderModal() {
       + '<div style="margin:10px 0"><label class="form-label">QC Attachments <span style="font-size:0.72rem;color:var(--gray-4);font-weight:400">(photos, reports — optional)</span></label>'
         + '<div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer;background:rgba(99,102,241,0.02)" id="qcAttachZone" onclick="document.getElementById(\'qcAttachFile\').click()">'
         + '<input type="file" id="qcAttachFile" accept="image/*,.pdf" multiple style="display:none" onchange="handleQCAttach(event)"/>'
-        + '<div style="font-size:0.78rem;font-weight:600">📎 Click to attach QC photos / reports</div>'
+        + '<div style="font-size:0.78rem;font-weight:600"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551" /></svg> Click to attach QC photos / reports</div>'
         + '</div><div id="qcAttachList" style="margin-top:6px;display:flex;flex-direction:column;gap:3px"></div>'
       + '</div>'
       + '<div id="samplesSection" style="display:none" class="samples-section">'
-        + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px">📦 Sample Rejection Quantities</div>'
+        + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /> <path d="M12 22V12" /> <polyline points="3.29 7 12 12 20.71 7" /> <path d="m7.5 4.27 9 5.15" /></svg> Sample Rejection Quantities</div>'
         + '<div style="font-size:0.76rem;color:var(--gray-3);margin-bottom:8px">Enter the number of samples rejected per item. Defaults to GRN rejected qty — edit if only some are being rejected.</div>'
         + '<div style="overflow-x:auto"><table class="samples-table">'
           + '<thead><tr><th>#</th><th style="text-align:left">Item</th><th>Received</th><th>Rejected Qty</th><th>Accepted (auto)</th></tr></thead>'
@@ -247,7 +247,7 @@ function renderModal() {
       + '<div><label class="form-label">Inspection Notes *</label>'
         + '<textarea class="form-control" id="qcNotes" rows="3" placeholder="Describe findings, defects, measurements checked…"></textarea></div>'
       + '<div id="jwcFormSection" style="display:none" class="jwc-form">'
-        + '<div style="font-size:0.84rem;font-weight:700;color:#dc2626;margin-bottom:10px">📄 Job Work Challan Details</div>'
+        + '<div style="font-size:0.84rem;font-weight:700;color:#dc2626;margin-bottom:10px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg> Job Work Challan Details</div>'
         + '<div class="jwc-form-grid">'
           + '<div><label class="form-label" style="font-size:0.7rem">JWC NUMBER *</label>'
             + '<input class="form-control" id="jwcNumber" placeholder="O2C/JW/00012" style="font-family:var(--font-mono);font-size:0.82rem"/></div>'
@@ -281,21 +281,21 @@ function renderModal() {
 
   } else if (pr.phase === 'rework2_returned') {
     var jwcRework2Data = (pr.qc_criteria && pr.qc_criteria.jwc2) ? pr.qc_criteria.jwc2 : (pr.qc_criteria && pr.qc_criteria.jwc ? pr.qc_criteria.jwc : {});
-    actionSection = '<div class="action-section">'      + '<div class="action-section-title">🔄 Final Post-Rework QC Inspection <span class="action-badge">ACTION REQUIRED</span></div>'      + grnSummary      + (jwcRework2Data.jwc_number          ? '<div style="margin-bottom:14px;padding:10px 12px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);font-size:0.82rem">'            + '<div style="font-weight:700;color:#dc2626;margin-bottom:4px">📄 2nd Rework History — JWC ' + jwcRework2Data.jwc_number + '</div>'            + '<div>Rework Vendor: <strong>' + (jwcRework2Data.rework_vendor || '—') + '</strong></div>'            + (jwcRework2Data.notes ? '<div>Notes: ' + jwcRework2Data.notes + '</div>' : '')            + '</div>'          : '')      + '<div style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;font-size:0.82rem">'        + '<strong>⚠️ This is the final rework cycle.</strong> If goods still fail QC, they will be outright rejected.'      + '</div>'      + '<div style="margin-bottom:12px"><label class="form-label">Re-QC Attachments <span style="font-size:0.72rem;color:var(--gray-4);font-weight:400">(optional)</span></label>'        + '<div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center;cursor:pointer" onclick="document.getElementById(\'finalReQcAttachFile\').click()">'        + '<input type="file" id="finalReQcAttachFile" accept="image/*,.pdf" multiple style="display:none" onchange="handleFinalReQCAttach(event)"/>'        + '<div style="font-size:0.78rem;font-weight:600">📎 Click to attach photos / reports</div>'        + '</div><div id="finalReQcAttachList" style="margin-top:6px"></div></div>'      + '<div class="qc-result-row" style="grid-template-columns:1fr 1fr;max-width:480px">'        + '<div class="qc-option pass" id="rw2OptPass" onclick="selectRework2QC(\'pass\')">'          + '<div class="qc-icon">✅</div><div class="qc-label">QC Passed</div>'          + '<div class="qc-desc">Final rework accepted</div></div>'        + '<div class="qc-option reject" id="rw2OptReject" onclick="selectRework2QC(\'reject\')">'          + '<div class="qc-icon">🚫</div><div class="qc-label">QC Rejected</div>'          + '<div class="qc-desc">Still defective — outright rejection</div></div>'      + '</div>'      + '<div id="rw2SamplesSection" style="display:none" class="samples-section">'        + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px">📦 Final Rejection Quantities</div>'        + '<table class="samples-table"><thead><tr><th>#</th><th style="text-align:left">Item</th><th>Received</th><th>Rejected Qty</th><th>Accepted (auto)</th></tr></thead>'        + '<tbody id="rw2SamplesBody"></tbody></table>'      + '</div>'      + '<div><label class="form-label">Final Post-Rework Inspection Notes *</label>'        + '<textarea class="form-control" id="qcNotesRework2" rows="3" placeholder="Describe final rework quality findings..."></textarea></div>'      + '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'        + '<button class="btn btn-primary" onclick="submitFinalReworkQC()">Submit Final Re-QC Result →</button>'      + '</div>'      + '</div>';
+    actionSection = '<div class="action-section">'      + '<div class="action-section-title"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></svg> Final Post-Rework QC Inspection <span class="action-badge">ACTION REQUIRED</span></div>'      + grnSummary      + (jwcRework2Data.jwc_number          ? '<div style="margin-bottom:14px;padding:10px 12px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);font-size:0.82rem">'            + '<div style="font-weight:700;color:#dc2626;margin-bottom:4px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg> 2nd Rework History — JWC ' + jwcRework2Data.jwc_number + '</div>'            + '<div>Rework Vendor: <strong>' + (jwcRework2Data.rework_vendor || '—') + '</strong></div>'            + (jwcRework2Data.notes ? '<div>Notes: ' + jwcRework2Data.notes + '</div>' : '')            + '</div>'          : '')      + '<div style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;font-size:0.82rem">'        + '<strong><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></svg> This is the final rework cycle.</strong> If goods still fail QC, they will be outright rejected.'      + '</div>'      + '<div style="margin-bottom:12px"><label class="form-label">Re-QC Attachments <span style="font-size:0.72rem;color:var(--gray-4);font-weight:400">(optional)</span></label>'        + '<div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center;cursor:pointer" onclick="document.getElementById(\'finalReQcAttachFile\').click()">'        + '<input type="file" id="finalReQcAttachFile" accept="image/*,.pdf" multiple style="display:none" onchange="handleFinalReQCAttach(event)"/>'        + '<div style="font-size:0.78rem;font-weight:600"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551" /></svg> Click to attach photos / reports</div>'        + '</div><div id="finalReQcAttachList" style="margin-top:6px"></div></div>'      + '<div class="qc-result-row" style="grid-template-columns:1fr 1fr;max-width:480px">'        + '<div class="qc-option pass" id="rw2OptPass" onclick="selectRework2QC(\'pass\')">'          + '<div class="qc-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg></div><div class="qc-label">QC Passed</div>'          + '<div class="qc-desc">Final rework accepted</div></div>'        + '<div class="qc-option reject" id="rw2OptReject" onclick="selectRework2QC(\'reject\')">'          + '<div class="qc-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></svg></div><div class="qc-label">QC Rejected</div>'          + '<div class="qc-desc">Still defective — outright rejection</div></div>'      + '</div>'      + '<div id="rw2SamplesSection" style="display:none" class="samples-section">'        + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /> <path d="M12 22V12" /> <polyline points="3.29 7 12 12 20.71 7" /> <path d="m7.5 4.27 9 5.15" /></svg> Final Rejection Quantities</div>'        + '<table class="samples-table"><thead><tr><th>#</th><th style="text-align:left">Item</th><th>Received</th><th>Rejected Qty</th><th>Accepted (auto)</th></tr></thead>'        + '<tbody id="rw2SamplesBody"></tbody></table>'      + '</div>'      + '<div><label class="form-label">Final Post-Rework Inspection Notes *</label>'        + '<textarea class="form-control" id="qcNotesRework2" rows="3" placeholder="Describe final rework quality findings..."></textarea></div>'      + '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'        + '<button class="btn btn-primary" onclick="submitFinalReworkQC()">Submit Final Re-QC Result →</button>'      + '</div>'      + '</div>';
 
   } else if (pr.phase === 'deviation_approval') {
     var devTarget = allPMsAndDirector.find(function(u){ return u.id === pr.deviation_target_id; });
     var devTargetName = devTarget ? devTarget.name + ' (' + (devTarget.role === 'director' ? 'Director' : 'Project Manager') + ')' : 'Recipient';
     var devReason = (pr.qc_criteria && pr.qc_criteria.deviation_reason) ? pr.qc_criteria.deviation_reason : 'No reason recorded.';
     actionSection = '<div style="padding:14px;border:1px solid rgba(124,58,237,0.25);border-radius:var(--radius);background:rgba(124,58,237,0.04)">'
-      + '<div style="font-weight:700;color:#7c3aed;margin-bottom:6px">↗ Request Deviated — Pending Review by ' + devTargetName + '</div>'
+      + '<div style="font-weight:700;color:#7c3aed;margin-bottom:6px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /> <path d="M7 17 17 7" /></svg> Request Deviated — Pending Review by ' + devTargetName + '</div>'
       + '<div style="padding:8px 12px;background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.15);border-radius:var(--radius-sm);font-size:0.82rem;margin-bottom:8px"><strong>Deviation reason:</strong> ' + devReason + '</div>'
       + '<p style="font-size:0.78rem;color:var(--gray-4);margin:0">Awaiting the recipient\'s decision. No further action required from QC at this stage.</p>'
       + '</div>';
 
   } else if (pr.phase === 'qc_passed' || pr.phase === 'accepted') {
     actionSection = '<div class="action-section" style="background:rgba(22,163,74,0.04);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:14px">'
-      + '<div class="action-section-title" style="color:#16a34a">✅ QC Passed</div>'
+      + '<div class="action-section-title" style="color:#16a34a"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> QC Passed</div>'
       + (pr.qc_notes ? '<p style="font-size:0.82rem;color:var(--gray-3)">' + pr.qc_notes + '</p>' : '')
       + '</div>';
 
@@ -314,7 +314,7 @@ function renderModal() {
           }).join('') + '</tbody></table></div>'
       : '';
     actionSection = '<div class="action-section" style="background:rgba(124,58,237,0.04);border:1px solid rgba(124,58,237,0.25);border-radius:var(--radius);padding:14px">'
-      + '<div class="action-section-title" style="color:#7c3aed">🚫 QC Rejected</div>'
+      + '<div class="action-section-title" style="color:#7c3aed"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></svg> QC Rejected</div>'
       + '<p style="font-size:0.82rem;color:var(--gray-3);margin:6px 0">' + (pr.qc_notes || '—') + '</p>'
       + (pr.qc_criteria && pr.qc_criteria.qc_inspector ? '<div style="font-size:0.75rem;color:var(--gray-4)">Inspected by: <strong>' + pr.qc_criteria.qc_inspector + '</strong></div>' : '')
       + rejRows
@@ -324,10 +324,10 @@ function renderModal() {
     // QC marked fail → store manager needs to fill dispatch form
     var sfJwcData = (pr.qc_criteria && pr.qc_criteria.jwc) ? pr.qc_criteria.jwc : {};
     actionSection = '<div class="action-section" style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius);padding:14px">'
-      + '<div class="action-section-title" style="color:#b45309">🔄 Rework — Awaiting Store Manager Dispatch Form</div>'
+      + '<div class="action-section-title" style="color:#b45309"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></svg> Rework — Awaiting Store Manager Dispatch Form</div>'
       + (sfJwcData.jwc_number
           ? '<div style="margin:10px 0;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.82rem">'
-            + '<div style="font-weight:700;color:#b45309;margin-bottom:4px">📄 JWC Details (filled by QC)</div>'
+            + '<div style="font-weight:700;color:#b45309;margin-bottom:4px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg> JWC Details (filled by QC)</div>'
             + '<div>JWC No: <strong>' + sfJwcData.jwc_number + '</strong></div>'
             + (sfJwcData.rework_vendor ? '<div>Rework Vendor: <strong>' + sfJwcData.rework_vendor + '</strong></div>' : '')
             + (sfJwcData.expected_days ? '<div>Expected Duration: <strong>' + sfJwcData.expected_days + ' days</strong></div>' : '')
@@ -335,7 +335,7 @@ function renderModal() {
             + '</div>'
           : '')
       + '<p style="font-size:0.82rem;color:var(--gray-3);margin:8px 0">QC has marked this for rework. The Store Manager is filling the dispatch form and will send goods out. This will move to <strong>Rework Pending</strong> once dispatched.</p>'
-      + '<button class="btn btn-secondary btn-sm" onclick="previewJWC()">📄 View JWC</button>'
+      + '<button class="btn btn-secondary btn-sm" onclick="previewJWC()"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg> View JWC</button>'
       + '</div>';
 
   } else if (pr.phase === 'rework_pending') {
@@ -358,37 +358,37 @@ function renderModal() {
   } else if (pr.phase === 'rework_returned') {
     var jwcReworkData = (pr.qc_criteria && pr.qc_criteria.jwc) ? pr.qc_criteria.jwc : {};
     actionSection = '<div class="action-section">'
-      + '<div class="action-section-title">🔄 Post-Rework QC Inspection <span class="action-badge">ACTION REQUIRED</span></div>'
+      + '<div class="action-section-title"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></svg> Post-Rework QC Inspection <span class="action-badge">ACTION REQUIRED</span></div>'
       + grnSummary
       + (jwcReworkData.jwc_number
           ? '<div style="margin-bottom:14px;padding:10px 12px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);font-size:0.82rem">'
-            + '<div style="font-weight:700;color:#dc2626;margin-bottom:4px">📄 Rework History — JWC ' + jwcReworkData.jwc_number + '</div>'
+            + '<div style="font-weight:700;color:#dc2626;margin-bottom:4px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg> Rework History — JWC ' + jwcReworkData.jwc_number + '</div>'
             + '<div>Rework Vendor: <strong>' + (jwcReworkData.rework_vendor || '—') + '</strong></div>'
             + '<div>Process: <strong>' + (jwcReworkData.process || '—') + '</strong></div>'
             + (jwcReworkData.notes ? '<div>Rework Notes: ' + jwcReworkData.notes + '</div>' : '')
-            + '<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="previewJWC()">📄 View JWC</button>'
+            + '<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="previewJWC()"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg> View JWC</button>'
             + '</div>'
           : '')
       + '<div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;font-size:0.82rem">'
-        + '<strong>⚠️ Goods returned from rework.</strong> Inspect the reworked items — pass if they now meet specs, or reject if still defective.'
+        + '<strong><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></svg> Goods returned from rework.</strong> Inspect the reworked items — pass if they now meet specs, or reject if still defective.'
       + '</div>'
       + '<div class="qc-result-row" style="grid-template-columns:1fr 1fr;max-width:480px">'
         + '<div class="qc-option pass" id="rwOptPass" onclick="selectReworkQC(\'pass\')">'
-          + '<div class="qc-icon">✅</div><div class="qc-label">QC Passed</div>'
+          + '<div class="qc-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg></div><div class="qc-label">QC Passed</div>'
           + '<div class="qc-desc">Rework accepted — meets specs</div></div>'
         + '<div class="qc-option reject" id="rwOptReject" onclick="selectReworkQC(\'reject\')">'
-          + '<div class="qc-icon">🚫</div><div class="qc-label">QC Rejected</div>'
+          + '<div class="qc-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></svg></div><div class="qc-label">QC Rejected</div>'
           + '<div class="qc-desc">Still defective — outright rejection</div></div>'
       + '</div>'
       + '<div id="rwSamplesSection" style="display:none" class="samples-section">'
-        + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px">📦 Sample Rejection Quantities</div>'
+        + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /> <path d="M12 22V12" /> <polyline points="3.29 7 12 12 20.71 7" /> <path d="m7.5 4.27 9 5.15" /></svg> Sample Rejection Quantities</div>'
         + '<div style="font-size:0.76rem;color:var(--gray-3);margin-bottom:8px">Enter the number of reworked samples still being rejected.</div>'
         + '<div style="overflow-x:auto"><table class="samples-table">'
           + '<thead><tr><th>#</th><th style="text-align:left">Item</th><th>Received</th><th>Rejected Qty</th><th>Accepted (auto)</th></tr></thead>'
           + '<tbody id="rwSamplesBody"></tbody>'
         + '</table></div>'
       + '</div>'
-      + '<div style="margin:10px 0"><label class="form-label">Re-QC Attachments <span style="font-size:0.72rem;color:var(--gray-4);font-weight:400">(photos, reports — optional)</span></label>'        + '<div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer;background:rgba(99,102,241,0.02)" onclick="document.getElementById(\'reQcAttachFile\').click()">'        + '<input type="file" id="reQcAttachFile" accept="image/*,.pdf" multiple style="display:none" onchange="handleReQCAttach(event)"/>'        + '<div style="font-size:0.78rem;font-weight:600">📎 Click to attach Re-QC photos / reports</div>'        + '</div><div id="reQcAttachList" style="margin-top:6px"></div></div>'
+      + '<div style="margin:10px 0"><label class="form-label">Re-QC Attachments <span style="font-size:0.72rem;color:var(--gray-4);font-weight:400">(photos, reports — optional)</span></label>'        + '<div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer;background:rgba(99,102,241,0.02)" onclick="document.getElementById(\'reQcAttachFile\').click()">'        + '<input type="file" id="reQcAttachFile" accept="image/*,.pdf" multiple style="display:none" onchange="handleReQCAttach(event)"/>'        + '<div style="font-size:0.78rem;font-weight:600"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551" /></svg> Click to attach Re-QC photos / reports</div>'        + '</div><div id="reQcAttachList" style="margin-top:6px"></div></div>'
       + '<div><label class="form-label">Post-Rework Inspection Notes *</label>'
         + '<textarea class="form-control" id="qcNotesRework" rows="3" placeholder="Describe rework quality findings — measurements checked, defects resolved, overall condition…"></textarea></div>'
       + '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'
@@ -584,7 +584,7 @@ window.submitQC = async function submitQC() {
     if (devResult.error) { showToast('Error: ' + devResult.error.message, 'error'); return; }
     notifyPhaseChange(currentPR.id, 'deviation_approval', currentUser.id);
     var devTargetUser = allPMsAndDirector.find(function(u){ return u.id === devTarget; });
-    await window.postComment(currentPR.id, currentUser.id, '↗ QC Inspector deviated this request to ' + (devTargetUser ? devTargetUser.name : 'recipient') + '. Reason: ' + devReason);
+    await window.postComment(currentPR.id, currentUser.id, '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /> <path d="M7 17 17 7" /></svg> QC Inspector deviated this request to ' + (devTargetUser ? devTargetUser.name : 'recipient') + '. Reason: ' + devReason);
     showToast('Request deviated successfully. Recipient has been notified.', 'success');
     closeModal('prModal'); await loadRequests();
     return;
@@ -677,18 +677,18 @@ window.submitQC = async function submitQC() {
   notifyPhaseChange(currentPR.id, newPhase, currentUser.id);
 
   var commentText = isPassed
-    ? '✅ QC Passed — ' + notes
+    ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> QC Passed — ' + notes
     : isFail
-      ? '❌ QC Failed — Rework noted. Store Manager will fill dispatch form and send goods out.' + (jwcData ? ' JWC: ' + jwcData.jwc_number : '') + ' Notes: ' + notes
-      : '🚫 QC Rejected — ' + notes;
+      ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /></svg> QC Failed — Rework noted. Store Manager will fill dispatch form and send goods out.' + (jwcData ? ' JWC: ' + jwcData.jwc_number : '') + ' Notes: ' + notes
+      : '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></svg> QC Rejected — ' + notes;
   await window.postComment(currentPR.id, currentUser.id, commentText);
 
   showToast(
     isPassed
-      ? '✅ QC Passed — Procurement & Requestor notified!'
+      ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> QC Passed — Procurement & Requestor notified!'
       : isFail
-        ? '❌ QC Failed — Store Manager notified to dispatch for rework!'
-        : '🚫 QC Rejected — Procurement & Requestor notified!',
+        ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /></svg> QC Failed — Store Manager notified to dispatch for rework!'
+        : '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></svg> QC Rejected — Procurement & Requestor notified!',
     'success'
   );
 
@@ -835,13 +835,13 @@ window.submitPostReworkQC = async function submitPostReworkQC() {
   window._reQcAttachFiles = [];
   notifyPhaseChange(currentPR.id, newPhase, currentUser.id);
   var commentText = isPassed
-    ? '✅ Post-Rework QC Passed — ' + notes
-    : '🔄 Post-Rework QC Failed — sending for 2nd rework cycle. ' + notes;
+    ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> Post-Rework QC Passed — ' + notes
+    : '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></svg> Post-Rework QC Failed — sending for 2nd rework cycle. ' + notes;
   await window.postComment(currentPR.id, currentUser.id, commentText);
   showToast(
     isPassed
-      ? '✅ Post-Rework QC Passed — Procurement Manager notified!'
-      : '🔄 2nd Rework cycle initiated — Store Manager notified!',
+      ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> Post-Rework QC Passed — Procurement Manager notified!'
+      : '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></svg> 2nd Rework cycle initiated — Store Manager notified!',
     'success'
   );
   closeModal('prModal');
@@ -1036,7 +1036,7 @@ function renderQCAttachList() {
   if (!el) return;
   el.innerHTML = qcAttachments.map(function(f, i) {
     return '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.75rem">'
-      + (f.type.includes('image') ? '🖼️' : '📄') + ' <span style="flex:1">' + f.name + '</span>'
+      + (f.type.includes('image') ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>' : '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg>') + ' <span style="flex:1">' + f.name + '</span>'
       + '<button onclick="removeQCAttach(' + i + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.75rem">✕</button></div>';
   }).join('');
 }
@@ -1054,7 +1054,7 @@ window.handleReQCAttach = async function handleReQCAttach(e) {
   var el = document.getElementById('reQcAttachList');
   if (el) el.innerHTML = window._reQcAttachFiles.map(function(f, i) {
     return '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.75rem">'
-      + (f.type.includes('image') ? '🖼️' : '📄') + ' <span style="flex:1">' + f.name + '</span></div>';
+      + (f.type.includes('image') ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>' : '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg>') + ' <span style="flex:1">' + f.name + '</span></div>';
   }).join('');
 };
 
@@ -1068,7 +1068,7 @@ window.handleFinalReQCAttach = async function handleFinalReQCAttach(e) {
   e.target.value = '';
   var el = document.getElementById('finalReQcAttachList');
   if (el) el.innerHTML = window._finalReQcAttachFiles.map(function(f) {
-    return '<div style="font-size:0.75rem;padding:2px 0">' + (f.type.includes('image') ? '🖼️' : '📄') + ' ' + f.name + '</div>';
+    return '<div style="font-size:0.75rem;padding:2px 0">' + (f.type.includes('image') ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>' : '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg>') + ' ' + f.name + '</div>';
   }).join('');
 };
 
@@ -1150,8 +1150,8 @@ window.submitFinalReworkQC = async function submitFinalReworkQC() {
   rework2QCSelection = null;
   notifyPhaseChange(currentPR.id, newPhase, currentUser.id);
   await window.postComment(currentPR.id, currentUser.id,
-    isPassed ? '✅ Final Post-Rework QC Passed — ' + notes : '🚫 Final Post-Rework QC Rejected (2nd rework cycle). ' + notes);
-  showToast(isPassed ? '✅ Final QC Passed — Procurement Manager notified!' : '🚫 QC Rejected after 2nd rework.', 'success');
+    isPassed ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> Final Post-Rework QC Passed — ' + notes : '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></svg> Final Post-Rework QC Rejected (2nd rework cycle). ' + notes);
+  showToast(isPassed ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> Final QC Passed — Procurement Manager notified!' : '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></svg> QC Rejected after 2nd rework.', 'success');
   closeModal('prModal');
   await loadRequests();
 };

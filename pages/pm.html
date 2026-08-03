@@ -19,26 +19,26 @@
   </div>
 
   <div class="stats-grid">
-    <div class="stat-card"><div class="stat-card-value" id="sTotal">—</div><div class="stat-card-label">Total Requests</div><div class="stat-card-icon">📋</div></div>
-    <div class="stat-card" style="--accent:#6366f1"><div class="stat-card-value" id="sClearance">—</div><div class="stat-card-label">Needs Clearance</div><div class="stat-card-icon">🔐</div></div>
-    <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sFinal">—</div><div class="stat-card-label">Pending Final</div><div class="stat-card-icon">✍️</div></div>
-    <div class="stat-card" style="--accent:#3b82f6"><div class="stat-card-value" id="sOngoing">—</div><div class="stat-card-label">Ongoing</div><div class="stat-card-icon">⚙️</div></div>
-    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sDone">—</div><div class="stat-card-label">Closed</div><div class="stat-card-icon">✅</div></div>
-    <div class="stat-card" style="--accent:#dc2626"><div class="stat-card-value" id="sRejected">—</div><div class="stat-card-label">Declined / Rejected</div><div class="stat-card-icon">❌</div></div>
+    <div class="stat-card"><div class="stat-card-value" id="sTotal">—</div><div class="stat-card-label">Total Requests</div><div class="stat-card-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></svg></div></div>
+    <div class="stat-card" style="--accent:#6366f1"><div class="stat-card-value" id="sClearance">—</div><div class="stat-card-label">Needs Clearance</div><div class="stat-card-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1" /> <rect x="3" y="10" width="18" height="12" rx="2" /> <path d="M7 10V7a5 5 0 0 1 10 0v3" /></svg></div></div>
+    <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sFinal">—</div><div class="stat-card-label">Pending Final</div><div class="stat-card-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8" /> <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /></svg></div></div>
+    <div class="stat-card" style="--accent:#3b82f6"><div class="stat-card-value" id="sOngoing">—</div><div class="stat-card-label">Ongoing</div><div class="stat-card-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></svg></div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sDone">—</div><div class="stat-card-label">Closed</div><div class="stat-card-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg></div></div>
+    <div class="stat-card" style="--accent:#dc2626"><div class="stat-card-value" id="sRejected">—</div><div class="stat-card-label">Declined / Rejected</div><div class="stat-card-icon"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /></svg></div></div>
   </div>
 
   <div id="pendingBanner" style="display:none;margin-bottom:16px"></div>
 
   <div class="tabs">
-    <button class="tab-btn active" data-tab="clearance" onclick="switchTab('clearance')">🔐 Clearance</button>
-    <button class="tab-btn" data-tab="final" onclick="switchTab('final')">✍️ Final Approval</button>
+    <button class="tab-btn active" data-tab="clearance" onclick="switchTab('clearance')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1" /> <rect x="3" y="10" width="18" height="12" rx="2" /> <path d="M7 10V7a5 5 0 0 1 10 0v3" /></svg> Clearance</button>
+    <button class="tab-btn" data-tab="final" onclick="switchTab('final')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8" /> <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /></svg> Final Approval</button>
     <button class="tab-btn" data-tab="all" onclick="switchTab('all')">All Requests</button>
-    <button class="tab-btn" data-tab="ongoing" onclick="switchTab('ongoing')">⚙️ Ongoing</button>
-    <button class="tab-btn" data-tab="declined" onclick="switchTab('declined')">❌ Declined / Rejected</button>
-    <button class="tab-btn" data-tab="closed" onclick="switchTab('closed')">✅ Closed</button>
-    <button class="tab-btn" data-tab="mine" onclick="switchTab('mine')">📝 My Requests</button>
-    <button class="tab-btn" data-tab="vendors" onclick="switchTab('vendors')">🏢 Vendors</button>
-    <button class="tab-btn" onclick="goToProjects()">📋 Projects</button>
+    <button class="tab-btn" data-tab="ongoing" onclick="switchTab('ongoing')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></svg> Ongoing</button>
+    <button class="tab-btn" data-tab="declined" onclick="switchTab('declined')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /></svg> Declined / Rejected</button>
+    <button class="tab-btn" data-tab="closed" onclick="switchTab('closed')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> Closed</button>
+    <button class="tab-btn" data-tab="mine" onclick="switchTab('mine')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /> <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" /></svg> My Requests</button>
+    <button class="tab-btn" data-tab="vendors" onclick="switchTab('vendors')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4" /> <path d="M10 8h4" /> <path d="M14 21v-3a2 2 0 0 0-4 0v3" /> <path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2" /> <path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" /></svg> Vendors</button>
+    <button class="tab-btn" onclick="goToProjects()"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></svg> Projects</button>
   </div>
 
   <div id="tabContent">
@@ -78,7 +78,7 @@
           <div class="pm-approval-option selected" id="pmOptYes"><div class="pm-approval-option-icon"></div><div class="pm-approval-option-label">Project Manager Approved</div><div class="pm-approval-option-sub">You are the Project Manager</div></div>
         </div>
         <div id="vendorInfoNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.18);border-radius:var(--radius-sm);font-size:0.78rem;color:#6d28d9">ℹ Vendor Info requests go directly to the Procurement Manager — no Project Manager clearance needed.</div>
-        <div id="localPurchaseNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.28);border-radius:var(--radius-sm);font-size:0.78rem;color:#15803d">🛒 Local Purchase requests go directly to the Procurement Manager for payment processing.</div>
+        <div id="localPurchaseNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.28);border-radius:var(--radius-sm);font-size:0.78rem;color:#15803d"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1" /> <circle cx="19" cy="21" r="1" /> <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg> Local Purchase requests go directly to the Procurement Manager for payment processing.</div>
       </div>
       <div id="pmScreenshotSection" style="display:none"></div>
 
@@ -168,8 +168,8 @@
         <div class="form-group full">
           <label class="form-label">Sourcing</label>
           <div class="sourcing-options">
-            <label class="sourcing-chip" id="srcDomestic" onclick="toggleSourcing('domestic')">🏠 Domestic</label>
-            <label class="sourcing-chip" id="srcInternational" onclick="toggleSourcing('international')">🌍 International</label>
+            <label class="sourcing-chip" id="srcDomestic" onclick="toggleSourcing('domestic')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg> Domestic</label>
+            <label class="sourcing-chip" id="srcInternational" onclick="toggleSourcing('international')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /> <path d="M2 12h20" /></svg> International</label>
           </div>
         </div>
         <div class="form-group full">
@@ -180,7 +180,7 @@
 
       <!-- QC Criteria -->
       <div style="margin-top:14px;padding:14px;border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius);background:rgba(99,102,241,0.03)">
-        <div style="font-size:0.82rem;font-weight:600;margin-bottom:10px;color:#6366f1">🔍 QC Criteria <span style="color:var(--gray-4);font-weight:400;font-size:0.72rem">(optional)</span></div>
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:10px;color:#6366f1"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></svg> QC Criteria <span style="color:var(--gray-4);font-weight:400;font-size:0.72rem">(optional)</span></div>
         <div class="form-grid">
           <div class="form-group"><label class="form-label">Preferred Color / Finish</label><input class="form-control" id="fQcColor" placeholder="e.g. Matte black, RAL 7016, Silver"/></div>
           <div class="form-group"><label class="form-label">Preferred Material</label><input class="form-control" id="fQcMaterial" placeholder="e.g. Stainless steel 316L, ABS plastic"/></div>
@@ -193,7 +193,7 @@
         <label class="form-label" style="margin-bottom:6px;display:block">Attachments <span style="color:var(--gray-4);font-weight:400;font-size:0.72rem">(drawings, specs, reference images)</span></label>
         <div class="bom-upload-zone" id="attachZone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleAttachDrop(event)">
           <input type="file" id="attachFile" accept="image/*,.pdf,.doc,.docx" multiple onchange="handleAttachFiles(event)"/>
-          <div style="font-size:1.3rem;margin-bottom:4px">📎</div>
+          <div style="font-size:1.3rem;margin-bottom:4px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551" /></svg></div>
           <div style="font-size:0.8rem;font-weight:600">Drag &amp; drop or click to attach files</div>
           <div style="font-size:0.72rem;color:var(--gray-4)">Images, PDF, DOC — max 5MB each</div>
         </div>
@@ -203,12 +203,12 @@
       <!-- BOM Upload -->
       <div style="margin-top:14px;padding:14px;border:1.5px dashed rgba(34,197,94,0.4);border-radius:var(--radius);background:rgba(34,197,94,0.03)">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-          <div style="font-size:0.82rem;font-weight:600;color:#16a34a">📊 Upload BOM (Bill of Materials) — Auto-fills parts below</div>
-          <a id="bomTemplateLink" href="#" onclick="downloadBOMTemplate(event)" style="font-size:0.72rem;font-weight:600;color:#6366f1;text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border:1px solid #6366f130;border-radius:6px;background:#6366f108;white-space:nowrap">⬇ Download Template</a>
+          <div style="font-size:0.82rem;font-weight:600;color:#16a34a"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="M18 17V9" /> <path d="M13 17V5" /> <path d="M8 17v-3" /></svg> Upload BOM (Bill of Materials) — Auto-fills parts below</div>
+          <a id="bomTemplateLink" href="#" onclick="downloadBOMTemplate(event)" style="font-size:0.72rem;font-weight:600;color:#6366f1;text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border:1px solid #6366f130;border-radius:6px;background:#6366f108;white-space:nowrap"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></svg> Download Template</a>
         </div>
         <div class="bom-upload-zone" id="bomZone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleBOMDrop(event)">
           <input type="file" id="bomFile" accept=".csv,.xlsx,.xls,.xlsm" onchange="handleBOMFile(event)"/>
-          <div style="font-size:1.3rem;margin-bottom:4px">📊</div>
+          <div style="font-size:1.3rem;margin-bottom:4px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="M18 17V9" /> <path d="M13 17V5" /> <path d="M8 17v-3" /></svg></div>
           <div style="font-size:0.8rem;font-weight:600">Upload BOM CSV</div>
           <div style="font-size:0.72rem;color:var(--gray-4)">CSV or Excel (.xlsx) — auto-parses into parts table</div>
         </div>
@@ -357,7 +357,7 @@ function renderBanner() {
   if(!total){b.style.display='none';return;}
   b.style.display='block';
   b.innerHTML=`<div style="background:rgba(214,43,43,0.06);border:1.5px solid rgba(214,43,43,0.22);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <span style="font-size:1.1rem">⏳</span>
+    <span style="font-size:1.1rem"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14" /> <path d="M5 2h14" /> <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /> <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /></svg></span>
     <div style="flex:1"><strong style="font-size:0.85rem">${total} request${total>1?'s':''} awaiting your decision</strong>
     <div style="font-size:0.75rem;color:var(--gray-3);margin-top:2px">${clearance.length?`${clearance.length} clearance`:''}${clearance.length&&final.length?' · ':''}${final.length?`${final.length} final approval`:''}</div></div>
     <button class="btn btn-primary btn-sm" onclick="switchTab('clearance')">Review Now</button>
@@ -392,7 +392,7 @@ function filterTable() {
 
 function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
-  const emptyIcon={clearance:'🔐',final:'✍️',all:'📭',ongoing:'⚙️',declined:'❌',closed:'✅',mine:'📝'}[activeTab]||'📭';
+  const emptyIcon={clearance:'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1" /> <rect x="3" y="10" width="18" height="12" rx="2" /> <path d="M7 10V7a5 5 0 0 1 10 0v3" /></svg>',final:'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8" /> <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /></svg>',all:'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9" /> <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /> <path d="m17 17 4 4" /> <path d="m21 17-4 4" /></svg>',ongoing:'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></svg>',declined:'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /></svg>',closed:'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg>',mine:'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /> <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" /></svg>'}[activeTab]||'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9" /> <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /> <path d="m17 17 4 4" /> <path d="m21 17-4 4" /></svg>';
   const emptyTitle={clearance:'No pending clearance requests',final:'No final approvals pending',all:'No requests assigned yet',ongoing:'No ongoing requests',declined:'No declined or rejected requests',closed:'No closed requests',mine:'You haven\'t submitted any requests yet'}[activeTab]||'No requests found';
   const emptySub={mine:'Click + New Request to get started.',clearance:'All clearance requests have been handled.',final:'No quotes are awaiting your final decision.',ongoing:'All requests are in terminal or action-pending states.',declined:'No requests have been declined or rejected.',closed:'No requests have been fully completed yet.',all:'No procurement requests assigned to you yet.'}[activeTab]||'';
   if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${emptyIcon}</div><h3>${emptyTitle}</h3><p>${emptySub}</p>${activeTab==='mine'?'<button class="btn btn-primary" style="margin-top:12px" onclick="openNewPR()">+ New Request</button>':''}</div></td></tr>`;return;}
@@ -402,7 +402,7 @@ function renderTable(reqs) {
     const needsAction=isClearance||isFinal;
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
       <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
-      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${r.item_note}</div>`:''}</td>
+      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /> <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" /></svg> ${r.item_note}</div>`:''}</td>
       <td style="font-size:0.8rem">${r.users?.name||'—'}</td>
       <td style="font-size:0.78rem">${DEPARTMENTS[r.department]||r.department}</td>
       <td><span style="font-size:0.72rem;background:var(--off-white);border:1px solid var(--border);padding:1px 7px;border-radius:3px">${r.request_category==='vendor_info'?'Vendor Info':'RFQ'}</span></td>
@@ -438,7 +438,7 @@ async function openPR(id) {
   // ── AWAITING MASTER TO ASSIGN AN APPROVER ──
   if(currentPR.phase==='pending_master_reassignment') {
     actionSection=`<div class="action-section" style="border-color:#dc262633;background:rgba(220,38,38,0.04)">
-      <div class="action-section-title" style="color:#dc2626">🧭 Awaiting Approver Assignment</div>
+      <div class="action-section-title" style="color:#dc2626"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /></svg> Awaiting Approver Assignment</div>
       <p style="font-size:0.82rem;color:var(--gray-3)">This request could not be auto-routed for requirement clearance (usually because the requester is themselves the resolved approver). It is waiting for <strong>Master Admin</strong> to manually assign who should clear it.</p>
     </div>`;
   }
@@ -446,7 +446,7 @@ async function openPR(id) {
   // ── INITIAL CLEARANCE ──
   if(currentPR.phase==='pending_initial_pm_approval' && currentPR.initial_approver_id===currentUser.id) {
     actionSection=`<div class="action-section">
-      <div class="action-section-title">🔐 Requirement Clearance <span class="action-badge">ACTION REQUIRED</span></div>
+      <div class="action-section-title"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1" /> <rect x="3" y="10" width="18" height="12" rx="2" /> <path d="M7 10V7a5 5 0 0 1 10 0v3" /></svg> Requirement Clearance <span class="action-badge">ACTION REQUIRED</span></div>
       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">The engineer does not yet have <strong>Project Manager approval</strong> for this requirement. Review and grant or deny clearance to begin procurement.</p>
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Decision Notes *</label>
@@ -459,7 +459,7 @@ async function openPR(id) {
     </div>`;
   } else if(currentPR.phase==='pending_initial_pm_approval') {
     actionSection=`<div class="action-section" style="border-color:#f59e0b33;background:rgba(245,158,11,0.04)">
-      <div class="action-section-title" style="color:#b45309">🔐 Awaiting Requirement Clearance</div>
+      <div class="action-section-title" style="color:#b45309"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1" /> <rect x="3" y="10" width="18" height="12" rx="2" /> <path d="M7 10V7a5 5 0 0 1 10 0v3" /></svg> Awaiting Requirement Clearance</div>
       <p style="font-size:0.82rem;color:var(--gray-3)">Waiting on ${currentPR.initial_approver_id?'the assigned department approver':'Master Admin to assign an approver'} — no action needed from you.</p>
     </div>`;
   }
@@ -471,10 +471,10 @@ async function openPR(id) {
 
     const quotesHTML = quotations.length
       ? `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${quotations.map(q=>renderQuotationCard(q,true,pmSelectedQuotationId)).join('')}</div>`
-      : `<div style="margin-bottom:14px;padding:10px;background:#fff8f0;border:1px solid #f59e0b33;border-radius:var(--radius-sm);font-size:0.82rem;color:#92400e">⚠ No quotations uploaded yet — contact procurement.</div>`;
+      : `<div style="margin-bottom:14px;padding:10px;background:#fff8f0;border:1px solid #f59e0b33;border-radius:var(--radius-sm);font-size:0.82rem;color:#92400e"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></svg> No quotations uploaded yet — contact procurement.</div>`;
 
     actionSection=`<div class="action-section">
-      <div class="action-section-title">✍️ Final Approval <span class="action-badge">ACTION REQUIRED</span></div>
+      <div class="action-section-title"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8" /> <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /></svg> Final Approval <span class="action-badge">ACTION REQUIRED</span></div>
       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Select the final quotation below, then approve or reject. Amounts of <strong>₹5,000 or above</strong> will be automatically escalated to the Director.</p>
       <div class="detail-key" style="margin-bottom:8px">Select Final Quotation</div>
       ${quotesHTML}
@@ -495,7 +495,7 @@ async function openPR(id) {
     const selQ=quotations.find(q=>q.is_selected)||quotations.find(q=>q.id===currentPR.selected_quotation_id);
     const amt=selQ?.amount?`₹${parseFloat(selQ.amount).toLocaleString('en-IN')}`:'—';
     actionSection=`<div class=\"action-section\" style=\"border-color:#7c3aed33;background:rgba(124,58,237,0.04)\">
-      <div class=\"action-section-title\" style=\"color:#7c3aed\">👤 Awaiting Director Approval <span class=\"action-badge\" style=\"background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35\">ESCALATED</span></div>
+      <div class=\"action-section-title\" style=\"color:#7c3aed\"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /> <circle cx="12" cy="7" r="4" /></svg> Awaiting Director Approval <span class=\"action-badge\" style=\"background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35\">ESCALATED</span></div>
       <p style=\"font-size:0.82rem;color:var(--gray-3);margin-bottom:12px\">This request has been escalated to the Director (sandy@on2cook.com) because the selected quotation amount <strong>${amt}</strong> exceeds the Project Manager approval limit of <strong>₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}</strong>.</p>
       <div style=\"background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.18);border-radius:var(--radius-sm);padding:9px 12px;font-size:0.78rem;color:#6d28d9\">
         The Director has been notified by email. No further action required from you.
@@ -506,7 +506,7 @@ async function openPR(id) {
   // ── PENDING DECLINE APPROVAL — Project Manager must approve/deny the decline ──
   if(currentPR.phase==='pending_decline_approval') {
     actionSection=`<div class="action-section" style="border-color:#dc2626;background:rgba(220,38,38,0.04)">
-      <div class="action-section-title" style="color:#dc2626">🚫 Decline Approval Required <span class="action-badge" style="background:#dc2626">ACTION REQUIRED</span></div>
+      <div class="action-section-title" style="color:#dc2626"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></svg> Decline Approval Required <span class="action-badge" style="background:#dc2626">ACTION REQUIRED</span></div>
       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:10px">The <strong>Procurement Manager</strong> wants to decline this request. You must confirm or reject this decline decision.</p>
       ${currentPR.rejection_reason?`<div style="padding:10px 12px;background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);border-radius:var(--radius-sm);margin-bottom:12px;font-size:0.82rem"><strong>Procurement Manager's reason:</strong> ${currentPR.rejection_reason}</div>`:''}
       <div class="form-group" style="margin-bottom:12px">
@@ -515,7 +515,7 @@ async function openPR(id) {
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn btn-danger" onclick="confirmDecline()" style="flex:1">✓ Confirm Decline</button>
-        <button class="btn btn-success" onclick="rejectDecline()" style="flex:1">↩ Reject Decline — Keep Active</button>
+        <button class="btn btn-success" onclick="rejectDecline()" style="flex:1"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" /></svg> Reject Decline — Keep Active</button>
       </div>
     </div>`;
   }
@@ -526,12 +526,12 @@ async function openPR(id) {
     const qcInspector=currentPR.qc_criteria?.qc_inspector||'QC Inspector';
     const devAttachments=currentPR.qc_criteria?.qc_attachments||[];
     actionSection=`<div class="action-section" style="border-color:#7c3aed;background:rgba(124,58,237,0.04)">
-      <div class="action-section-title" style="color:#7c3aed">↗ QC Deviation — Your Review Required <span class="action-badge" style="background:#7c3aed">ACTION REQUIRED</span></div>
+      <div class="action-section-title" style="color:#7c3aed"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /> <path d="M7 17 17 7" /></svg> QC Deviation — Your Review Required <span class="action-badge" style="background:#7c3aed">ACTION REQUIRED</span></div>
       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:10px">The <strong>QC Inspector (${qcInspector})</strong> has deviated this request to you for review.</p>
       <div style="padding:10px 12px;background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.18);border-radius:var(--radius-sm);margin-bottom:12px;font-size:0.82rem">
         <strong>Deviation Reason:</strong> ${devReason}
       </div>
-      ${devAttachments.length?`<div style="margin-bottom:12px"><div style="font-size:0.78rem;font-weight:600;margin-bottom:4px">📎 QC Attachments</div>${devAttachments.map(a=>`<div style="font-size:0.75rem;padding:2px 0">${a.type?.includes('image')?'🖼️':'📄'} ${a.name}</div>`).join('')}</div>`:''}
+      ${devAttachments.length?`<div style="margin-bottom:12px"><div style="font-size:0.78rem;font-weight:600;margin-bottom:4px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551" /></svg> QC Attachments</div>${devAttachments.map(a=>`<div style="font-size:0.75rem;padding:2px 0">${a.type?.includes('image')?'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>':'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg>'} ${a.name}</div>`).join('')}</div>`:''}
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Your Decision Notes *</label>
         <textarea class="form-control" id="deviationApprovalNotes" placeholder="State your decision reason..."></textarea>
@@ -548,8 +548,8 @@ async function openPR(id) {
   var isMasterActingOnLP = canActOnLP && currentUser.role === 'master';
   if(canActOnLP) {
     var lpLabel = isMasterActingOnLP
-      ? '🔑 Master Admin — LP Approval Override'
-      : '🛒 Local Purchase — Your Approval Required';
+      ? '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /> <path d="m21 2-9.6 9.6" /> <circle cx="7.5" cy="15.5" r="5.5" /></svg> Master Admin — LP Approval Override'
+      : '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1" /> <circle cx="19" cy="21" r="1" /> <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg> Local Purchase — Your Approval Required';
     var lpDesc = isMasterActingOnLP
       ? 'You are acting as Master Admin. You can approve or reject this LP request on behalf of the Project Manager.'
       : 'An engineer submitted a Local Purchase request. Review the details and approve to forward to the Procurement Manager, or reject.';
@@ -570,7 +570,7 @@ async function openPR(id) {
   // ── LOCAL PURCHASE: lp_procurement_processing — PM info (read-only in PM view) ──
   if(currentPR.phase==='lp_procurement_processing'&&currentPR.request_category==='local_purchase') {
     actionSection=`<div style="padding:12px 14px;border:1px solid rgba(59,130,246,0.25);border-radius:var(--radius);background:rgba(59,130,246,0.04)">
-      <div style="font-weight:700;color:#1d4ed8;margin-bottom:4px">🛒 Local Purchase — With Procurement Team</div>
+      <div style="font-weight:700;color:#1d4ed8;margin-bottom:4px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1" /> <circle cx="19" cy="21" r="1" /> <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg> Local Purchase — With Procurement Team</div>
       <p style="font-size:0.78rem;color:var(--gray-3);margin:0">You approved this request. The Procurement Manager is handling payment processing.</p>
     </div>`;
   }
@@ -579,7 +579,7 @@ async function openPR(id) {
     buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',currentPR.project_manager_name||'',{poData:poRes.data||null,advPayRec:advRes.data||null,payRec:payRes.data||null,clearanceManagerName})
     +actionSection+
     `<div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
-      <div class="section-title" style="margin-bottom:10px">💬 Comments</div>
+      <div class="section-title" style="margin-bottom:10px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /></svg> Comments</div>
       <div id="commentsList">${renderComments(comments)}</div>
       <div style="position:relative;display:flex;gap:8px;margin-top:10px">
         <div style="position:relative;flex:1">
@@ -663,7 +663,7 @@ async function rejectDecline() {
     phase_timestamps:addPhaseTimestamp(currentPR,'procurement_active')
   }).eq('id',currentPR.id);
   notifyPhaseChange(currentPR.id,'procurement_active',currentUser?.id);
-  if(!error) await postComment(currentPR.id,currentUser.id,`↩ Project Manager rejected the decline — request restored to Procurement Active. Notes: ${notes}`);
+  if(!error) await postComment(currentPR.id,currentUser.id,`<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" /></svg> Project Manager rejected the decline — request restored to Procurement Active. Notes: ${notes}`);
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
   showToast('Decline rejected — request restored to Procurement Active.','success');
@@ -838,21 +838,21 @@ async function finalDecision(decision) {
     const amtDisplay = selectedQ?.currency && selectedQ.currency !== 'INR'
       ? `${selectedQ.currency} ${selectedAmount.toLocaleString()} ≈ ₹${selectedAmountINR.toLocaleString('en-IN')}`
       : `₹${selectedAmountINR.toLocaleString('en-IN')}`;
-    commentText=`⬆️ Escalated to Director for approval — amount ${amtDisplay} meets/exceeds Project Manager limit of ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}. Project Manager notes: ${notes}`;
+    commentText=`<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7" /> <path d="M12 19V5" /></svg> Escalated to Director for approval — amount ${amtDisplay} meets/exceeds Project Manager limit of ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}. Project Manager notes: ${notes}`;
   }
   else if(decision==='approved')
-    commentText=`✅ Project Manager Final Approved: ${notes}`;
+    commentText=`<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> Project Manager Final Approved: ${notes}`;
   else
-    commentText=`❌ Project Manager Final Rejected: ${notes}${needsMoreVendors?' — more vendors requested.':''}`;
+    commentText=`<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="m15 9-6 6" /> <path d="m9 9 6 6" /></svg> Project Manager Final Rejected: ${notes}${needsMoreVendors?' — more vendors requested.':''}`;
 
   if(!error) await postComment(currentPR.id,currentUser.id,commentText);
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
 
   if(needsDirectorApproval)
-    showToast(`⬆️ Amount ₹${selectedAmountINR.toLocaleString('en-IN')} meets/exceeds ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')} — escalated to Director.`,'info');
+    showToast(`<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7" /> <path d="M12 19V5" /></svg> Amount ₹${selectedAmountINR.toLocaleString('en-IN')} meets/exceeds ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')} — escalated to Director.`,'info');
   else
-    showToast(decision==='approved'?'✅ Approved! Procurement may now place the order.':needsMoreVendors?'Rejected — Procurement will find more vendors.':'Rejected — request closed.',decision==='approved'?'success':'error');
+    showToast(decision==='approved'?'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> Approved! Procurement may now place the order.':needsMoreVendors?'Rejected — Procurement will find more vendors.':'Rejected — request closed.',decision==='approved'?'success':'error');
   closeModal('prModal'); await loadRequests();
 }
 
@@ -1021,7 +1021,7 @@ async function handleAttachFiles(e) {
 function renderAttachList() {
   document.getElementById('attachList').innerHTML=attachedFiles.map((f,i)=>`
     <div class="upload-item">
-      <span>${f.type.includes('pdf')?'📄':f.type.includes('image')?'🖼️':'📎'}</span>
+      <span>${f.type.includes('pdf')?'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg>':f.type.includes('image')?'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>':'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551" /></svg>'}</span>
       <span class="upload-item-name">${f.name}</span>
       <button class="btn btn-danger btn-sm" onclick="removeAttach(${i})">✕</button>
     </div>`).join('');
@@ -1046,14 +1046,14 @@ function handleBOMDrop(e){e.preventDefault();document.getElementById('bomZone').
 async function handleBOMFile(e) {
   const file=e.target.files[0];if(!file)return;
   const status=document.getElementById('bomStatus');
-  status.innerHTML=`<span style="color:#6366f1">⏳ Parsing BOM...</span>`;
+  status.innerHTML=`<span style="color:#6366f1"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14" /> <path d="M5 2h14" /> <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /> <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /></svg> Parsing BOM...</span>`;
   try{
     const parts=await parseBOMFile(file);
     if(!parts.length){status.innerHTML=`<span style="color:var(--red)">No valid rows found</span>`;return;}
     initPartsEditor('partsEditorContainer',parts.map((p,i)=>({...p,_id:i+1})),_partsEditorProductionMode);
     status.innerHTML=`<span style="color:#16a34a">✓ ${parts.length} part${parts.length>1?'s':''} imported!</span>`;
     showToast(`${parts.length} parts imported from BOM!`,'success');
-  }catch(err){status.innerHTML=`<span style="color:var(--red)">⚠ ${err.message}</span>`;}
+  }catch(err){status.innerHTML=`<span style="color:var(--red)"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></svg> ${err.message}</span>`;}
   document.getElementById('bomFile').value='';
 }
 
