@@ -260,9 +260,9 @@ function _safePreview(url, name) {
     ? `<div style="max-width:90vw;max-height:85vh;overflow:auto;border-radius:10px;background:white;padding:4px"><img src="${url}" style="max-width:100%;display:block;border-radius:8px" alt="${name}"/></div>`
     : isPDF
     ? `<div style="width:84vw;height:82vh;border-radius:10px;overflow:hidden;background:white"><iframe src="${pdfSrc}" style="width:100%;height:100%;border:none" title="${name}"></iframe></div>`
-    : `<div style="padding:48px;background:white;border-radius:10px;text-align:center;color:#6b7280"><div style="font-size:3rem;margin-bottom:12px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg></div><div style="font-weight:600">${name}</div><div style="font-size:0.8rem;margin-top:8px">Preview not available</div></div>`;
+    : `<div style="padding:48px;background:white;border-radius:10px;text-align:center;color:#6b7280"><div style="font-size:3rem;margin-bottom:12px">📄</div><div style="font-weight:600">${name}</div><div style="font-size:0.8rem;margin-top:8px">Preview not available</div></div>`;
   o.innerHTML = inner + `<div style="display:flex;gap:10px;margin-top:14px">
-    <button style="background:white;border:none;padding:8px 22px;border-radius:6px;font-weight:600;cursor:pointer" id="_previewDlBtn"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></svg> Download</button>
+    <button style="background:white;border:none;padding:8px 22px;border-radius:6px;font-weight:600;cursor:pointer" id="_previewDlBtn">⬇ Download</button>
     <button style="background:white;border:none;padding:8px 22px;border-radius:6px;font-weight:600;cursor:pointer" onclick="this.closest('[style*=fixed]').remove()">✕ Close</button>
   </div>`;
   // Wire download button via closure — avoids stale registry-index bug
@@ -298,71 +298,9 @@ function showLoader(s){ const e=document.getElementById('loadingOverlay'); if(e)
 function openModal(id){ const m=document.getElementById(id); if(m){m.classList.add('active');document.body.style.overflow='hidden';} }
 function closeModal(id){ const m=document.getElementById(id); if(m){m.classList.remove('active');document.body.style.overflow='';} }
 
-// ── CUSTOM CONFIRM MODAL ─────────────────────────────────────
-// Themed replacement for window.confirm(). Usage:
-//   if (!await showConfirm('Delete this request?')) return;
-//   if (!await showConfirm('Delete permanently?', {danger:true, confirmLabel:'Delete', title:'Delete Request'})) return;
-function showConfirm(message, opts = {}) {
-  const { title = 'Please Confirm', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = opts;
-  return new Promise((resolve) => {
-    let overlay = document.getElementById('_confirmModalOverlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = '_confirmModalOverlay';
-      overlay.className = 'modal-overlay';
-      overlay.innerHTML = `
-        <div class="modal" style="max-width:420px">
-          <div class="modal-header">
-            <div class="modal-title" id="_confirmModalTitle"></div>
-          </div>
-          <div class="modal-body" id="_confirmModalBody" style="font-size:0.86rem;color:var(--gray-3);line-height:1.5;white-space:pre-line"></div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" id="_confirmModalCancel">Cancel</button>
-            <button class="btn btn-danger" id="_confirmModalOk">Confirm</button>
-          </div>
-        </div>`;
-      document.body.appendChild(overlay);
-    }
-    const titleEl = overlay.querySelector('#_confirmModalTitle');
-    const bodyEl = overlay.querySelector('#_confirmModalBody');
-    const okBtn = overlay.querySelector('#_confirmModalOk');
-    const cancelBtn = overlay.querySelector('#_confirmModalCancel');
-
-    titleEl.textContent = title;
-    bodyEl.textContent = message;
-    okBtn.textContent = confirmLabel;
-    cancelBtn.textContent = cancelLabel;
-    okBtn.className = danger ? 'btn btn-danger' : 'btn btn-primary';
-
-    const cleanup = (result) => {
-      overlay.classList.remove('active');
-      document.body.style.overflow = '';
-      okBtn.removeEventListener('click', onOk);
-      cancelBtn.removeEventListener('click', onCancel);
-      overlay.removeEventListener('click', onOverlay);
-      document.removeEventListener('keydown', onKey);
-      resolve(result);
-    };
-    const onOk = () => cleanup(true);
-    const onCancel = () => cleanup(false);
-    const onOverlay = (e) => { if (e.target === overlay) cleanup(false); };
-    const onKey = (e) => { if (e.key === 'Escape') cleanup(false); if (e.key === 'Enter') cleanup(true); };
-
-    okBtn.addEventListener('click', onOk);
-    cancelBtn.addEventListener('click', onCancel);
-    overlay.addEventListener('click', onOverlay);
-    document.addEventListener('keydown', onKey);
-
-    overlay.classList.add('active');
-    document.body.style.overflow = 'hidden';
-    okBtn.focus();
-  });
-}
-window.showConfirm = showConfirm;
-
 // ── CONSTANTS ────────────────────────────────────────────────
 var CURRENCIES = typeof CURRENCIES !== 'undefined' ? CURRENCIES : ['USD','EUR','INR','RMB'];
-var SOURCING_OPTIONS = typeof SOURCING_OPTIONS !== 'undefined' ? SOURCING_OPTIONS : [{value:'domestic',label:'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg> Domestic'},{value:'international',label:'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /> <path d="M2 12h20" /></svg> International'}];
+var SOURCING_OPTIONS = typeof SOURCING_OPTIONS !== 'undefined' ? SOURCING_OPTIONS : [{value:'domestic',label:'🏠 Domestic'},{value:'international',label:'🌍 International'}];
 var PAYMENT_TERMS_OPTIONS = typeof PAYMENT_TERMS_OPTIONS !== 'undefined' ? PAYMENT_TERMS_OPTIONS : [
   {value:'50_50',label:'50% Advance — 50% Post Delivery'},
   {value:'full_advance',label:'100% Full Advance'},
@@ -423,8 +361,8 @@ function getPhaseBadge(phase){
 function getUrgencyBadge(urgency){
   if(!urgency||urgency==='normal') return '';
   const map={
-    urgent:['<svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /></svg> Within 24 hours','background:rgba(245,158,11,0.12);color:#b45309;border:1px solid rgba(245,158,11,0.35)'],
-    critical:['<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <line x1="12" x2="12" y1="8" y2="12" /> <line x1="12" x2="12.01" y1="16" y2="16" /></svg> Within 48 hours','background:rgba(214,43,43,0.12);color:#b91c1c;border:1px solid rgba(214,43,43,0.35)'],
+    urgent:['⚡ Within 24 hours','background:rgba(245,158,11,0.12);color:#b45309;border:1px solid rgba(245,158,11,0.35)'],
+    critical:['🔴 Within 48 hours','background:rgba(214,43,43,0.12);color:#b91c1c;border:1px solid rgba(214,43,43,0.35)'],
   };
   const[label,style]=map[urgency]||['',''];
   if(!label) return '';
@@ -459,22 +397,6 @@ window.toggleUserMenu = function toggleUserMenu(e) {
   menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
 }
 
-function toggleMobileNav() {
-  const el = document.getElementById('navLinks');
-  const btn = document.getElementById('navHamburger');
-  if (!el) return;
-  const open = el.classList.toggle('open');
-  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-}
-document.addEventListener('click', (e) => {
-  const el = document.getElementById('navLinks');
-  const btn = document.getElementById('navHamburger');
-  if (!el || !el.classList.contains('open')) return;
-  if (el.contains(e.target) || (btn && btn.contains(e.target))) return;
-  el.classList.remove('open');
-  if (btn) btn.setAttribute('aria-expanded', 'false');
-});
-
 function buildNavbar(user) {
   const navLinks = {
     master: [
@@ -482,7 +404,7 @@ function buildNavbar(user) {
       {href:'projects.html',label:'Projects'},
       {href:'pm.html',label:'PM Portal'},
       {href:'accounts.html',label:'Accounts'},
-      {href:'admin.html',label:'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></svg> Admin'}
+      {href:'admin.html',label:'⚙ Admin'}
     ],
     project_manager: [
       {href:'pm.html',label:'My Requests'},
@@ -516,15 +438,11 @@ function buildNavbar(user) {
       </div>
       <div><div class="nav-logo-text">Procure<span>X</span></div></div>
     </a>
-    <div class="nav-links" id="navLinks">
-      ${links.map(l=>`<a href="${l.href}" class="nav-link ${window.location.pathname.includes(l.href)?'active':''}">${l.label}${l.badge?` <span id="${l.badge}" class="nav-link-badge" style="display:none"></span>`:''}</a>`).join('')}
+    <div class="nav-links" style="display:flex;gap:4px;margin-left:18px">
+      ${links.map(l=>`<a href="${l.href}" class="nav-link ${window.location.pathname.includes(l.href)?'active':''}" style="font-size:0.78rem;padding:5px 12px;border-radius:5px;color:rgba(6, 5, 5, 0.8);text-decoration:none;transition:background 0.15s;${window.location.pathname.includes(l.href)?'background:rgba(255,255,255,0.15);color:black':''}" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='${window.location.pathname.includes(l.href)?'rgba(255,255,255,0.15)':'transparent'}'">${l.label}${l.badge?` <span id="${l.badge}" style="display:none;background:#dc2626;color:#fff;border-radius:999px;padding:0 6px;font-size:0.68rem;margin-left:2px"></span>`:''}</a>`).join('')}
     </div>
     <div class="nav-spacer"></div>
     <span class="nav-role-badge" id="navRoleBadge"></span>
-
-    <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileNav()" aria-label="Toggle menu" aria-expanded="false">
-      <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-    </button>
 
     <!-- User Menu Wrap -->
     <div id="navUserWrap" style="position:relative">
@@ -543,7 +461,7 @@ function buildNavbar(user) {
           <div style="font-size:0.72rem;color:#6b7280">${roleLabel(user.role)}</div>
         </div>
         <button onclick="openChangePasswordModal()" style="width:100%;text-align:left;padding:8px 10px;border:none;background:none;cursor:pointer;font-size:0.8rem;color:#374151;border-radius:6px;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='none'">
-          <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /> <path d="m21 2-9.6 9.6" /> <circle cx="7.5" cy="15.5" r="5.5" /></svg> <span>Change Password</span>
+          🔑 <span>Change Password</span>
         </button>
         <div style="height:1px;background:#f3f4f6;margin:4px 0"></div>
         <button onclick="logout()" style="width:100%;text-align:left;padding:8px 10px;border:none;background:none;cursor:pointer;font-size:0.8rem;color:#dc2626;border-radius:6px;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'">
@@ -599,7 +517,7 @@ function injectSharedModals() {
     <div class="modal-overlay" id="_sharedChangePasswordModal" onclick="event.target===this&&closeChangePasswordModal()">
       <div class="modal" style="max-width:420px">
         <div class="modal-header">
-          <div><div class="modal-title"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /> <path d="m21 2-9.6 9.6" /> <circle cx="7.5" cy="15.5" r="5.5" /></svg> Change Password</div><div class="modal-title-sub">Update your account password</div></div>
+          <div><div class="modal-title">🔑 Change Password</div><div class="modal-title-sub">Update your account password</div></div>
           <button class="modal-close" onclick="closeChangePasswordModal()">✕</button>
         </div>
         <div class="modal-body">
@@ -729,7 +647,7 @@ function renderWorkflowTrack(phase, phaseTimestamps, createdAt, requestCategory)
     var emailKey = s.key + '_email_sent';
     var emailTs = ts[emailKey];
     var emailHtml = emailTs
-      ? '<div class="wf-email-tag"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" /> <rect x="2" y="4" width="20" height="16" rx="2" /></svg> ' + shortDate(emailTs) + '</div>'
+      ? '<div class="wf-email-tag">✉ ' + shortDate(emailTs) + '</div>'
       : (isCurrent || isDone) && !isSkipped ? '<div class="wf-email-tag wf-email-pending"></div>' : '';
 
     var nodeStyle = '', labelStyle = '', nodeContent = isDone && !isSkipped ? '✓' : i + 1;
@@ -796,7 +714,7 @@ function buildPRDetailEditableHTML(pr) {
   const orderTypeOpts = ['',...Object.keys(ORDER_TYPES)].map(k=>`<option value="${k}" ${(pr.order_type||'')===k?'selected':''}>${k?ORDER_TYPES[k]:'— None —'}</option>`).join('');
   return `
     <div style="padding:12px 14px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius);margin-bottom:14px;font-size:0.78rem;color:#4f46e5">
-      <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></svg> Editing request details. Changes save directly to this request when you click <strong>Save Changes</strong>.
+      ✏️ Editing request details. Changes save directly to this request when you click <strong>Save Changes</strong>.
     </div>
     <div class="form-grid">
       <div class="form-group"><label class="form-label">Project</label><input class="form-control" id="editReqProject" value="${_shEsc(pr.project_name)}"/></div>
@@ -809,8 +727,8 @@ function buildPRDetailEditableHTML(pr) {
       <div class="form-group full">
         <label class="form-label">Sourcing</label>
         <div style="display:flex;gap:16px;margin-top:4px">
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem"><input type="checkbox" id="editReqSourcingDomestic" ${sourcingArr.includes('domestic')?'checked':''}/> <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg> Domestic</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem"><input type="checkbox" id="editReqSourcingIntl" ${sourcingArr.includes('international')?'checked':''}/> <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /> <path d="M2 12h20" /></svg> International</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem"><input type="checkbox" id="editReqSourcingDomestic" ${sourcingArr.includes('domestic')?'checked':''}/> 🏠 Domestic</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem"><input type="checkbox" id="editReqSourcingIntl" ${sourcingArr.includes('international')?'checked':''}/> 🌍 International</label>
         </div>
       </div>
       <div class="form-group full"><label class="form-label">Item Tag / Note</label><input class="form-control" id="editReqItemNote" value="${_shEsc(pr.item_note)}" placeholder="e.g. gearbox seal"/></div>
@@ -846,18 +764,18 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       <div class="detail-item"><div class="detail-key">Department</div><div class="detail-value">${DEPARTMENTS[pr.department]||pr.department}</div></div>
       ${pr.request_for?`<div class="detail-item"><div class="detail-key">Request For</div><div class="detail-value">${pr.request_for==='npd'?'NPD':'Production'}${pr.discipline?' · '+(DISCIPLINES[pr.discipline]||pr.discipline):''}</div></div>`:''}
       ${pr.order_type?`<div class="detail-item"><div class="detail-key">Order Type</div><div class="detail-value">${ORDER_TYPES[pr.order_type]||pr.order_type}</div></div>`:''}
-      ${pr.product_link?`<div class="detail-item"><div class="detail-key">Product Link</div><div class="detail-value"><a href="${pr.product_link}" target="_blank" style="color:var(--red)"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /> <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg> View Product</a></div></div>`:''}
-      ${pr.sourcing?`<div class="detail-item"><div class="detail-key">Sourcing</div><div class="detail-value">${(Array.isArray(pr.sourcing)?pr.sourcing:JSON.parse(pr.sourcing||'[]')).map(s=>s==='domestic'?'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg> Domestic':'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /> <path d="M2 12h20" /></svg> International').join(', ')}</div></div>`:''}
+      ${pr.product_link?`<div class="detail-item"><div class="detail-key">Product Link</div><div class="detail-value"><a href="${pr.product_link}" target="_blank" style="color:var(--red)">🔗 View Product</a></div></div>`:''}
+      ${pr.sourcing?`<div class="detail-item"><div class="detail-key">Sourcing</div><div class="detail-value">${(Array.isArray(pr.sourcing)?pr.sourcing:JSON.parse(pr.sourcing||'[]')).map(s=>s==='domestic'?'🏠 Domestic':'🌍 International').join(', ')}</div></div>`:''}
       <div class="detail-item"><div class="detail-key">Assigned Vendor</div><div class="detail-value">${vendorName||'—'}</div></div>
       <div class="detail-item"><div class="detail-key">Submitted</div><div class="detail-value">${fmtDate(pr.created_at)}</div></div>
-      ${pr.item_note?`<div class="detail-item" style="grid-column:1/-1"><div class="detail-key"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /> <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" /></svg> Item Tag / Note</div><div class="detail-value">${pr.item_note}</div></div>`:''}
+      ${pr.item_note?`<div class="detail-item" style="grid-column:1/-1"><div class="detail-key">🏷️ Item Tag / Note</div><div class="detail-value">${pr.item_note}</div></div>`:''}
       ${pr.description?`<div class="detail-item" style="grid-column:1/-1"><div class="detail-key">Description / Notes</div><div class="detail-value" style="line-height:1.5">${pr.description}</div></div>`:''}
       ${pr.modification_note?`<div class="detail-item" style="grid-column:1/-1"><div class="detail-key" style="color:#6366f1">Modification Note</div><div class="detail-value">${pr.modification_note}</div></div>`:''}
     </div>
 
     ${pr.qc_criteria&&(pr.qc_criteria.preferred_color||pr.qc_criteria.preferred_material||pr.qc_criteria.custom)?`
     <div style="margin-top:14px;padding:12px 14px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius)">
-      <div class="detail-key" style="color:#6366f1;margin-bottom:8px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></svg> QC Criteria</div>
+      <div class="detail-key" style="color:#6366f1;margin-bottom:8px">🔍 QC Criteria</div>
       <div class="detail-grid" style="gap:8px">
         ${pr.qc_criteria.preferred_color?`<div class="detail-item"><div class="detail-key">Preferred Color</div><div class="detail-value">${pr.qc_criteria.preferred_color}</div></div>`:''}
         ${pr.qc_criteria.preferred_material?`<div class="detail-item"><div class="detail-key">Preferred Material</div><div class="detail-value">${pr.qc_criteria.preferred_material}</div></div>`:''}
@@ -875,7 +793,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
 
     ${(pr.phase==='advance_requested'||pr.phase==='advance_approved'||pr.phase==='advance_rejected')?`<div style="margin-top:14px;padding:12px 14px;background:${pr.phase==='advance_approved'?'rgba(22,163,74,0.06)':pr.phase==='advance_rejected'?'rgba(214,43,43,0.06)':'rgba(245,158,11,0.06)'};border:1px solid ${pr.phase==='advance_approved'?'rgba(22,163,74,0.25)':pr.phase==='advance_rejected'?'rgba(214,43,43,0.25)':'rgba(245,158,11,0.25)'};border-radius:var(--radius)">
       <div class="detail-key" style="color:${pr.phase==='advance_approved'?'#16a34a':pr.phase==='advance_rejected'?'var(--red)':'#b45309'};margin-bottom:6px">
-        ${{advance_approved:' Advance Payment Approved',advance_rejected:' Advance Payment Rejected',advance_requested:'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14" /> <path d="M5 2h14" /> <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /> <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /></svg> Advance Payment Pending'}[pr.phase]||'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /> <line x1="2" x2="22" y1="10" y2="10" /></svg> Advance Payment'}
+        ${{advance_approved:' Advance Payment Approved',advance_rejected:' Advance Payment Rejected',advance_requested:'⏳ Advance Payment Pending'}[pr.phase]||'💳 Advance Payment'}
       </div>
     </div>`:''}
     ${quotations.length?`<div style="margin-top:14px">
@@ -884,15 +802,15 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
     </div>`:''}
 
     ${pr.vendor_info_details?`<div style="margin-top:14px;padding:14px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:var(--radius)">
-      <div class="detail-key" style="color:#7c3aed;margin-bottom:6px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4" /> <path d="M10 8h4" /> <path d="M14 21v-3a2 2 0 0 0-4 0v3" /> <path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2" /> <path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" /></svg> Vendor Information (from Procurement)</div>
+      <div class="detail-key" style="color:#7c3aed;margin-bottom:6px">🏢 Vendor Information (from Procurement)</div>
       <p style="font-size:0.83rem;line-height:1.5;white-space:pre-wrap">${pr.vendor_info_details}</p>
     </div>`:''}
 
     ${pr.client_approval_screenshot?`<div style="margin-top:14px;padding:12px;background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div class="detail-key" style="color:#16a34a">✓ Client Approval</div>
-        <button class="btn btn-secondary btn-sm" onclick="_previewByIdx(${_regFile(pr.client_approval_screenshot,'client_approval')})"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg> Preview</button>
-        <button class="btn btn-secondary btn-sm" onclick="_downloadByIdx(${_regFile(pr.client_approval_screenshot,'client_approval')})"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></svg> Download</button>
+        <button class="btn btn-secondary btn-sm" onclick="_previewByIdx(${_regFile(pr.client_approval_screenshot,'client_approval')})">👁 Preview</button>
+        <button class="btn btn-secondary btn-sm" onclick="_downloadByIdx(${_regFile(pr.client_approval_screenshot,'client_approval')})">⬇ Download</button>
       </div>
       <img src="${pr.client_approval_screenshot}" style="max-width:100%;max-height:240px;object-fit:contain;border-radius:6px;border:1px solid var(--border)" onerror="this.style.display='none'"/>
       ${pr.client_approval_notes?`<p style="font-size:0.8rem;color:var(--gray-3);margin-top:6px">${pr.client_approval_notes}</p>`:''}
@@ -909,7 +827,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
     </div>`:''}
 
     ${pr.qc_notes?`<div style="margin-top:14px;padding:12px;background:${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'rgba(22,163,74,0.06)':pr.phase==='qc_rejected'?'rgba(124,58,237,0.06)':'rgba(214,43,43,0.06)'};border:1px solid ${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'rgba(22,163,74,0.2)':pr.phase==='qc_rejected'?'rgba(124,58,237,0.25)':'rgba(214,43,43,0.2)'};border-radius:var(--radius)">
-      <div class="detail-key" style="color:${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'#16a34a':pr.phase==='qc_rejected'?'#7c3aed':'var(--red)'};margin-bottom:4px">QC — ${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'Passed ✓':pr.phase==='qc_rejected'?'Rejected <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M4.929 4.929 19.07 19.071" /></svg>':'Failed ✗'}</div>
+      <div class="detail-key" style="color:${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'#16a34a':pr.phase==='qc_rejected'?'#7c3aed':'var(--red)'};margin-bottom:4px">QC — ${pr.qc_result==='qc_passed'||pr.qc_result==='accepted'?'Passed ✓':pr.phase==='qc_rejected'?'Rejected 🚫':'Failed ✗'}</div>
       <p style="font-size:0.83rem">${pr.qc_notes}</p>
     </div>`:''}
 
@@ -922,7 +840,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       const isPassed = resultVal==='accepted'||resultVal==='qc_passed';
       return `<div style="margin-top:16px;border:1px solid ${isPassed?'rgba(22,163,74,0.25)':'rgba(214,43,43,0.25)'};border-radius:var(--radius);overflow:hidden">
         <div style="padding:10px 14px;background:${isPassed?'rgba(22,163,74,0.08)':'rgba(214,43,43,0.08)'};display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-          <div style="font-weight:700;font-size:0.85rem;color:${isPassed?'#16a34a':'var(--red)'}"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></svg> GRN / QC Form — ${isPassed?'Passed ✓':'Rejected ✗'}</div>
+          <div style="font-weight:700;font-size:0.85rem;color:${isPassed?'#16a34a':'var(--red)'}">📋 GRN / QC Form — ${isPassed?'Passed ✓':'Rejected ✗'}</div>
           <span style="font-family:var(--font-mono);font-size:0.72rem;font-weight:600;padding:2px 8px;border-radius:3px;background:${isPassed?'rgba(22,163,74,0.12)':'rgba(214,43,43,0.12)'};color:${isPassed?'#16a34a':'var(--red)'}">GRN# ${grn.grn_number||'—'}</span>
         </div>
         <div style="padding:12px 14px;background:white">
@@ -969,7 +887,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       if (!po) return '';
       return `<div style="margin-top:16px;border:1px solid rgba(99,102,241,0.25);border-radius:var(--radius);overflow:hidden">
         <div style="padding:10px 14px;background:rgba(99,102,241,0.07);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-          <div style="font-weight:700;font-size:0.85rem;color:#4f46e5"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg> Purchase Order</div>
+          <div style="font-weight:700;font-size:0.85rem;color:#4f46e5">📄 Purchase Order</div>
           <span style="font-family:var(--font-mono);font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:3px;background:rgba(99,102,241,0.12);color:#4f46e5">${po.po_number}</span>
         </div>
         <div style="padding:12px 14px;background:white;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 14px">
@@ -989,7 +907,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       if (adv && (adv.smartsheet_screenshot || adv.smartsheet_payment_id)) {
         html += `<div style="margin-bottom:10px;border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);overflow:hidden">
           <div style="padding:9px 14px;background:rgba(245,158,11,0.07);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-            <div style="font-weight:700;font-size:0.83rem;color:#b45309"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7" /> <path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8" /> <path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z" /></svg> Advance Payment — Smartsheet</div>
+            <div style="font-weight:700;font-size:0.83rem;color:#b45309">🧾 Advance Payment — Smartsheet</div>
             ${adv.smartsheet_payment_id?`<span style="font-family:var(--font-mono);font-size:0.72rem;font-weight:700;padding:2px 8px;background:rgba(245,158,11,0.12);color:#b45309;border-radius:3px">ID: ${adv.smartsheet_payment_id}</span>`:''}
           </div>
           <div style="padding:10px 14px;background:white">
@@ -1002,8 +920,8 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
               <div class="detail-key" style="margin-bottom:6px">Screenshot</div>
               <img src="${adv.smartsheet_screenshot}" style="max-width:100%;max-height:220px;object-fit:contain;border-radius:6px;border:1px solid var(--border);display:block" onerror="this.style.display='none'"/>
               <div style="margin-top:6px;display:flex;gap:6px">
-                <button class="btn btn-secondary btn-sm" onclick="_previewByIdx(${_regFile(adv.smartsheet_screenshot,'adv_smartsheet_screenshot')})"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg> Preview</button>
-                <button class="btn btn-secondary btn-sm" onclick="_downloadByIdx(${_regFile(adv.smartsheet_screenshot,'adv_smartsheet_screenshot')})"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></svg> Download</button>
+                <button class="btn btn-secondary btn-sm" onclick="_previewByIdx(${_regFile(adv.smartsheet_screenshot,'adv_smartsheet_screenshot')})">👁 Preview</button>
+                <button class="btn btn-secondary btn-sm" onclick="_downloadByIdx(${_regFile(adv.smartsheet_screenshot,'adv_smartsheet_screenshot')})">⬇ Download</button>
               </div>
             </div>`:''}
             ${adv.notes?`<p style="font-size:0.78rem;color:var(--gray-3);margin-top:6px">${adv.notes}</p>`:''}
@@ -1013,7 +931,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       if (pay && (pay.smartsheet_screenshot || pay.smartsheet_payment_id)) {
         html += `<div style="border:1px solid rgba(139,92,246,0.3);border-radius:var(--radius);overflow:hidden">
           <div style="padding:9px 14px;background:rgba(139,92,246,0.07);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-            <div style="font-weight:700;font-size:0.83rem;color:#7c3aed"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12" /> <path d="M6 8h12" /> <path d="m6 13 8.5 8" /> <path d="M6 13h3" /> <path d="M9 13c6.667 0 6.667-10 0-10" /></svg> Full Payment — Smartsheet</div>
+            <div style="font-weight:700;font-size:0.83rem;color:#7c3aed">💰 Full Payment — Smartsheet</div>
             ${pay.smartsheet_payment_id?`<span style="font-family:var(--font-mono);font-size:0.72rem;font-weight:700;padding:2px 8px;background:rgba(139,92,246,0.12);color:#7c3aed;border-radius:3px">ID: ${pay.smartsheet_payment_id}</span>`:''}
           </div>
           <div style="padding:10px 14px;background:white">
@@ -1026,8 +944,8 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
               <div class="detail-key" style="margin-bottom:6px">Screenshot</div>
               <img src="${pay.smartsheet_screenshot}" style="max-width:100%;max-height:220px;object-fit:contain;border-radius:6px;border:1px solid var(--border);display:block" onerror="this.style.display='none'"/>
               <div style="margin-top:6px;display:flex;gap:6px">
-                <button class="btn btn-secondary btn-sm" onclick="_previewByIdx(${_regFile(pay.smartsheet_screenshot,'pay_smartsheet_screenshot')})"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg> Preview</button>
-                <button class="btn btn-secondary btn-sm" onclick="_downloadByIdx(${_regFile(pay.smartsheet_screenshot,'pay_smartsheet_screenshot')})"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></svg> Download</button>
+                <button class="btn btn-secondary btn-sm" onclick="_previewByIdx(${_regFile(pay.smartsheet_screenshot,'pay_smartsheet_screenshot')})">👁 Preview</button>
+                <button class="btn btn-secondary btn-sm" onclick="_downloadByIdx(${_regFile(pay.smartsheet_screenshot,'pay_smartsheet_screenshot')})">⬇ Download</button>
               </div>
             </div>`:''}
             ${pay.notes||pay.payment_notes?`<p style="font-size:0.78rem;color:var(--gray-3);margin-top:6px">${pay.notes||pay.payment_notes}</p>`:''}
@@ -1049,7 +967,7 @@ function renderQuotationCard(q, showSelectBtn=false, selectedId=null) {
   return `<div class="quotation-card ${isSelected?'selected':''}" id="qcard-${q.id}">
     <div class="quotation-card-header">
       <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
-        <span style="font-size:1.1rem;flex-shrink:0">${isPDF?'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg>':isImg?'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>':'<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /> <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>'}</span>
+        <span style="font-size:1.1rem;flex-shrink:0">${isPDF?'📄':isImg?'🖼️':'🔗'}</span>
         <div style="min-width:0">
           <div style="font-weight:600;font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${q.file_name}</div>
           <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--gray-4)">${q.vendor_name||'—'} · ${fmtDate(q.created_at)}</div>
@@ -1064,8 +982,8 @@ function renderQuotationCard(q, showSelectBtn=false, selectedId=null) {
       </div>`:''}
       ${q.notes?`<p style="font-size:0.78rem;color:var(--gray-3);margin-bottom:8px">${q.notes}</p>`:''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <button class="btn btn-secondary btn-sm" onclick="_previewByIdx(${fi})"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" /></svg> Preview</button>
-        <button class="btn btn-secondary btn-sm" onclick="_downloadByIdx(${fi})"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /></svg> Download</button>
+        <button class="btn btn-secondary btn-sm" onclick="_previewByIdx(${fi})">👁 Preview</button>
+        <button class="btn btn-secondary btn-sm" onclick="_downloadByIdx(${fi})">⬇ Download</button>
         ${showSelectBtn&&!isSelected?`<button class="btn btn-primary btn-sm" onclick="selectQuotation('${q.id}')">✓ Select as Final</button>`:''}
         ${showSelectBtn&&isSelected?`<button class="btn btn-danger btn-sm" onclick="selectQuotation(null)">Deselect</button>`:''}
       </div>
@@ -1104,25 +1022,25 @@ function renderVendorCards(vendors, gridId, canEdit=false) {
         </span>
       </div>
       <div style="margin-bottom:6px">${starRating(v.avg_rating,v.rating_count)}</div>
-      ${pt?`<div style="font-size:0.7rem;margin-bottom:8px;padding:3px 7px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:3px;color:#6366f1"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /> <line x1="2" x2="22" y1="10" y2="10" /></svg> ${pt.label}</div>`:''}
+      ${pt?`<div style="font-size:0.7rem;margin-bottom:8px;padding:3px 7px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:3px;color:#6366f1">💳 ${pt.label}</div>`:''}
       <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:9px">
-      ${v.contact_person?`<div style="font-size:0.75rem;color:var(--gray-3)"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /> <circle cx="12" cy="7" r="4" /></svg> ${v.contact_person}</div>`:''}
-      ${v.email?`<div style="font-size:0.75rem"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" /> <rect x="2" y="4" width="20" height="16" rx="2" /></svg> <a href="mailto:${v.email}" style="color:var(--red);text-decoration:none">${v.email}</a></div>`:''}
-      ${v.phone?`<div style="font-size:0.75rem;color:var(--gray-3)"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" /></svg> ${v.phone}</div>`:''}
+      ${v.contact_person?`<div style="font-size:0.75rem;color:var(--gray-3)">👤 ${v.contact_person}</div>`:''}
+      ${v.email?`<div style="font-size:0.75rem">✉ <a href="mailto:${v.email}" style="color:var(--red);text-decoration:none">${v.email}</a></div>`:''}
+      ${v.phone?`<div style="font-size:0.75rem;color:var(--gray-3)">📞 ${v.phone}</div>`:''}
 
-      ${(v.gstin||v.GSTIN)?`<div style="font-size:0.75rem;color:var(--gray-3)"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V7" /> <path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8" /> <path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z" /></svg> GSTIN: ${v.gstin||v.GSTIN}</div>`:''}
-        ${v.country?`<div style="font-size:0.75rem;color:var(--gray-3)"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /> <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /> <path d="M2 12h20" /></svg> ${v.country}</div>`:''}
-        ${v.vendor_type?`<div style="font-size:0.75rem;color:var(--gray-3)"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /> <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" /></svg> ${v.vendor_type}</div>`:''}
+      ${(v.gstin||v.GSTIN)?`<div style="font-size:0.75rem;color:var(--gray-3)">🧾 GSTIN: ${v.gstin||v.GSTIN}</div>`:''}
+        ${v.country?`<div style="font-size:0.75rem;color:var(--gray-3)">🌍 ${v.country}</div>`:''}
+        ${v.vendor_type?`<div style="font-size:0.75rem;color:var(--gray-3)">🏷 ${v.vendor_type}</div>`:''}
     </div>
       <div style="display:flex;gap:5px;flex-wrap:wrap">
         ${canEdit?`
           <button class="btn btn-secondary btn-sm" onclick="editVendor('${v.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="toggleVendorActive('${v.id}',${v.is_active})">${v.is_active?'Deactivate':'Activate'}</button>
-          <button class="btn btn-ghost btn-sm" onclick="openVendorHistory('${v.id}')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></svg> History</button>
-          <button class="btn btn-ghost btn-sm" onclick="openVendorPartsModal('${v.id}','${v.name.replace(/'/g,'\\\'')}')" style="color:#6366f1;border-color:rgba(99,102,241,0.3)"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></svg> Parts</button>
+          <button class="btn btn-ghost btn-sm" onclick="openVendorHistory('${v.id}')">📋 History</button>
+          <button class="btn btn-ghost btn-sm" onclick="openVendorPartsModal('${v.id}','${v.name.replace(/'/g,'\\\'')}')" style="color:#6366f1;border-color:rgba(99,102,241,0.3)">🔩 Parts</button>
         `:`
-          <button class="btn btn-secondary btn-sm" onclick="openVendorEnquiry(${JSON.stringify(v).split('"').join('&quot;')})"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12" /> <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg> Enquire</button>
-          <button class="btn btn-ghost btn-sm" onclick="openVendorHistory('${v.id}')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></svg> History</button>
+          <button class="btn btn-secondary btn-sm" onclick="openVendorEnquiry(${JSON.stringify(v).split('"').join('&quot;')})">📬 Enquire</button>
+          <button class="btn btn-ghost btn-sm" onclick="openVendorHistory('${v.id}')">📋 History</button>
         `}
       </div>
     </div>`;
@@ -1153,19 +1071,19 @@ async function openVendorHistory(vendorId) {
 
   document.getElementById('_vhBody').innerHTML=`
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
-      <div style="width:48px;height:48px;border-radius:10px;background:var(--off-white);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:1.4rem"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4" /> <path d="M10 8h4" /> <path d="M14 21v-3a2 2 0 0 0-4 0v3" /> <path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2" /> <path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" /></svg></div>
+      <div style="width:48px;height:48px;border-radius:10px;background:var(--off-white);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:1.4rem">🏢</div>
       <div>
         <div style="font-weight:700;font-size:1rem">${v.name}</div>
         <div style="font-size:0.78rem;color:var(--gray-3)">${v.specialization||''}</div>
         <div style="margin-top:3px">${starRating(v.avg_rating,v.rating_count)}</div>
       </div>
       ${v.email?`<div style="font-size:0.76rem;color:var(--gray-3);margin-left:8px">${v.email}${v.phone?' · '+v.phone:''}</div>`:''}
-      ${pt?`<div style="margin-left:auto;font-size:0.72rem;padding:4px 10px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:5px;color:#6366f1;white-space:nowrap"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /> <line x1="2" x2="22" y1="10" y2="10" /></svg> ${pt.label}</div>`:''}
+      ${pt?`<div style="margin-left:auto;font-size:0.72rem;padding:4px 10px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:5px;color:#6366f1;white-space:nowrap">💳 ${pt.label}</div>`:''}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
       <div>
         <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--gray-4);margin-bottom:10px;display:flex;align-items:center;gap:6px">
-          <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /> <path d="M12 22V12" /> <polyline points="3.29 7 12 12 20.71 7" /> <path d="m7.5 4.27 9 5.15" /></svg> Orders <span style="background:var(--off-white);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:0.68rem">${orders.length}</span>
+          📦 Orders <span style="background:var(--off-white);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:0.68rem">${orders.length}</span>
         </div>
         ${orders.length?`<div style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto">
           ${orders.map(o=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--off-white);border:1px solid var(--border);border-radius:6px">
@@ -1176,11 +1094,11 @@ async function openVendorHistory(vendorId) {
             </div>
             ${getPhaseBadge(o.phase)}
           </div>`).join('')}
-        </div>`:`<div style="padding:20px;text-align:center;background:var(--off-white);border:1px solid var(--border);border-radius:6px"><div style="font-size:1.5rem;margin-bottom:4px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9" /> <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /> <path d="m17 17 4 4" /> <path d="m21 17-4 4" /></svg></div><p style="color:var(--gray-4);font-size:0.78rem">No orders yet</p></div>`}
+        </div>`:`<div style="padding:20px;text-align:center;background:var(--off-white);border:1px solid var(--border);border-radius:6px"><div style="font-size:1.5rem;margin-bottom:4px">📭</div><p style="color:var(--gray-4);font-size:0.78rem">No orders yet</p></div>`}
       </div>
       <div>
         <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--gray-4);margin-bottom:10px;display:flex;align-items:center;gap:6px">
-          <svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" /></svg> Ratings <span style="background:var(--off-white);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:0.68rem">${ratings.length}</span>
+          ⭐ Ratings <span style="background:var(--off-white);border:1px solid var(--border);border-radius:10px;padding:1px 7px;font-size:0.68rem">${ratings.length}</span>
         </div>
         ${ratings.length?`<div style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto">
           ${ratings.map(r=>{
@@ -1194,15 +1112,15 @@ async function openVendorHistory(vendorId) {
                 <span style="font-size:0.65rem;color:var(--gray-4)">${fmtDate(r.created_at)}</span>
               </div>
               ${hasDual?`<div style="display:flex;gap:12px;padding:6px 8px;background:white;border:1px solid var(--border);border-radius:4px;margin-bottom:5px">
-                <div><div style="font-size:0.6rem;color:var(--gray-4);font-weight:600;margin-bottom:2px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="14" y1="2" y2="2" /> <line x1="12" x2="15" y1="14" y2="11" /> <circle cx="12" cy="14" r="8" /></svg> TAT</div><div>${miniStars(tatR)}</div></div>
+                <div><div style="font-size:0.6rem;color:var(--gray-4);font-weight:600;margin-bottom:2px">⏱ TAT</div><div>${miniStars(tatR)}</div></div>
                 <div style="width:1px;background:var(--border)"></div>
-                <div><div style="font-size:0.6rem;color:var(--gray-4);font-weight:600;margin-bottom:2px"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> Quality</div><div>${miniStars(qualR)}</div></div>
+                <div><div style="font-size:0.6rem;color:var(--gray-4);font-weight:600;margin-bottom:2px">✅ Quality</div><div>${miniStars(qualR)}</div></div>
               </div>`:''}
               <div style="font-size:0.7rem;color:var(--gray-4);margin-bottom:3px">${r.users?.name||'Unknown'}${r.procurement_requests?.project_name?' · '+r.procurement_requests.project_name:''}</div>
               ${noteText?`<p style="font-size:0.76rem;color:var(--gray-3);line-height:1.4">${noteText}</p>`:(!hasDual&&r.comment?`<p style="font-size:0.76rem;color:var(--gray-3);line-height:1.4">${r.comment}</p>`:'<p style="font-size:0.7rem;color:var(--gray-4);font-style:italic">No comment</p>')}
             </div>`;
           }).join('')}
-        </div>`:`<div style="padding:20px;text-align:center;background:var(--off-white);border:1px solid var(--border);border-radius:6px"><div style="font-size:1.5rem;margin-bottom:4px"><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" /></svg></div><p style="color:var(--gray-4);font-size:0.78rem">No ratings yet</p></div>`}
+        </div>`:`<div style="padding:20px;text-align:center;background:var(--off-white);border:1px solid var(--border);border-radius:6px"><div style="font-size:1.5rem;margin-bottom:4px">⭐</div><p style="color:var(--gray-4);font-size:0.78rem">No ratings yet</p></div>`}
       </div>
     </div>`;
 }
@@ -1223,13 +1141,13 @@ function openVendorEnquiry(vendor) {
         <div><div class="enquiry-contact-label">Specialization</div><div class="enquiry-contact-value">${vendor.specialization||'—'}</div></div>
         <div><div class="enquiry-contact-label">Email</div><div class="enquiry-contact-value">${vendor.email?`<a href="mailto:${vendor.email}">${vendor.email}</a>`:'—'}</div></div>
         <div><div class="enquiry-contact-label">Phone</div><div class="enquiry-contact-value">${vendor.phone||'—'}</div></div>
-        ${pt?`<div style="grid-column:1/-1"><div class="enquiry-contact-label">Payment Terms</div><div class="enquiry-contact-value" style="color:#6366f1"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /> <line x1="2" x2="22" y1="10" y2="10" /></svg> ${pt.label}</div></div>`:''}
+        ${pt?`<div style="grid-column:1/-1"><div class="enquiry-contact-label">Payment Terms</div><div class="enquiry-contact-value" style="color:#6366f1">💳 ${pt.label}</div></div>`:''}
       </div>
       ${vendor.notes?`<div style="border-top:1px solid var(--border);padding-top:12px"><div class="detail-key" style="margin-bottom:5px">Notes</div><p style="font-size:0.8rem;color:var(--gray-3);line-height:1.5">${vendor.notes}</p></div>`:''}
       <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:13px"><div class="detail-key" style="margin-bottom:5px">Rating</div><div>${starRating(vendor.avg_rating,vendor.rating_count)}</div></div>
     </div>
     <div class="modal-footer">
-      ${vendor.email?`<a href="mailto:${vendor.email}?subject=Enquiry%20from%20ProcureOps" class="btn btn-primary"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" /> <rect x="2" y="4" width="20" height="16" rx="2" /></svg> Send Email</a>`:''}
+      ${vendor.email?`<a href="mailto:${vendor.email}?subject=Enquiry%20from%20ProcureOps" class="btn btn-primary">✉ Send Email</a>`:''}
       <button class="btn btn-secondary" onclick="document.getElementById('_vendorEnquiryModal').classList.remove('active')">Close</button>
     </div>
   </div>`;
@@ -1559,7 +1477,7 @@ function renderPartsEditor(containerId) {
   const pm = _partsEditorProductionMode;
   c.innerHTML=`
     ${pm ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:6px;font-size:0.78rem;color:#6366f1">
-      <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></svg> <strong>Production mode</strong> — Part numbers are required. Use the search to auto-fill from catalog.
+      🔩 <strong>Production mode</strong> — Part numbers are required. Use the search to auto-fill from catalog.
     </div>` : ''}
     <div style="overflow-x:auto">
     <table class="parts-table" style="width:100%;min-width:${pm?'720':'600'}px">

@@ -70,15 +70,15 @@
     <!-- Sidebar -->
     <div class="admin-sidebar">
       <div class="admin-sidebar-title">Overview</div>
-      <div class="admin-nav-item active" onclick="switchPanel('overview')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="M18 17V9" /> <path d="M13 17V5" /> <path d="M8 17v-3" /></svg> Dashboard</div>
-      <div class="admin-nav-item" onclick="switchPanel('closed')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> Closed Requests</div>
+      <div class="admin-nav-item active" onclick="switchPanel('overview')">📊 Dashboard</div>
+      <div class="admin-nav-item" onclick="switchPanel('closed')">🔒 Closed Requests</div>
 
       <div class="admin-sidebar-title">Pipeline Config</div>
-      <div class="admin-nav-item" onclick="switchPanel('pipelines')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></svg> Pipeline Editor</div>
-      <div class="admin-nav-item" onclick="switchPanel('override')"><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /></svg> Force Phase Override</div>
+      <div class="admin-nav-item" onclick="switchPanel('pipelines')">🔧 Pipeline Editor</div>
+      <div class="admin-nav-item" onclick="switchPanel('override')">⚡ Force Phase Override</div>
 
       <div class="admin-sidebar-title">Local Purchase</div>
-      <div class="admin-nav-item" onclick="switchPanel('lp_queue')"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1" /> <circle cx="19" cy="21" r="1" /> <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg> LP Approval Queue <span class="nav-badge" id="lpBadge">0</span></div>
+      <div class="admin-nav-item" onclick="switchPanel('lp_queue')">🛒 LP Approval Queue <span class="nav-badge" id="lpBadge">0</span></div>
 
       <div class="admin-sidebar-title">System</div>
       <div class="admin-nav-item" onclick="window.location.href='master.html'">← Back to Dashboard</div>
@@ -99,15 +99,15 @@
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
           <div style="background:white;border:1px solid var(--border);border-radius:var(--radius);padding:16px">
-            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#6366f1"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></svg> RFQ Pipeline</div>
+            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#6366f1">📋 RFQ Pipeline</div>
             <div id="rfqBreakdown" style="font-size:0.78rem;color:var(--gray-3)">Loading...</div>
           </div>
           <div style="background:white;border:1px solid var(--border);border-radius:var(--radius);padding:16px">
-            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#22c55e"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1" /> <circle cx="19" cy="21" r="1" /> <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg> Local Purchase Pipeline</div>
+            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#22c55e">🛒 Local Purchase Pipeline</div>
             <div id="lpBreakdown" style="font-size:0.78rem;color:var(--gray-3)">Loading...</div>
           </div>
           <div style="background:white;border:1px solid var(--border);border-radius:var(--radius);padding:16px">
-            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#8b5cf6"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4" /> <path d="M10 8h4" /> <path d="M14 21v-3a2 2 0 0 0-4 0v3" /> <path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2" /> <path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" /></svg> Vendor Info Pipeline</div>
+            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#8b5cf6">🏢 Vendor Info Pipeline</div>
             <div id="viBreakdown" style="font-size:0.78rem;color:var(--gray-3)">Loading...</div>
           </div>
         </div>
@@ -145,7 +145,7 @@
         <div class="panel-title">Force Phase Override</div>
         <div class="panel-sub">Move any request to any phase — bypasses the normal workflow. Use only when a request is stuck or data needs correction.</div>
 
-        <div class="override-warning"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></svg> This directly modifies the database. Use sparingly. All overrides are logged as comments on the request.</div>
+        <div class="override-warning">⚠️ This directly modifies the database. Use sparingly. All overrides are logged as comments on the request.</div>
 
         <div class="override-form">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -175,7 +175,7 @@
             </div>
           </div>
           <div style="display:flex;gap:10px;align-items:center">
-            <button class="btn btn-danger" onclick="executeOverride()" style="min-width:180px"><svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /></svg> Execute Override</button>
+            <button class="btn btn-danger" onclick="executeOverride()" style="min-width:180px">⚡ Execute Override</button>
             <span style="font-size:0.75rem;color:var(--gray-4)">A comment will be posted on the request with your name, timestamp, and reason.</span>
           </div>
         </div>
@@ -401,8 +401,8 @@ function togglePipelineCard(key) {
   if (body) body.classList.toggle('open');
 }
 
-async function removePhaseFromPipeline(pipelineKey, phaseKey) {
-  if (!await showConfirm(`Remove "${phaseKey}" from the ${pipelineKey} pipeline view? This only affects the UI — existing requests in this phase are not affected.`, {title:'Remove Phase', confirmLabel:'Remove', danger:true})) return;
+function removePhaseFromPipeline(pipelineKey, phaseKey) {
+  if (!confirm(`Remove "${phaseKey}" from the ${pipelineKey} pipeline view? This only affects the UI — existing requests in this phase are not affected.`)) return;
   runtimePipelines[pipelineKey].phases = runtimePipelines[pipelineKey].phases.filter(p => p !== phaseKey);
   savePipelineConfig();
   renderPipelineEditor();
@@ -423,7 +423,7 @@ function addPhaseToConfig() {
   if (isTerminal) runtimePipelines[pipelineKey].terminal.push(key);
   // Also register in PHASES for badge rendering
   if (!PHASES[key]) {
-    PHASES[key] = { label: label, color: '#6b7280', icon: '<svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5" /> <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" /></svg>' };
+    PHASES[key] = { label: label, color: '#6b7280', icon: '📌' };
   }
   savePipelineConfig();
   renderPipelineEditor();
@@ -485,7 +485,7 @@ async function executeOverride() {
   if (!prId) { showToast('Select or enter a request first.', 'error'); return; }
   if (!newPhase) { showToast('Select a target phase.', 'error'); return; }
   if (!reason) { showToast('Reason is required for overrides.', 'error'); return; }
-  if (!await showConfirm(`Force PR to phase "${newPhase}"?\n\nReason: ${reason}\n\nThis will be logged permanently.`, {title:'Force Phase Override', confirmLabel:'Force Override', danger:true})) return;
+  if (!confirm(`Force PR to phase "${newPhase}"?\n\nReason: ${reason}\n\nThis will be logged permanently.`)) return;
 
   const pr = overrideTargetPR || allRequests.find(r => r.id === prId);
   const isTerminal = Object.values(PIPELINES).some(p => (p.terminal||[]).includes(newPhase));
@@ -504,7 +504,7 @@ async function executeOverride() {
     await db.from('pr_comments').insert({
       pr_id: prId,
       user_id: currentUser.id,
-      comment: `<svg class="icon-inline" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /></svg> [MASTER ADMIN OVERRIDE] Phase forced to "${newPhase}" by ${currentUser.name}. Reason: ${reason}`
+      comment: `⚡ [MASTER ADMIN OVERRIDE] Phase forced to "${newPhase}" by ${currentUser.name}. Reason: ${reason}`
     });
   }
   showLoader(false);
@@ -522,7 +522,7 @@ function renderLPQueue() {
   const pending = allRequests.filter(r => ['lp_submitted','lp_pending_pm_approval'].includes(r.phase));
   const mount = document.getElementById('lpQueueMount');
   if (!pending.length) {
-    mount.innerHTML = `<div style="text-align:center;padding:40px;color:var(--gray-4)"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="m9 12 2 2 4-4" /></svg> No LP requests pending approval.</div>`;
+    mount.innerHTML = `<div style="text-align:center;padding:40px;color:var(--gray-4)">✅ No LP requests pending approval.</div>`;
     return;
   }
   mount.innerHTML = `<div style="background:white;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
@@ -563,7 +563,7 @@ async function openLPModal(id) {
   document.getElementById('lpModalBody').innerHTML =
     buildPRDetailHTML(currentLPPR, quotations||[], '', currentLPPR.project_manager_name||'', {clearanceManagerName}) +
     `<div class="action-section" style="border-color:#15803d;background:rgba(34,197,94,0.04);margin-top:16px">
-      <div class="action-section-title" style="color:#15803d"><svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /> <path d="m21 2-9.6 9.6" /> <circle cx="7.5" cy="15.5" r="5.5" /></svg> Master Admin — LP Decision <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
+      <div class="action-section-title" style="color:#15803d">🔑 Master Admin — LP Decision <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">You are acting as Master Admin, overriding the Project Manager approval step.</p>
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Decision Notes (optional for approval)</label>
@@ -600,7 +600,7 @@ async function adminApproveLPRequest() {
 async function adminRejectLPRequest() {
   const notes = document.getElementById('adminLPNotes')?.value.trim();
   if (!notes) { showToast('Please add a rejection reason.', 'error'); return; }
-  if (!await showConfirm(`Reject and close this LP request?\n\nReason: ${notes}`, {title:'Reject LP Request', confirmLabel:'Reject & Close', danger:true})) return;
+  if (!confirm(`Reject and close this LP request?\n\nReason: ${notes}`)) return;
   showLoader(true);
   const now = new Date().toISOString();
   const { error } = await db.from('procurement_requests').update({
