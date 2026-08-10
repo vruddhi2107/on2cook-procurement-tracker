@@ -228,6 +228,7 @@
     <div class="stat-card"><div class="stat-card-value" id="sActive">—</div><div class="stat-card-label">Active</div><div class="stat-card-icon">⚙️</div></div>
     <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sOrders">—</div><div class="stat-card-label">To Order</div><div class="stat-card-icon">🛒</div></div>
     <div class="stat-card" style="--accent:#f59e0b"><div class="stat-card-value" id="sGRN">—</div><div class="stat-card-label">GRN Pending</div><div class="stat-card-icon">📦</div></div>
+    <div class="stat-card" style="--accent:#dc2626"><div class="stat-card-value" id="sOnHold">—</div><div class="stat-card-label">On Hold</div><div class="stat-card-icon">⏸</div></div>
     <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sVendors">—</div><div class="stat-card-label">Active Vendors</div><div class="stat-card-icon">🏢</div></div>
   </div>
 
@@ -886,6 +887,7 @@ function updateStats() {
   document.getElementById('sActive').textContent=allRequests.filter(r=>r.phase==='procurement_active'||r.phase==='lp_procurement_processing').length;
   document.getElementById('sOrders').textContent=allRequests.filter(r=>r.phase==='approved').length;
   document.getElementById('sGRN').textContent=allRequests.filter(r=>['grn_initiated','qc_pending','rework_store_form','rework_pending'].includes(r.phase)).length;
+  document.getElementById('sOnHold').textContent=allRequests.filter(r=>r.is_on_hold).length;
 }
 
 function switchTab(t) {
@@ -945,11 +947,11 @@ function renderTable(reqs) {
       <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
       <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase||''}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${r.item_note}</div>`:''}</td>
       <td><span style="font-size:0.72rem;padding:1px 7px;border-radius:3px;border:1px solid;${typeBg}">${typeLabel}</span></td>
-      <td>${getPhaseBadge(r.phase)}</td>
+      <td>${getPhaseBadge(r.phase)}${r.is_on_hold?' <span style="background:#f59e0b18;color:#b45309;border:1px solid #f59e0b35;border-radius:3px;font-size:0.6rem;font-family:var(--font-mono);font-weight:700;padding:1px 5px;vertical-align:middle">⏸ HOLD</span>':''}</td>
       <td>${getUrgencyBadge(r.urgency)}</td>
       <td style="font-size:0.78rem">${r.project_manager_name||'—'}</td>
       <td style="font-size:0.78rem">${r.users?.name||'—'}</td>
-      <td>${leadTimeBadge(r.created_at, r.closed_at)}</td>
+      <td>${leadTimeBadge(r.created_at, r.closed_at, r.total_hold_seconds, r.is_on_hold, r.hold_started_at)}</td>
       <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gray-4)">${fmtDate(r.updated_at||r.created_at)}</td>
       <td><button class="btn ${needsAction?'btn-primary':'btn-ghost'} btn-sm" onclick='openPR("${r.id}")'>${lbl}</button></td>
     </tr>`;
@@ -1432,12 +1434,11 @@ async function openPR(id) {
     actionSection = buildAdvanceRejectedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO);
   }
 
-  // ── ORDER PLACED: invoke GRN ──
+  // ── ORDER PLACED: awaiting goods receipt (Store Manager owns this step) ──
   if(currentPR.phase==='order_placed') {
     actionSection=`<div class="action-section">
-      <div class="action-section-title">📦 Invoke GRN <span class="action-badge">ACTION REQUIRED</span></div>
-      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Once goods have arrived at the warehouse, invoke GRN to notify the Store Manager (Hrithik) for goods receipt.</p>
-      <button class="btn btn-primary" onclick="invokeGRN()">Goods Arrived — Notify Store Manager →</button>
+      <div class="action-section-title">🚚 Order Placed — Awaiting Goods Receipt</div>
+      <p style="font-size:0.82rem;color:var(--gray-3)">The Store Manager will mark goods as received and complete the GRN once they arrive at the warehouse — no action needed here.</p>
     </div>`;
   }
 
@@ -1557,7 +1558,7 @@ async function openPR(id) {
 
   document.getElementById('prModalBody').innerHTML=
     `<div id="prDetailViewSection">`+
-    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',currentPR.project_manager_name||'',{poData:existingPO,advPayRec:advRes.data||null,payRec:payRes.data||null,clearanceManagerName})
+    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',currentPR.project_manager_name||'',{poData:existingPO,advPayRec:advRes.data||null,payRec:payRes.data||null,clearanceManagerName,currentUser})
     +`</div><div id="prDetailEditSection" style="display:none"></div>`
     +attachmentsSectionHTML
     +actionSection+
@@ -2244,20 +2245,25 @@ async function placeOrder() {
   closeModal('prModal');
   await loadRequests();
 }
-// ── GRN ─────────────────────────────────────────────────────
-async function invokeGRN() {
+// ── HOLD / CONTINUE ─────────────────────────────────────────
+async function handleHoldPR() {
   if (!currentPR) return;
+  const reason = document.getElementById('holdReasonInput')?.value.trim();
+  if (!reason) { showToast('Please enter a reason for the hold','error'); return; }
   showLoader(true);
-  const { error } = await db.from('procurement_requests').update({
-    phase:'grn_initiated', updated_at:new Date().toISOString(), phase_timestamps:addPhaseTimestamp(currentPR,'grn_initiated')
-  }).eq('id',currentPR.id);
-  notifyPhaseChange(currentPR.id,'grn_initiated',currentUser?.id);
-  if (!error) {
-    await window.postComment(currentPR.id, currentUser?.id, '📦 GRN invoked — Store Manager notified to receive goods.');
-  }
+  const { error } = await setPRHold(currentPR.id, currentUser, reason);
   showLoader(false);
   if (error) { showToast('Error: '+error.message,'error'); return; }
-  showToast('GRN invoked — Store Manager notified!','success');
+  showToast('Request put on hold — lead time paused.','success');
+  closeModal('prModal'); await loadRequests();
+}
+async function handleContinuePR() {
+  if (!currentPR) return;
+  showLoader(true);
+  const { error } = await clearPRHold(currentPR.id, currentUser);
+  showLoader(false);
+  if (error) { showToast('Error: '+error.message,'error'); return; }
+  showToast('Request resumed — lead time is ticking again.','success');
   closeModal('prModal'); await loadRequests();
 }
 

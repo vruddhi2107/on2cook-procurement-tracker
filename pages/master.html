@@ -32,6 +32,7 @@
     <div class="stat-card" style="--accent:#3b82f6"><div class="stat-card-value" id="sUsers">—</div><div class="stat-card-label">Users</div><div class="stat-card-icon">👥</div></div>
     <div class="stat-card" style="--accent:#8b5cf6"><div class="stat-card-value" id="sVendors">—</div><div class="stat-card-label">Vendors</div><div class="stat-card-icon">🏢</div></div>
     <div class="stat-card" style="--accent:#ef4444"><div class="stat-card-value" id="sRejected">—</div><div class="stat-card-label">Rejected</div><div class="stat-card-icon">✖</div></div>
+    <div class="stat-card" style="--accent:#dc2626"><div class="stat-card-value" id="sOnHold">—</div><div class="stat-card-label">On Hold</div><div class="stat-card-icon">⏸</div></div>
   </div>
 
   <!-- TABS -->
@@ -516,6 +517,7 @@ function updateStats() {
   document.getElementById('sActive').textContent=allRequests.filter(r=>!['accepted','rejected'].includes(r.phase)).length;
   document.getElementById('sClosed').textContent=allRequests.filter(r=>r.is_closed||CLOSED_PHASES.has(r.phase)).length;
   document.getElementById('sRejected').textContent=allRequests.filter(r=>['rejected','declined','qc_rejected','lp_rejected'].includes(r.phase)).length;
+  document.getElementById('sOnHold').textContent=allRequests.filter(r=>r.is_on_hold).length;
   // Director badge
   const directorPending=allRequests.filter(r=>['pending_sandy_approval','deviation_approval','pending_decline_approval'].includes(r.phase));
   const badge=document.getElementById('directorBadge');
@@ -567,8 +569,8 @@ function renderTable(reqs) {
     <td class="mono">${r.request_category}</td>
     <td style="font-size:0.82rem">${DEPARTMENTS[r.department]||r.department}</td>
     <td style="font-size:0.8rem;max-width:110px;overflow:hidden;text-overflow:ellipsis">${r.vendors?.name||'—'}</td>
-    <td>${getPhaseBadge(r.phase)}</td>
-    <td>${leadTimeBadge(r.created_at, r.closed_at)}</td>
+    <td>${getPhaseBadge(r.phase)}${r.is_on_hold?' <span style="background:#f59e0b18;color:#b45309;border:1px solid #f59e0b35;border-radius:3px;font-size:0.6rem;font-family:var(--font-mono);font-weight:700;padding:1px 5px;vertical-align:middle">⏸ HOLD</span>':''}</td>
+    <td>${leadTimeBadge(r.created_at, r.closed_at, r.total_hold_seconds, r.is_on_hold, r.hold_started_at)}</td>
     <td class="mono" style="font-size:0.75rem">${formatDate(r.updated_at||r.created_at)}</td>
     <td style="font-size:0.82rem">${r.users?.name||'—'}</td>
     <td style="white-space:nowrap">
@@ -618,7 +620,7 @@ async function viewPR(id) {
       <button class="btn btn-primary btn-sm" onclick="saveOverride('${pr.id}')">Save Reassignment</button>
     </div>`;
   document.getElementById('prDetailBody').innerHTML=
-    buildPRDetailHTML(pr,quotations,vd?.data?.name||'','',{clearanceManagerName:allUsers.find(u=>u.id===pr.initial_approver_id)?.name||''})+
+    buildPRDetailHTML(pr,quotations,vd?.data?.name||'','',{clearanceManagerName:allUsers.find(u=>u.id===pr.initial_approver_id)?.name||'',currentUser})+
     reassignHTML+
     attachmentsHTML+
     `<div style="margin-top:24px;border-top:1.5px solid var(--border);padding-top:18px">
@@ -626,6 +628,30 @@ async function viewPR(id) {
       ${renderComments(comments)}
     </div>`;
   openModal('prDetailModal');
+}
+
+// ── HOLD / CONTINUE ─────────────────────────────────────────
+async function handleHoldPR() {
+  if (!viewingPRId) return;
+  const reason = document.getElementById('holdReasonInput')?.value.trim();
+  if (!reason) { showToast('Please enter a reason for the hold','error'); return; }
+  showLoader(true);
+  const { error } = await setPRHold(viewingPRId, currentUser, reason);
+  showLoader(false);
+  if (error) { showToast('Error: '+error.message,'error'); return; }
+  showToast('Request put on hold — lead time paused.','success');
+  closeModal('prDetailModal');
+  await loadRequests();
+}
+async function handleContinuePR() {
+  if (!viewingPRId) return;
+  showLoader(true);
+  const { error } = await clearPRHold(viewingPRId, currentUser);
+  showLoader(false);
+  if (error) { showToast('Error: '+error.message,'error'); return; }
+  showToast('Request resumed — lead time is ticking again.','success');
+  closeModal('prDetailModal');
+  await loadRequests();
 }
 
 async function saveOverride(prId) {
@@ -925,7 +951,7 @@ function renderAnalytics() {
   // ── KPI cards ─────────────────────────────────────────────
   const open   = reqs.filter(r=>!['accepted','rejected'].includes(r.phase)).length;
   const closed = reqs.filter(r=>['accepted','rejected'].includes(r.phase)).length;
-  const avgLT  = reqs.length ? Math.round(reqs.reduce((s,r)=>s+calcLeadTimeDays(r.created_at),0)/reqs.length) : 0;
+  const avgLT  = reqs.length ? Math.round(reqs.reduce((s,r)=>s+calcLeadTimeDays(r.created_at, r.closed_at, r.total_hold_seconds, r.is_on_hold, r.hold_started_at),0)/reqs.length) : 0;
   const pendPay= reqs.filter(r=>r.phase==='payment_requested').length;
   document.getElementById('analyticsKPIs').innerHTML = [
     {icon:'📋',label:'Total Requests',val:reqs.length,color:'#6366f1'},
@@ -997,7 +1023,7 @@ function renderAnalytics() {
 
   // ── Chart 3: Lead time histogram ──────────────────────────
   const bins = [{label:'1–7d',min:0,max:7},{label:'8–14d',min:7,max:14},{label:'15–30d',min:14,max:30},{label:'31–60d',min:30,max:60},{label:'>60d',min:60,max:Infinity}];
-  const binCounts = bins.map(b=>reqs.filter(r=>{ const d=calcLeadTimeDays(r.created_at); return d>b.min&&d<=b.max; }).length);
+  const binCounts = bins.map(b=>reqs.filter(r=>{ const d=calcLeadTimeDays(r.created_at, r.closed_at, r.total_hold_seconds, r.is_on_hold, r.hold_started_at); return d>b.min&&d<=b.max; }).length);
   const binColors = ['#22c55eCC','#84cc16CC','#f59e0bCC','#ef4444CC','#991b1bCC'];
   const ltCanvas = document.getElementById('chartLeadTime');
   ltCanvas._chart = new Chart(ltCanvas, {

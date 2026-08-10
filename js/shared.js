@@ -669,19 +669,118 @@ function renderWorkflowTrack(phase, phaseTimestamps, createdAt, requestCategory)
 }
 
 // ── LEAD TIME HELPERS ────────────────────────────────────────
-function calcLeadTimeDays(createdAt, closedAt) {
+// holdSeconds/isOnHold/holdStartedAt are optional — omitting them behaves
+// exactly as before (plain created→closed/now day count). When supplied,
+// any accumulated hold time is subtracted, and while currently on hold the
+// clock freezes at hold_started_at instead of ticking to "now".
+function calcLeadTimeDays(createdAt, closedAt, holdSeconds, isOnHold, holdStartedAt) {
   if (!createdAt) return null;
-  var endTime = closedAt ? new Date(closedAt) : Date.now();
-  return Math.floor((endTime - new Date(createdAt)) / 86400000);
+  var endTime = closedAt ? new Date(closedAt) : (isOnHold && holdStartedAt ? new Date(holdStartedAt) : Date.now());
+  var elapsedMs = endTime - new Date(createdAt);
+  var heldMs = (holdSeconds || 0) * 1000;
+  var netMs = Math.max(0, elapsedMs - heldMs);
+  return Math.floor(netMs / 86400000);
 }
-function leadTimeBadge(createdAt, closedAt) {
-  var days = calcLeadTimeDays(createdAt, closedAt);
+function leadTimeBadge(createdAt, closedAt, holdSeconds, isOnHold, holdStartedAt) {
+  var days = calcLeadTimeDays(createdAt, closedAt, holdSeconds, isOnHold, holdStartedAt);
   if (days === null) return '';
   var isClosed = !!closedAt;
-  var color = isClosed ? '#6b7280' : (days <= 7 ? '#22c55e' : days <= 21 ? '#f59e0b' : '#ef4444');
-  var suffix = isClosed ? 'd ✓' : 'd';
+  var color = isOnHold ? '#f59e0b' : isClosed ? '#6b7280' : (days <= 7 ? '#22c55e' : days <= 21 ? '#f59e0b' : '#ef4444');
+  var suffix = isClosed ? 'd ✓' : isOnHold ? 'd ⏸' : 'd';
   return '<span style="font-family:var(--font-mono);font-size:0.7rem;padding:1px 7px;border-radius:10px;background:'+color+'15;color:'+color+';border:1px solid '+color+'35">'+days+suffix+'</span>';
 }
+
+// ── HOLD / CONTINUE ──────────────────────────────────────────
+// Lets Procurement Managers and the Master admin pause a request's lead-time
+// clock (e.g. waiting on an external dependency that isn't anyone's active
+// action) and resume it later. Requires these columns on procurement_requests
+// (see migration): is_on_hold boolean, hold_reason text,
+// hold_started_at timestamptz, total_hold_seconds numeric, hold_history jsonb.
+function canManageHold(user) {
+  return !!user && (user.role === 'procurement_manager' || user.role === 'master');
+}
+window.canManageHold = canManageHold;
+
+async function setPRHold(prId, currentUser, reason) {
+  const nowIso = new Date().toISOString();
+  const { data: cur } = await db.from('procurement_requests').select('hold_history').eq('id', prId).single();
+  const history = (cur && cur.hold_history) || [];
+  history.push({ action: 'hold', at: nowIso, by: currentUser?.id || null, by_name: currentUser?.name || '', reason: reason || '' });
+  const { error } = await db.from('procurement_requests').update({
+    is_on_hold: true,
+    hold_reason: reason || '',
+    hold_started_at: nowIso,
+    hold_history: history,
+    updated_at: nowIso
+  }).eq('id', prId);
+  if (!error) {
+    await window.postComment(prId, currentUser?.id, `⏸ Request put ON HOLD${reason ? ' — ' + reason : ''}. Lead time paused.`);
+  }
+  return { error };
+}
+window.setPRHold = setPRHold;
+
+async function clearPRHold(prId, currentUser) {
+  const { data: cur } = await db.from('procurement_requests').select('hold_started_at,total_hold_seconds,hold_history').eq('id', prId).single();
+  if (!cur) return { error: { message: 'Request not found' } };
+  const nowIso = new Date().toISOString();
+  const heldForSec = cur.hold_started_at ? Math.max(0, (new Date(nowIso) - new Date(cur.hold_started_at)) / 1000) : 0;
+  const newTotal = (cur.total_hold_seconds || 0) + heldForSec;
+  const history = cur.hold_history || [];
+  history.push({ action: 'resume', at: nowIso, by: currentUser?.id || null, by_name: currentUser?.name || '' });
+  const { error } = await db.from('procurement_requests').update({
+    is_on_hold: false,
+    hold_reason: null,
+    hold_started_at: null,
+    total_hold_seconds: newTotal,
+    hold_history: history,
+    updated_at: nowIso
+  }).eq('id', prId);
+  if (!error) {
+    const heldDays = (heldForSec / 86400).toFixed(1);
+    await window.postComment(prId, currentUser?.id, `▶ Request resumed — was on hold for ${heldDays} day(s). Lead time continues.`);
+  }
+  return { error };
+}
+window.clearPRHold = clearPRHold;
+
+// Informational banner shown to everyone viewing a held request.
+function buildHoldBanner(pr) {
+  if (!pr || !pr.is_on_hold) return '';
+  const since = pr.hold_started_at ? fmtDateTime(pr.hold_started_at) : '—';
+  return `<div style="margin-top:12px;padding:10px 14px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);display:flex;align-items:flex-start;gap:8px">
+    <span style="font-size:1rem;line-height:1.3">⏸</span>
+    <div style="font-size:0.8rem">
+      <div style="font-weight:700;color:#b45309">ON HOLD${pr.hold_reason ? ' — ' + pr.hold_reason : ''}</div>
+      <div style="color:var(--gray-3);font-size:0.74rem;margin-top:2px">Since ${since} — lead time is paused and will resume ticking once the request is continued.</div>
+    </div>
+  </div>`;
+}
+window.buildHoldBanner = buildHoldBanner;
+
+// Actionable hold/continue control, only rendered for users who can manage
+// holds (Procurement Manager, Master) and only for still-open requests.
+// Callers must define global handleHoldPR()/handleContinuePR() wrappers
+// that call setPRHold()/clearPRHold() with their page's currentPR/currentUser
+// and then refresh their own modal + list.
+function buildHoldControlHTML(pr, currentUser) {
+  if (!pr || !canManageHold(currentUser)) return '';
+  if (pr.is_closed || (typeof CLOSED_PHASES !== 'undefined' && CLOSED_PHASES.has(pr.phase))) return '';
+  if (pr.is_on_hold) {
+    return `<div class="action-section" style="background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius);padding:14px;margin-top:14px">
+      <div class="action-section-title" style="color:#b45309">⏸ Request On Hold</div>
+      <p style="font-size:0.8rem;color:var(--gray-3);margin-bottom:10px">Lead time is paused. Continue the request once it's ready to move forward again.</p>
+      <button class="btn btn-primary" onclick="handleContinuePR()">▶ Continue Request</button>
+    </div>`;
+  }
+  return `<div class="action-section" style="border:1px dashed var(--border);border-radius:var(--radius);padding:14px;margin-top:14px">
+    <div class="action-section-title">⏸ Hold Request</div>
+    <p style="font-size:0.8rem;color:var(--gray-3);margin-bottom:8px">Pausing stops lead-time tracking until you continue it.</p>
+    <input class="form-control" id="holdReasonInput" placeholder="Reason for hold (required)" style="margin-bottom:8px;font-size:0.82rem"/>
+    <button class="btn btn-secondary" onclick="handleHoldPR()">⏸ Put on Hold</button>
+  </div>`;
+}
+window.buildHoldControlHTML = buildHoldControlHTML;
 
 
 
@@ -786,9 +885,11 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
     ${renderPartsTable(parts)}
     <div style="margin-top:12px;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius)">
       <span style="font-size:0.8rem;color:var(--gray-3)">Total Lead Time:</span>
-      <strong style="font-family:var(--font-mono);font-size:0.88rem">${calcLeadTimeDays(pr.created_at, pr.closed_at)} days${pr.closed_at ? ' (final)' : ''}</strong>
+      <strong style="font-family:var(--font-mono);font-size:0.88rem">${calcLeadTimeDays(pr.created_at, pr.closed_at, pr.total_hold_seconds, pr.is_on_hold, pr.hold_started_at)} days${pr.closed_at ? ' (final)' : pr.is_on_hold ? ' (paused)' : ''}</strong>
       <span style="font-size:0.75rem;color:var(--gray-4)">(from ${fmtDate(pr.created_at)}${pr.closed_at ? ' to ' + fmtDate(pr.closed_at) : ' to today'})</span>
     </div>
+    ${buildHoldBanner(pr)}
+    ${extras.currentUser ? buildHoldControlHTML(pr, extras.currentUser) : ''}
     <div style="margin-top:16px">${renderWorkflowTrack(pr.phase, pr.phase_timestamps, pr.created_at, pr.request_category)}</div>
 
     ${(pr.phase==='advance_requested'||pr.phase==='advance_approved'||pr.phase==='advance_rejected')?`<div style="margin-top:14px;padding:12px 14px;background:${pr.phase==='advance_approved'?'rgba(22,163,74,0.06)':pr.phase==='advance_rejected'?'rgba(214,43,43,0.06)':'rgba(245,158,11,0.06)'};border:1px solid ${pr.phase==='advance_approved'?'rgba(22,163,74,0.25)':pr.phase==='advance_rejected'?'rgba(214,43,43,0.25)':'rgba(245,158,11,0.25)'};border-radius:var(--radius)">

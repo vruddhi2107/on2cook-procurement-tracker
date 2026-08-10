@@ -141,7 +141,7 @@ async function loadRequests() {
 }
 
 function updateStats() {
-  document.getElementById('sGrnPending').textContent = allRequests.filter(r=>r.phase==='grn_initiated').length;
+  document.getElementById('sGrnPending').textContent = allRequests.filter(r=>['order_placed','grn_initiated'].includes(r.phase)).length;
   document.getElementById('sRework').textContent = allRequests.filter(r=>['rework_store_form','rework_pending','rework2_pending'].includes(r.phase)).length;
   document.getElementById('sDone').textContent = allRequests.filter(r=>['qc_passed','accepted'].includes(r.phase)).length;
 }
@@ -149,7 +149,7 @@ function updateStats() {
 
 
 function renderTable() {
-  const actionPhases = ['grn_initiated','rework_store_form','rework_pending','rework2_pending'];
+  const actionPhases = ['order_placed','grn_initiated','rework_store_form','rework_pending','rework2_pending'];
   const postOrderPhases = ['order_placed','grn_pending','grn_initiated','qc_pending','rework_store_form','rework_pending','rework_returned','rework2_pending','rework2_returned','qc_deviated','deviation_approval','qc_passed','qc_rejected','accepted','rejected','payment_requested','advance_requested','advance_raised_to_accounts','advance_approved','advance_payment_received','advance_rejected','lp_procurement_processing','lp_payment_pending','lp_payment_done'];
   const rows = activeTab==='action'
     ? allRequests.filter(r=>actionPhases.includes(r.phase))
@@ -161,7 +161,7 @@ function renderTable() {
   tbody.innerHTML = rows.map(r=>{
     const parts = r.parts||[];
     const isAction = actionPhases.includes(r.phase);
-    const lbl = {grn_initiated:'Complete GRN',rework_store_form:'Fill Dispatch Form',rework_pending:'Mark Rework Returned',rework2_pending:'Mark 2nd Rework Returned'}[r.phase]||'View';
+    const lbl = {order_placed:'Receive Goods (GRN)',grn_initiated:'Complete GRN',rework_store_form:'Fill Dispatch Form',rework_pending:'Mark Rework Returned',rework2_pending:'Mark 2nd Rework Returned'}[r.phase]||'View';
     return `<tr${isAction?' class="row-action"':''}>
       <td><span class="pr-num">PR-${String(r.request_number).padStart(4,'0')}</span></td>
       <td><span class="fw-600">${r.project_name}</span>${r.project_phase?`<br><span class="text-muted" style="font-size:0.75rem">${r.project_phase}</span>`:''}</td>
@@ -193,8 +193,11 @@ function renderModal() {
 
   let actionSection = '';
 
-  // ── GRN INITIATED: store manager does GRN ──
-  if (pr.phase==='grn_initiated') {
+  // ── ORDER PLACED / GRN INITIATED: store manager receives goods & does GRN ──
+  // order_placed is the normal entry point — the Store Manager marks goods
+  // received directly (no separate "notify" step from Procurement needed).
+  // grn_initiated is kept for backward compatibility with older requests.
+  if (pr.phase==='order_placed' || pr.phase==='grn_initiated') {
     const grnRows = parts.map((p,i)=>`<tr>
       <td style="text-align:center;color:var(--gray-4)">${i+1}</td>
       <td><input class="form-control" style="font-size:0.78rem" placeholder="Item code" id="grnCode_${i}"/></td>
@@ -206,6 +209,7 @@ function renderModal() {
 
     actionSection = `<div class="action-section">
       <div class="action-section-title">📦 Goods Receipt Note (GRN) <span class="action-badge">ACTION REQUIRED</span></div>
+      <p style="font-size:0.8rem;color:var(--gray-3);margin-bottom:10px">Once goods arrive at the warehouse, log them here to raise the GRN and send the request to QC.</p>
 
       <div class="grn-header-grid">
         <div><label class="form-label" style="font-size:0.7rem">GRN NUMBER *</label>

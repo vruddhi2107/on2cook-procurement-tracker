@@ -330,7 +330,7 @@ function renderClosedTable(reqs) {
     return;
   }
   tbody.innerHTML = reqs.map(r => {
-    const leadDays = calcLeadTimeDays(r.created_at, r.closed_at);
+    const leadDays = calcLeadTimeDays(r.created_at, r.closed_at, r.total_hold_seconds);
     const typeLabel = r.request_category === 'local_purchase' ? 'LP' : r.request_category === 'vendor_info' ? 'VI' : 'RFQ';
     const typeColor = r.request_category === 'local_purchase' ? '#22c55e' : r.request_category === 'vendor_info' ? '#8b5cf6' : '#6366f1';
     return `<tr>
