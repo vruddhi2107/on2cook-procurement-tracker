@@ -274,7 +274,7 @@
     <div class="card">
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>Urgency</th><th>Project Manager</th><th>Engineer</th><th>Lead Time</th><th>Updated</th><th></th></tr></thead>
+          <thead><tr><th>PR #</th><th>Project</th><th>Type</th><th>Phase</th><th>Urgency</th><th>Project Manager</th><th>Engineer</th><th>Lead Time</th><th>Created</th><th></th></tr></thead>
           <tbody id="requestsBody"></tbody>
         </table>
       </div>
@@ -973,7 +973,7 @@ function renderTable(reqs) {
       <td style="font-size:0.78rem">${r.project_manager_name||'—'}</td>
       <td style="font-size:0.78rem">${r.users?.name||'—'}</td>
       <td>${leadTimeBadge(r.created_at, r.closed_at, r.total_hold_seconds, r.is_on_hold, r.hold_started_at)}</td>
-      <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gray-4)">${fmtDate(r.updated_at||r.created_at)}</td>
+      <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gray-4)">${fmtDate(r.created_at)}</td>
       <td><button class="btn ${needsAction?'btn-primary':'btn-ghost'} btn-sm" onclick='openPR("${r.id}")'>${lbl}</button></td>
     </tr>`;
   }).join('');
