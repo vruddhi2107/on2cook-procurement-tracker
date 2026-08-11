@@ -51,25 +51,45 @@ const _fileRegistry = [];
 // INITIAL-CLEARANCE APPROVAL ROUTING
 // Resolves who must grant "requirement clearance" (pending_initial_pm_approval)
 // for a new RFQ, based on request_for (npd/production) x discipline
-// (elec/mechanical) — 4 standing combos — with a per-project override for
-// Antunes projects.
+// (elec/mechanical) — 4 standing combos — with per-project overrides.
 // This is INDEPENDENT of assigned_pm_id, which still drives final quote
 // approval and stays tied to the project's linked Project Manager.
+//
+// Priority order:
+//  1. GENERIC "Routing Group" override — any project can be tagged with a
+//     named routing_group (e.g. "CM Yuva") from the Projects page. Master
+//     assigns ONE manager per group (Master → Approval Routing → Project
+//     Routing Groups), and that write fans out to all 4 request_for x
+//     discipline combos, so that one person gets authority across both
+//     NPD/Production and both Elec/Mechanical for every project tagged with
+//     that group. This is the fully generic, admin-configurable version of
+//     what used to be the Antunes-only special case below.
+//  2. LEGACY Antunes override — kept working as-is for existing configured
+//     data: only applies if the project is flagged is_antunes AND a routing
+//     row exists for this exact request_for/discipline combo.
+//  3. Default department routing (one of the 4 standing combos).
 // ══════════════════════════════════════════════════════════════
 async function resolveInitialApprover(projectId, requestFor, discipline) {
   if (!discipline || !requestFor) return null;
   try {
-    // 1. Antunes override — only applies if the project is flagged is_antunes
-    //    AND a routing row exists for this exact request_for/discipline combo.
     if (projectId) {
-      const { data: proj } = await db.from('projects').select('is_antunes').eq('id', projectId).maybeSingle();
+      const { data: proj } = await db.from('projects').select('is_antunes, routing_group').eq('id', projectId).maybeSingle();
+      // 1. Generic routing-group override (any project, any admin-named group)
+      if (proj && proj.routing_group) {
+        const { data: gRow } = await db.from('routing_overrides')
+          .select('manager_id').eq('routing_group', proj.routing_group)
+          .eq('request_for', requestFor).eq('discipline', discipline).maybeSingle();
+        if (gRow && gRow.manager_id) return gRow.manager_id;
+      }
+      // 2. Legacy Antunes override — only applies if the project is flagged is_antunes
+      //    AND a routing row exists for this exact request_for/discipline combo.
       if (proj && proj.is_antunes) {
         const { data: aRow } = await db.from('antunes_routing')
           .select('manager_id').eq('request_for', requestFor).eq('discipline', discipline).maybeSingle();
         if (aRow && aRow.manager_id) return aRow.manager_id;
       }
     }
-    // 2. Default department routing (one of the 4 standing combos)
+    // 3. Default department routing (one of the 4 standing combos)
     const { data: dRow } = await db.from('department_routing')
       .select('manager_id').eq('request_for', requestFor).eq('discipline', discipline).maybeSingle();
     return dRow ? dRow.manager_id : null;

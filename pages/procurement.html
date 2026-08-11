@@ -233,11 +233,12 @@
   </div>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('active')">🔔 Action Needed</button>
-    <button class="tab-btn" onclick="switchTab('all')">All Requests</button>
-    <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendor DB</button>
-    <button class="tab-btn" onclick="switchTab('parts')">🔩 Parts Catalog</button>
-    <button class="tab-btn" onclick="switchTab('createpo')">📝 Create PO</button>
+    <button class="tab-btn active" data-tab="active" onclick="switchTab('active')">🔔 Action Needed</button>
+    <button class="tab-btn" data-tab="onhold" onclick="switchTab('onhold')">⏸ On Hold <span id="onHoldBadge" style="display:none;background:#b45309;color:#fff;border-radius:999px;padding:0 7px;font-size:0.72rem;margin-left:4px;vertical-align:middle"></span></button>
+    <button class="tab-btn" data-tab="all" onclick="switchTab('all')">All Requests</button>
+    <button class="tab-btn" data-tab="vendors" onclick="switchTab('vendors')">🏢 Vendor DB</button>
+    <button class="tab-btn" data-tab="parts" onclick="switchTab('parts')">🔩 Parts Catalog</button>
+    <button class="tab-btn" data-tab="createpo" onclick="switchTab('createpo')">📝 Create PO</button>
   </div>
 
   <div id="tabRequests">
@@ -771,6 +772,20 @@
 <script src="../js/shared.js"></script>
 <script>
 let currentUser, allRequests=[], allVendors=[], allParts=[], activeTab='active', currentPR=null;
+
+// Phases that genuinely require Procurement Manager input right now.
+// Deliberately excludes phases that are "in progress with someone else"
+// (Store, QC, or JWC/vendor rework) — those show "no action needed" in
+// their own detail view (see below) and would otherwise clutter this tab:
+//   grn_initiated        -> Store Manager is doing the GRN
+//   qc_pending            -> QC Inspector is inspecting
+//   rework_store_form     -> Store Manager is dispatching for rework
+//   rework_pending/rework2_pending -> item is out at the vendor/JWC
+//   pending_decline_approval -> Project Manager must confirm the decline
+// advance_raised_to_accounts / advance_payment_received were previously
+// MISSING from this list even though they need a PM action (mark advance
+// received, then place the order) — added back in.
+const ACTION_PHASES=['lp_procurement_processing','lp_payment_pending','procurement_active','quotes_revision_requested','approved','advance_raised_to_accounts','advance_payment_received','qc_passed'];
 function addPhaseTimestamp(pr, phaseName) {
   var existing = (pr && pr.phase_timestamps) ? pr.phase_timestamps : {};
   var ts = Object.assign({}, existing);
@@ -887,12 +902,15 @@ function updateStats() {
   document.getElementById('sActive').textContent=allRequests.filter(r=>r.phase==='procurement_active'||r.phase==='lp_procurement_processing').length;
   document.getElementById('sOrders').textContent=allRequests.filter(r=>r.phase==='approved').length;
   document.getElementById('sGRN').textContent=allRequests.filter(r=>['grn_initiated','qc_pending','rework_store_form','rework_pending'].includes(r.phase)).length;
-  document.getElementById('sOnHold').textContent=allRequests.filter(r=>r.is_on_hold).length;
+  const onHoldCount=allRequests.filter(r=>r.is_on_hold).length;
+  document.getElementById('sOnHold').textContent=onHoldCount;
+  const ohBadge=document.getElementById('onHoldBadge');
+  if(ohBadge){ohBadge.textContent=onHoldCount;ohBadge.style.display=onHoldCount?'':'none';}
 }
 
 function switchTab(t) {
   activeTab=t;
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['active','all','vendors','parts','createpo'][i]===t));
+  document.querySelectorAll('.tab-btn[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
   document.getElementById('tabRequests').style.display=['vendors','parts','createpo'].includes(t)?'none':'block';
   document.getElementById('tabVendors').style.display=t==='vendors'?'block':'none';
   document.getElementById('tabParts').style.display=t==='parts'?'block':'none';
@@ -916,9 +934,9 @@ function filterTable(){
   const ph=document.getElementById('filterPhase').value;
   const urg=document.getElementById('filterUrgency')?.value||'';
   const vid=document.getElementById('filterVendor')?.value||'';
-  const actionPhases=['lp_procurement_processing','lp_payment_pending','procurement_active','quotes_revision_requested','approved','advance_requested','grn_initiated','qc_pending','rework_store_form','rework_pending','rework2_pending','qc_passed','pending_decline_approval'];
   let reqs=allRequests;
-  if(activeTab==='active') reqs=reqs.filter(r=>actionPhases.includes(r.phase));
+  if(activeTab==='active') reqs=reqs.filter(r=>ACTION_PHASES.includes(r.phase));
+  if(activeTab==='onhold') reqs=reqs.filter(r=>r.is_on_hold);
   if(s) reqs=reqs.filter(r=>
     r.project_name.toLowerCase().includes(s)||
     String(r.request_number).includes(s)||
@@ -932,20 +950,23 @@ function filterTable(){
   if(ph) reqs=reqs.filter(r=>r.phase===ph);
   if(urg) reqs=reqs.filter(r=>(r.urgency||'normal')===urg);
   if(vid) reqs=reqs.filter(r=>r.assigned_vendor_id===vid);
+  if(activeTab==='onhold') reqs=[...reqs].sort((a,b)=>new Date(a.hold_started_at||a.updated_at)-new Date(b.hold_started_at||b.updated_at));
   renderTable(reqs);
 }
 
 function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
-  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>${activeTab==='active'?'All caught up!':'No requests'}</h3></div></td></tr>`;return;}
+  if(!reqs.length){
+    const emptyMsg=activeTab==='active'?'All caught up!':activeTab==='onhold'?'Nothing on hold':'No requests';
+    tbody.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">${activeTab==='onhold'?'✅':'📭'}</div><h3>${emptyMsg}</h3></div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
-    const needsAction=['lp_procurement_processing','lp_payment_pending','procurement_active','quotes_revision_requested','approved','grn_initiated','qc_pending','rework_store_form','rework_pending','rework2_pending','qc_passed','pending_decline_approval'].includes(r.phase);
-    const lbl={lp_procurement_processing:'Process LP',lp_payment_pending:'Mark LP Paid',procurement_active:'Work on it',quotes_revision_requested:'Revise Quotes',approved:'Place Order',advance_requested:'View Advance',grn_initiated:'GRN Sent to Store',qc_pending:'QC In Progress',rework_store_form:'Store Dispatching',rework_pending:'Rework Out',rework2_pending:'2nd Rework Out',qc_passed:'Payment Req',pending_decline_approval:'Decline Pending'}[r.phase]||'View';
+    const needsAction=ACTION_PHASES.includes(r.phase);
+    const lbl={lp_procurement_processing:'Process LP',lp_payment_pending:'Mark LP Paid',procurement_active:'Work on it',quotes_revision_requested:'Revise Quotes',approved:'Place Order',advance_raised_to_accounts:'Mark Advance Received',advance_payment_received:'Place Order',qc_passed:'Payment Req'}[r.phase]||'View';
     const typeLabel=r.request_category==='vendor_info'?'Vendor Info':r.request_category==='local_purchase'?'Local Purchase':'RFQ';
     const typeBg=r.request_category==='local_purchase'?'background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.35);color:#15803d':r.request_category==='vendor_info'?'background:rgba(139,92,246,0.08);border-color:rgba(139,92,246,0.3);color:#6d28d9':'background:var(--off-white);border-color:var(--border)';
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
       <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
-      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase||''}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${r.item_note}</div>`:''}</td>
+      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase||''}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${r.item_note}</div>`:''}${activeTab==='onhold'&&r.hold_reason?`<div style="font-size:0.7rem;color:#b45309;margin-top:2px">⏸ ${escHtml(r.hold_reason)}</div>`:''}</td>
       <td><span style="font-size:0.72rem;padding:1px 7px;border-radius:3px;border:1px solid;${typeBg}">${typeLabel}</span></td>
       <td>${getPhaseBadge(r.phase)}${r.is_on_hold?' <span style="background:#f59e0b18;color:#b45309;border:1px solid #f59e0b35;border-radius:3px;font-size:0.6rem;font-family:var(--font-mono);font-weight:700;padding:1px 5px;vertical-align:middle">⏸ HOLD</span>':''}</td>
       <td>${getUrgencyBadge(r.urgency)}</td>

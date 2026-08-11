@@ -89,7 +89,13 @@
       </div>
       <div class="form-group" style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="pIsAntunes" style="width:auto"/>
-        <label class="form-label" for="pIsAntunes" style="margin:0">Is this an Antunes project? (routes NPD-Mechanical requirement clearance to the Antunes manager instead of the default department manager)</label>
+        <label class="form-label" for="pIsAntunes" style="margin:0">Is this an Antunes project? (legacy — routes requirement clearance to the Antunes manager instead of the default department manager)</label>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Routing Group (optional)</label>
+        <input class="form-control" id="pRoutingGroup" list="routingGroupList" placeholder="e.g. CM Yuva — type an existing group or a new one"/>
+        <datalist id="routingGroupList"></datalist>
+        <div style="font-size:0.72rem;color:var(--gray-4);margin-top:4px">Tag this project to a named group to send ALL its requirement-clearance requests — both NPD &amp; Production, both Elec &amp; Mechanical — to one manager. Assign who that manager is in Master → Approval Routing → Project Routing Groups. Leave blank to use the default department routing.</div>
       </div>
       <div class="form-group">
         <label class="form-label">Description</label>
@@ -310,7 +316,7 @@ async function init() {
   document.getElementById('footerMount').innerHTML = buildFooter();
   initNavbar(currentUser);
   showLoader(true);
-  await Promise.all([loadProjects(), loadPMs(), loadPhaseLibrary()]);
+  await Promise.all([loadProjects(), loadPMs(), loadPhaseLibrary(), loadRoutingGroupOptions()]);
   showLoader(false);
 }
 
@@ -320,6 +326,21 @@ async function loadProjects() {
     .select('*,project_phases(id,name),users:default_pm_id(id,name)')
     .order('name'), 'projects');
   filterProjects();
+}
+
+// Distinct routing-group names, pulled from both projects already tagged
+// with one and from any group Master has already assigned a manager to —
+// just for the datalist autocomplete, so typing an existing name reuses it.
+async function loadRoutingGroupOptions() {
+  const [projRes, overrideRes] = await Promise.all([
+    db.from('projects').select('routing_group').not('routing_group', 'is', null),
+    db.from('routing_overrides').select('routing_group')
+  ]);
+  const names = new Set();
+  (projRes.data || []).forEach(r => { if (r.routing_group) names.add(r.routing_group); });
+  (overrideRes.data || []).forEach(r => { if (r.routing_group) names.add(r.routing_group); });
+  const dl = document.getElementById('routingGroupList');
+  if (dl) dl.innerHTML = [...names].sort().map(n => `<option value="${n.replace(/"/g,'&quot;')}"></option>`).join('');
 }
 
 async function loadPMs() {
@@ -359,6 +380,7 @@ function renderProjects(projs) {
         </span>
       </div>
       ${p.is_antunes ? `<span style="display:inline-block;margin-bottom:8px;font-size:0.62rem;padding:2px 7px;border-radius:3px;background:rgba(220,38,38,0.08);color:#dc2626;border:1px solid rgba(220,38,38,0.2)">🧭 Antunes</span>` : ''}
+      ${p.routing_group ? `<span style="display:inline-block;margin-bottom:8px;margin-left:${p.is_antunes?'4px':'0'};font-size:0.62rem;padding:2px 7px;border-radius:3px;background:rgba(99,102,241,0.08);color:#6366f1;border:1px solid rgba(99,102,241,0.2)">🧭 ${p.routing_group}</span>` : ''}
       ${p.description ? `<p style="font-size:0.76rem;color:var(--gray-3);margin-bottom:8px">${p.description}</p>` : ''}
       <div style="margin-bottom:10px">
         <div style="font-size:0.68rem;font-weight:600;color:var(--gray-4);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Phases (${phases.length})</div>
@@ -383,6 +405,7 @@ function openProjectModal() {
   document.getElementById('pDesc').value = '';
   document.getElementById('pDefaultPM').value = '';
   document.getElementById('pIsAntunes').checked = false;
+  document.getElementById('pRoutingGroup').value = '';
   selectedProjectPhases = [];
   renderLibrarySelectChips();
   renderSelectedPhasesPreview();
@@ -398,6 +421,7 @@ async function openEditProject(id) {
   document.getElementById('pDesc').value = proj.description || '';
   document.getElementById('pDefaultPM').value = proj.default_pm_id || '';
   document.getElementById('pIsAntunes').checked = !!proj.is_antunes;
+  document.getElementById('pRoutingGroup').value = proj.routing_group || '';
   // Pre-populate selectedProjectPhases from existing project_phases
   // Mark as fromLibrary=true if name exists in library (for toggle highlighting)
   selectedProjectPhases = (proj.project_phases || []).map(ph => ({
@@ -421,6 +445,7 @@ async function saveProject() {
     description: document.getElementById('pDesc').value.trim() || null,
     default_pm_id: document.getElementById('pDefaultPM').value || null,
     is_antunes: document.getElementById('pIsAntunes').checked,
+    routing_group: document.getElementById('pRoutingGroup').value.trim() || null,
     created_by: currentUser.id
   };
 
@@ -461,6 +486,7 @@ async function saveProject() {
   showToast(id ? 'Project updated!' : 'Project added!', 'success');
   closeModal('projectModal');
   await loadProjects();
+  await loadRoutingGroupOptions();
 }
 
 async function toggleProjectActive(id, current) {

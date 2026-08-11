@@ -32,17 +32,18 @@
     <div class="stat-card" style="--accent:#3b82f6"><div class="stat-card-value" id="sUsers">—</div><div class="stat-card-label">Users</div><div class="stat-card-icon">👥</div></div>
     <div class="stat-card" style="--accent:#8b5cf6"><div class="stat-card-value" id="sVendors">—</div><div class="stat-card-label">Vendors</div><div class="stat-card-icon">🏢</div></div>
     <div class="stat-card" style="--accent:#ef4444"><div class="stat-card-value" id="sRejected">—</div><div class="stat-card-label">Rejected</div><div class="stat-card-icon">✖</div></div>
-    <div class="stat-card" style="--accent:#dc2626"><div class="stat-card-value" id="sOnHold">—</div><div class="stat-card-label">On Hold</div><div class="stat-card-icon">⏸</div></div>
+    <div class="stat-card" style="--accent:#dc2626;cursor:pointer" onclick="switchTab('onhold')"><div class="stat-card-value" id="sOnHold">—</div><div class="stat-card-label">On Hold</div><div class="stat-card-icon">⏸</div></div>
   </div>
 
   <!-- TABS -->
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('requests')">📋 All Requests</button>
-    <button class="tab-btn" onclick="switchTab('director')">👤 Director Approvals <span id="directorBadge" style="display:none;background:#7c3aed;color:#fff;border-radius:999px;padding:0 7px;font-size:0.72rem;margin-left:4px;vertical-align:middle"></span></button>
-    <button class="tab-btn" onclick="switchTab('routing')">🧭 Approval Routing <span id="reassignBadge" style="display:none;background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:0.72rem;margin-left:4px;vertical-align:middle"></span></button>
-    <button class="tab-btn" onclick="switchTab('users')">👥 Users</button>
-    <button class="tab-btn" onclick="switchTab('vendors')">🏢 Vendors</button>
-    <button class="tab-btn" onclick="switchTab('analytics')">📊 Analytics</button>
+    <button class="tab-btn active" data-tab="requests" onclick="switchTab('requests')">📋 All Requests</button>
+    <button class="tab-btn" data-tab="onhold" onclick="switchTab('onhold')">⏸ On Hold <span id="onHoldBadge" style="display:none;background:#b45309;color:#fff;border-radius:999px;padding:0 7px;font-size:0.72rem;margin-left:4px;vertical-align:middle"></span></button>
+    <button class="tab-btn" data-tab="director" onclick="switchTab('director')">👤 Director Approvals <span id="directorBadge" style="display:none;background:#7c3aed;color:#fff;border-radius:999px;padding:0 7px;font-size:0.72rem;margin-left:4px;vertical-align:middle"></span></button>
+    <button class="tab-btn" data-tab="routing" onclick="switchTab('routing')">🧭 Approval Routing <span id="reassignBadge" style="display:none;background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:0.72rem;margin-left:4px;vertical-align:middle"></span></button>
+    <button class="tab-btn" data-tab="users" onclick="switchTab('users')">👥 Users</button>
+    <button class="tab-btn" data-tab="vendors" onclick="switchTab('vendors')">🏢 Vendors</button>
+    <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">📊 Analytics</button>
     <button class="tab-btn" onclick="goToProjects()">📋 Projects</button>
     <button class="tab-btn" onclick="window.location.href='admin.html'" style="background:rgba(224,32,32,0.08);color:var(--red);border:1px solid rgba(224,32,32,0.2);font-weight:600">⚙ Admin Panel</button>
   </div>
@@ -97,6 +98,26 @@
     </div>
   </div>
 
+  <!-- ON HOLD TAB -->
+  <div id="tab-onhold" style="display:none">
+    <div class="filter-bar">
+      <input type="text" id="onHoldSearchInput" placeholder="Search by project, PR #, team member, item note..." oninput="renderOnHoldTab()"/>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('onHoldSearchInput').value='';renderOnHoldTab()">✕ Clear</button>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="section-title" style="color:#b45309">⏸ Requests On Hold</span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Lead-time clock paused — hold reason and duration shown per request</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>PR #</th><th>Project</th><th>Hold Reason</th><th>On Hold Since</th><th>Held For</th><th>Phase</th><th>Actions</th></tr></thead>
+          <tbody id="onHoldBody"><tr><td colspan="7" style="text-align:center;padding:24px;color:var(--gray-4)">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- DIRECTOR APPROVALS TAB -->
   <div id="tab-director" style="display:none">
     <div class="card" style="margin-bottom:18px;border:1.5px solid rgba(124,58,237,0.25);background:rgba(124,58,237,0.03)">
@@ -141,9 +162,9 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" style="margin-bottom:18px">
       <div class="card-header">
-        <span class="section-title">Antunes Project Override</span>
+        <span class="section-title">Antunes Project Override <span style="font-weight:400;color:var(--gray-4)">(legacy)</span></span>
         <span style="font-size:0.8rem;color:var(--gray-3)">Applies instead of the default above, only for projects flagged "Antunes" in Projects</span>
       </div>
       <div class="table-wrap">
@@ -152,6 +173,25 @@
           <tbody id="antunesRoutingBody"></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="card" style="border:1.5px solid rgba(99,102,241,0.25);background:rgba(99,102,241,0.02)">
+      <div class="card-header">
+        <span class="section-title" style="color:#6366f1">🧭 Project Routing Groups</span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Pick any name (e.g. "CM Yuva") and one manager — that person gets requirement-clearance authority across BOTH NPD &amp; Production and BOTH Elec &amp; Mechanical for every project tagged with this group</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Group</th><th>Manager</th><th>Projects Tagged</th><th></th></tr></thead>
+          <tbody id="routingGroupsBody"><tr><td colspan="4" style="text-align:center;padding:20px;color:var(--gray-4)">Loading...</td></tr></tbody>
+        </table>
+      </div>
+      <div style="padding:14px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input class="form-control" id="newRoutingGroupName" placeholder="New group name, e.g. CM Yuva" style="max-width:220px"/>
+        <select class="form-control" id="newRoutingGroupManager" style="max-width:280px"></select>
+        <button class="btn btn-primary btn-sm" onclick="createRoutingGroup()">+ Create Group</button>
+      </div>
+      <div style="padding:0 16px 14px;font-size:0.72rem;color:var(--gray-4)">Then go to Projects and set that project's "Routing Group" field to this same name.</div>
     </div>
   </div>
 
@@ -407,18 +447,52 @@ async function loadVendors() {
   renderVendorGrid(allVendors);
 }
 
-let deptRouting=[], antunesRouting=[];
+let deptRouting=[], antunesRouting=[], routingOverrides=[], routingProjects=[];
 const ROUTING_COMBOS=[['npd','elec'],['npd','mechanical'],['production','elec'],['production','mechanical']];
 
 async function loadRoutingConfig() {
-  const[dr,ar]=await Promise.all([
+  const[dr,ar,ro,rp]=await Promise.all([
     db.from('department_routing').select('*'),
-    db.from('antunes_routing').select('*')
+    db.from('antunes_routing').select('*'),
+    db.from('routing_overrides').select('*'),
+    db.from('projects').select('id,name,routing_group')
   ]);
   if(dr.error) console.error('loadRoutingConfig department_routing failed:',dr.error);
   if(ar.error) console.error('loadRoutingConfig antunes_routing failed:',ar.error);
+  if(ro.error) console.error('loadRoutingConfig routing_overrides failed:',ro.error);
+  if(rp.error) console.error('loadRoutingConfig projects failed:',rp.error);
   deptRouting=dr.data||[];
   antunesRouting=ar.data||[];
+  routingOverrides=ro.data||[];
+  routingProjects=rp.data||[];
+}
+
+// Collapses the 4 per-combo routing_overrides rows for a group into one
+// "group -> manager" entry for display. Rows within a group are always
+// written together (see saveRoutingGroup), so any one row's manager_id
+// represents the whole group; if they've ever drifted apart (e.g. edited
+// directly in the DB) this shows the most common manager_id and flags it.
+function summarizeRoutingGroups() {
+  const byGroup = new Map();
+  routingOverrides.forEach(r => {
+    if (!byGroup.has(r.routing_group)) byGroup.set(r.routing_group, []);
+    byGroup.get(r.routing_group).push(r);
+  });
+  // Include groups that exist only as a tag on a project with no manager assigned yet
+  routingProjects.forEach(p => {
+    if (p.routing_group && !byGroup.has(p.routing_group)) byGroup.set(p.routing_group, []);
+  });
+  return [...byGroup.entries()].map(([name, rows]) => {
+    const managerIds = [...new Set(rows.map(r=>r.manager_id))];
+    const projectCount = routingProjects.filter(p=>p.routing_group===name).length;
+    return {
+      name,
+      managerId: managerIds.length === 1 ? managerIds[0] : null,
+      inconsistent: managerIds.length > 1,
+      configuredCombos: rows.length,
+      projectCount
+    };
+  }).sort((a,b)=>a.name.localeCompare(b.name));
 }
 
 function userPickerOptions(selectedId, excludeId) {
@@ -450,7 +524,74 @@ function renderRoutingTab() {
     </tr>`;
   }).join('');
 
+  renderRoutingGroups();
+  document.getElementById('newRoutingGroupManager').innerHTML = userPickerOptions(null);
   renderReassignQueue();
+}
+
+// ── PROJECT ROUTING GROUPS (generic, per-project override) ───
+function renderRoutingGroups() {
+  const body=document.getElementById('routingGroupsBody');
+  const groups=summarizeRoutingGroups();
+  if(!groups.length){ body.innerHTML='<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--gray-4)">No routing groups yet — create one below</td></tr>'; return; }
+  body.innerHTML=groups.map((g,i)=>`<tr>
+    <td><strong>${escHtml(g.name)}</strong>${g.inconsistent?' <span style="color:var(--red);font-size:0.68rem" title="The 4 combos for this group don\'t all point to the same manager — re-save to fix">⚠ mixed</span>':''}</td>
+    <td><select class="form-control" id="rg-manager-${i}" style="max-width:260px">${userPickerOptions(g.managerId)}</select></td>
+    <td style="font-family:var(--font-mono);font-size:0.8rem">${g.projectCount}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-primary btn-sm" onclick="saveRoutingGroup('${g.name.replace(/'/g,"\\'")}', ${i})">Save</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteRoutingGroup('${g.name.replace(/'/g,"\\'")}')">Remove</button>
+    </td>
+  </tr>`).join('');
+}
+
+// Writes (or clears) the SAME manager across all 4 request_for x discipline
+// combos for this routing_group in one go — this is what gives the assigned
+// manager authority over both disciplines and both NPD/Production, instead
+// of having to configure 4 separate rows by hand like the legacy tables.
+async function saveRoutingGroup(name, rowIndex) {
+  const sel=document.getElementById(`rg-manager-${rowIndex}`);
+  const managerId=sel ? sel.value : '';
+  showLoader(true);
+  // Delete-then-insert rather than upsert, since routing_overrides has no
+  // guaranteed unique constraint on (routing_group,request_for,discipline).
+  const{error:delErr}=await db.from('routing_overrides').delete().eq('routing_group',name);
+  let error=delErr;
+  if(!error && managerId){
+    const rows=ROUTING_COMBOS.map(([rf,disc])=>({routing_group:name,request_for:rf,discipline:disc,manager_id:managerId}));
+    ({error}=await db.from('routing_overrides').insert(rows));
+  }
+  showLoader(false);
+  if(error){ console.error('saveRoutingGroup failed:',error); showToast('Failed to save group: '+error.message,'error'); return; }
+  showToast(managerId?`"${name}" now routes to that manager for both disciplines`:`"${name}" cleared — falls back to default routing`,'success');
+  await loadRoutingConfig(); renderRoutingTab();
+}
+
+async function createRoutingGroup() {
+  const name=document.getElementById('newRoutingGroupName').value.trim();
+  const managerId=document.getElementById('newRoutingGroupManager').value;
+  if(!name){ showToast('Group name required','error'); return; }
+  if(!managerId){ showToast('Pick a manager for this group','error'); return; }
+  if(summarizeRoutingGroups().some(g=>g.name.toLowerCase()===name.toLowerCase())){ showToast('A group with that name already exists — edit it in the table above','error'); return; }
+  showLoader(true);
+  const rows=ROUTING_COMBOS.map(([rf,disc])=>({routing_group:name,request_for:rf,discipline:disc,manager_id:managerId}));
+  const{error}=await db.from('routing_overrides').insert(rows);
+  showLoader(false);
+  if(error){ console.error('createRoutingGroup failed:',error); showToast('Failed to create group: '+error.message,'error'); return; }
+  document.getElementById('newRoutingGroupName').value='';
+  showToast(`Group "${name}" created. Now tag projects with this group name on the Projects page.`,'success');
+  await loadRoutingConfig(); renderRoutingTab();
+}
+
+async function deleteRoutingGroup(name) {
+  const taggedCount=routingProjects.filter(p=>p.routing_group===name).length;
+  if(!confirm(`Remove routing group "${name}"? ${taggedCount?`${taggedCount} project(s) still tagged with it will fall back to default department routing.`:''}`)) return;
+  showLoader(true);
+  const{error}=await db.from('routing_overrides').delete().eq('routing_group',name);
+  showLoader(false);
+  if(error){ showToast('Failed to remove group: '+error.message,'error'); return; }
+  showToast(`Group "${name}" removed`,'success');
+  await loadRoutingConfig(); renderRoutingTab();
 }
 
 async function saveDeptRouting(requestFor,discipline) {
@@ -526,20 +667,28 @@ function updateStats() {
   const reassignPending=allRequests.filter(r=>r.phase==='pending_master_reassignment');
   const rBadge=document.getElementById('reassignBadge');
   if(rBadge){rBadge.textContent=reassignPending.length;rBadge.style.display=reassignPending.length?'':'none';}
+  // On Hold badge
+  const onHoldCount=allRequests.filter(r=>r.is_on_hold).length;
+  const ohBadge=document.getElementById('onHoldBadge');
+  if(ohBadge){ohBadge.textContent=onHoldCount;ohBadge.style.display=onHoldCount?'':'none';}
+  if(activeTab==='onhold') renderOnHoldTab();
 }
 
 function switchTab(tab) {
   activeTab=tab;
-  ['requests','director','routing','users','vendors','analytics'].forEach((t,i)=>{
+  ['requests','onhold','director','routing','users','vendors','analytics'].forEach(t=>{
     const el=document.getElementById(`tab-${t}`);
     if(el) el.style.display=t===tab?'':'none';
-    document.querySelectorAll('.tab-btn')[i].classList.toggle('active',t===tab);
+  });
+  document.querySelectorAll('.tab-btn[data-tab]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.tab===tab);
   });
   if(tab==='analytics') {
     requestAnimationFrame(() => requestAnimationFrame(renderAnalytics));
   }
   if(tab==='director') renderDirectorApprovals();
   if(tab==='routing') renderRoutingTab();
+  if(tab==='onhold') renderOnHoldTab();
 }
 
 function clearFilters() {
@@ -577,6 +726,35 @@ function renderTable(reqs) {
       <button class="btn btn-ghost btn-sm" onclick='viewPR("${r.id}")'>View</button>
     </td>
   </tr>`).join('');
+}
+
+// ── ON HOLD TAB ────────────────────────────────────────────────
+function renderOnHoldTab() {
+  const s=(document.getElementById('onHoldSearchInput')?.value||'').toLowerCase();
+  let reqs=allRequests.filter(r=>r.is_on_hold);
+  if(s) reqs=reqs.filter(r=>
+    r.project_name.toLowerCase().includes(s)||
+    String(r.request_number).includes(s)||
+    (r.team_member_name||'').toLowerCase().includes(s)||
+    (r.users?.name||'').toLowerCase().includes(s)||
+    (r.item_note||'').toLowerCase().includes(s)
+  );
+  // Longest-held first, so the most stuck requests surface at the top
+  reqs=[...reqs].sort((a,b)=>new Date(a.hold_started_at||a.updated_at)-new Date(b.hold_started_at||b.updated_at));
+  const tbody=document.getElementById('onHoldBody');
+  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">✅</div><h3>Nothing on hold</h3><p>No requests currently have their lead-time clock paused.</p></div></td></tr>`;return;}
+  tbody.innerHTML=reqs.map(r=>{
+    const heldDays=r.hold_started_at?((Date.now()-new Date(r.hold_started_at))/86400000).toFixed(1):'—';
+    return `<tr>
+    <td><span class="pr-number">PR-${String(r.request_number).padStart(4,'0')}</span></td>
+    <td><strong>${r.project_name}</strong><br/><span style="font-size:0.74rem;color:var(--gray-4)">${r.project_phase||''}</span></td>
+    <td style="font-size:0.8rem;max-width:220px">${r.hold_reason?escHtml(r.hold_reason):'<span style="color:var(--gray-4)">—</span>'}</td>
+    <td class="mono" style="font-size:0.75rem">${r.hold_started_at?formatDateTime(r.hold_started_at):'—'}</td>
+    <td class="mono" style="font-size:0.78rem;color:#b45309;font-weight:700">${heldDays}d</td>
+    <td>${getPhaseBadge(r.phase)}</td>
+    <td style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick='viewPR("${r.id}")'>View / Continue</button></td>
+  </tr>`;
+  }).join('');
 }
 
 async function viewPR(id) {
