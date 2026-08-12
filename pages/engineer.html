@@ -206,6 +206,7 @@
             <option value="">Select</option>
             <option value="elec">Elec</option>
             <option value="mechanical">Mechanical</option>
+            <option value="other">Other</option>
           </select>
         </div>
         <!-- Project name — dropdown from DB -->
@@ -824,7 +825,7 @@ async function submitPR() {
   if(!isEditMode&&!isVI&&!isLP&&selectedPMApproval==='already_approved'&&!pmScreenshotBase64){showToast('Please upload Project Manager approval screenshot','error');return;}
   const requestFor=document.getElementById('fRequestFor')?.value||'npd';
   const discipline=document.getElementById('fDiscipline')?.value||'';
-  if(!isVI&&!isLP&&!discipline){showToast('Please select a Discipline (Elec / Mechanical)','error');return;}
+  if(!isVI&&!isLP&&!discipline){showToast('Please select a Discipline','error');return;}
   const pmId=document.getElementById('fPMSelect').value;
   if(!pmId){showToast(requestFor==='production'?'Please select a Project Manager-Production (add one in Master Admin if none listed)':'Please select a Project Manager','error');return;}
   const projectId=document.getElementById('fProjectSelect').value;

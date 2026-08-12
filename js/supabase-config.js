@@ -237,11 +237,12 @@ const ORDER_TYPES = {
   inventory:    'Inventory Item (Available in Inventory)'
 };
 
-// Elec / Mechanical split, combined with request_for (npd/production) to give
-// 4 routing categories: npd-elec, npd-mechanical, production-elec, production-mechanical
+// Elec / Mechanical / Other split, combined with request_for (npd/production) to give
+// 6 routing categories: npd-elec, npd-mechanical, npd-other, production-elec, production-mechanical, production-other
 const DISCIPLINES = {
   elec:       'Electronics',
-  mechanical: 'Mechanical'
+  mechanical: 'Mechanical',
+  other:      'Other'
 };
 
 const DEPARTMENTS = {

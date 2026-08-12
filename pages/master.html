@@ -448,7 +448,8 @@ async function loadVendors() {
 }
 
 let deptRouting=[], antunesRouting=[], routingOverrides=[], routingProjects=[];
-const ROUTING_COMBOS=[['npd','elec'],['npd','mechanical'],['production','elec'],['production','mechanical']];
+const ROUTING_COMBOS=[['npd','elec'],['npd','mechanical'],['npd','other'],['production','elec'],['production','mechanical'],['production','other']];
+const DISCIPLINE_LABELS={elec:'Elec',mechanical:'Mechanical',other:'Other'};
 
 async function loadRoutingConfig() {
   const[dr,ar,ro,rp]=await Promise.all([
@@ -508,7 +509,7 @@ function renderRoutingTab() {
     const row=deptRouting.find(r=>r.request_for===rf&&r.discipline===disc);
     return `<tr>
       <td>${rf==='npd'?'NPD':'Production'}</td>
-      <td>${disc==='elec'?'Elec':'Mechanical'}</td>
+      <td>${DISCIPLINE_LABELS[disc]||disc}</td>
       <td><select class="form-control" id="dr-${rf}-${disc}" style="max-width:280px">${userPickerOptions(row?.manager_id)}</select></td>
       <td><button class="btn btn-primary btn-sm" onclick="saveDeptRouting('${rf}','${disc}')">Save</button></td>
     </tr>`;
@@ -518,7 +519,7 @@ function renderRoutingTab() {
     const row=antunesRouting.find(r=>r.request_for===rf&&r.discipline===disc);
     return `<tr>
       <td>${rf==='npd'?'NPD':'Production'}</td>
-      <td>${disc==='elec'?'Elec':'Mechanical'}</td>
+      <td>${DISCIPLINE_LABELS[disc]||disc}</td>
       <td><select class="form-control" id="ar-${rf}-${disc}" style="max-width:280px">${userPickerOptions(row?.manager_id)}</select></td>
       <td><button class="btn btn-primary btn-sm" onclick="saveAntunesRouting('${rf}','${disc}')">Save</button></td>
     </tr>`;
@@ -627,7 +628,7 @@ function renderReassignQueue() {
   body.innerHTML=pending.map(r=>`<tr>
     <td>PR-${String(r.request_number).padStart(4,'0')}</td>
     <td>${r.project_name}</td>
-    <td>${r.request_category}${r.discipline?` · ${r.discipline==='elec'?'Elec':'Mechanical'}`:''}</td>
+    <td>${r.request_category}${r.discipline?` · ${DISCIPLINE_LABELS[r.discipline]||r.discipline}`:''}</td>
     <td>${r.users?.name||r.team_member_name||'—'}</td>
     <td>${new Date(r.created_at).toLocaleDateString()}</td>
     <td><select class="form-control" id="reassign-${r.id}" style="max-width:260px">${userPickerOptions(null)}</select></td>
