@@ -44,7 +44,7 @@ async function init() {
   initNavbar(currentUser);
   // Load PMs + Director for the deviation dropdown
   allPMsAndDirector = await dbFetch(function(){ return db.from('users').select('id,name,role').in('role',['project_manager','director']).order('name'); }, 'PM/director list');
-  await loadRequests();
+  await Promise.all([loadRequests(), applyAdminConfigOverrides()]);
 }
 
 // ─── Data loading ─────────────────────────────────────────────────────────────

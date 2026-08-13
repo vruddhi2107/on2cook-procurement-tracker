@@ -1526,3 +1526,10 @@ footer { background: var(--black); color: var(--gray-4); padding: 18px 22px; dis
 /* ── CHANGE PASSWORD PAGE ── */
 .cp-page { max-width: 400px; margin: 52px auto; padding: 0 18px; }
 .cp-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-sm); }
+/* ── DYNAMIC FILTER BAR (multi-select dropdowns) ── */
+.ms-filter{position:relative}
+.ms-filter-btn{cursor:pointer;text-align:left;white-space:nowrap}
+.ms-filter-count{color:var(--red);font-weight:700}
+.ms-filter-panel{position:absolute;top:calc(100% + 4px);left:0;z-index:20;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,0.1);padding:8px;min-width:200px;max-height:260px;overflow-y:auto}
+.ms-filter-opt{display:flex;align-items:center;gap:8px;padding:5px 6px;font-size:0.8rem;cursor:pointer;border-radius:4px}
+.ms-filter-opt:hover{background:var(--off-white)}

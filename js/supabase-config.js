@@ -98,7 +98,8 @@ const PHASES = {
   lp_rejected:                  { label: 'LP Rejected & Closed',    color: '#ef4444', icon: '✖️'  },
   lp_payment_done:              { label: 'LP — Payment Done',          color: '#22c55e', icon: '✅' },
   qc_rejected:                  { label: 'QC Rejected & Closed',     color: '#ef4444', icon: '✖️'  },
-  payment_received:             { label: 'Payment Received & Closed',color: '#22c55e', icon: '✅' }
+  payment_received:             { label: 'Payment Received & Closed',color: '#22c55e', icon: '✅' },
+  vendor_info_received:         { label: 'Vendor Info Received & Closed', color: '#22c55e', icon: '✅' }
 };
 
 // Phases that represent a fully closed/terminal request — no further actions possible
@@ -110,6 +111,7 @@ const CLOSED_PHASES = new Set([
   'qc_rejected',
   'payment_received',
   'lp_rejected',
+  'vendor_info_received',
 ]);
 
 // ── PIPELINE DEFINITIONS ─────────────────────────────────────
@@ -166,8 +168,9 @@ const PIPELINES = {
       'pending_initial_pm_approval',
       'procurement_active',
       'vendor_info_shared',
+      'vendor_info_received',
     ],
-    terminal: ['vendor_info_shared', 'rejected', 'declined'],
+    terminal: ['vendor_info_received', 'rejected', 'declined'],
   },
 };
 
@@ -225,7 +228,8 @@ const PIPELINE_WF_STEPS = {
     {key:'submitted',label:'Submitted'},
     {key:'pending_initial_pm_approval',label:'PM Clearance',optional:true},
     {key:'procurement_active',label:'Procurement'},
-    {key:'vendor_info_shared',label:'Info Shared'}
+    {key:'vendor_info_shared',label:'Info Shared'},
+    {key:'vendor_info_received',label:'Closed'}
   ]
 };
 
@@ -237,12 +241,11 @@ const ORDER_TYPES = {
   inventory:    'Inventory Item (Available in Inventory)'
 };
 
-// Elec / Mechanical / Other split, combined with request_for (npd/production) to give
-// 6 routing categories: npd-elec, npd-mechanical, npd-other, production-elec, production-mechanical, production-other
+// Elec / Mechanical split, combined with request_for (npd/production) to give
+// 4 routing categories: npd-elec, npd-mechanical, production-elec, production-mechanical
 const DISCIPLINES = {
   elec:       'Electronics',
-  mechanical: 'Mechanical',
-  other:      'Other'
+  mechanical: 'Mechanical'
 };
 
 const DEPARTMENTS = {

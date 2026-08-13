@@ -106,7 +106,6 @@
             <option value="">Select</option>
             <option value="elec">Elec</option>
             <option value="mechanical">Mechanical</option>
-            <option value="other">Other</option>
           </select>
         </div>
         <div class="form-group">
@@ -251,6 +250,7 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="../js/supabase-config.js"></script>
 <script src="../js/shared.js"></script>
+<script src="../js/admin-config.js"></script>
 <script>
 let currentUser, allRequests=[], activeTab='clearance', currentPR=null;
 function addPhaseTimestamp(pr, phaseName) {
@@ -284,7 +284,7 @@ async function init() {
   document.getElementById('footerMount').innerHTML=buildFooter();
   initNavbar(currentUser);
   showLoader(true);
-  await Promise.all([loadRequests(), loadPMs(), loadProjects()]);
+  await Promise.all([loadRequests(), loadPMs(), loadProjects(), applyAdminConfigOverrides()]);
   showLoader(false);
   window.initNotifBell && window.initNotifBell(currentUser, function(prId){ var pr=allRequests.find(function(r){return r.id===prId;}); if(pr) openPRModal(prId); });
 }
@@ -1086,7 +1086,7 @@ async function submitPR() {
   const isLP=cat==='local_purchase';
   const requestFor=document.getElementById('fRequestFor')?.value||'npd';
   const discipline=document.getElementById('fDiscipline')?.value||'';
-  if(!isVI&&!isLP&&!discipline){showToast('Please select a Discipline','error');return;}
+  if(!isVI&&!isLP&&!discipline){showToast('Please select a Discipline (Elec / Mechanical)','error');return;}
   const pmId=document.getElementById('fPMSelect').value||(requestFor==='production'?'':currentUser.id); // assigned PM for the project, falling back to self (NPD only)
   if(requestFor==='production'&&!pmId){showToast('Please select a Project Manager-Production (add one in Master Admin if none listed)','error');return;}
   const projectId=document.getElementById('fProjectSelect').value;

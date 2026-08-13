@@ -84,13 +84,14 @@
         <option value="lp_payment_pending">LP — Payment Pending</option>
         <option value="lp_payment_done">LP — Payment Done</option>
       </select>
-      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Clear</button>
       <select id="filterUrgency" onchange="filterTable()" style="min-width:130px">
         <option value="">All Urgencies</option>
         <option value="urgent">⚡ Within 24 hours</option>
         <option value="critical">🔴 Within 48 hours</option>
         <option value="normal">Within 1 Week</option>
       </select>
+      <span id="dynamicFilterBar" style="display:contents"></span>
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Clear</button>
     </div>
     <div class="card">
       <div class="table-wrap">
@@ -206,7 +207,6 @@
             <option value="">Select</option>
             <option value="elec">Elec</option>
             <option value="mechanical">Mechanical</option>
-            <option value="other">Other</option>
           </select>
         </div>
         <!-- Project name — dropdown from DB -->
@@ -354,6 +354,7 @@
           <span style="font-size:0.72rem;color:var(--gray-4)">Add at least one part or upload a BOM</span>
         </div>
         <div id="partsEditorContainer"></div>
+        <div id="customFieldsContainer"></div>
       </div>
 
     </div>
@@ -383,6 +384,7 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="../js/supabase-config.js"></script>
 <script src="../js/shared.js"></script>
+<script src="../js/admin-config.js"></script>
 <script>
 let currentUser, myRequests=[], prQuotations=[], allPMs=[], allProjects=[];
 function addPhaseTimestamp(pr, phaseName) {
@@ -422,7 +424,10 @@ async function init() {
   document.getElementById('fTeam').value=currentUser.name;
   initPartsEditor('partsEditorContainer',[{_id:1,part_number:'',name:'',qty:1,spec:''}],false);
   showLoader(true);
-  await Promise.all([loadRequests(), loadPMs(), loadProjects()]);
+  await Promise.all([loadRequests(), loadPMs(), loadProjects(), applyAdminConfigOverrides()]);
+  refreshFieldCatalog(myRequests);
+  renderDynamicFilterBar('dynamicFilterBar','engineer','filterTable',{includeSearch:false,includeClear:false});
+  filterTable();
   showLoader(false);
 
   window.initNotifBell && window.initNotifBell(currentUser, function(prId){
@@ -540,7 +545,7 @@ function onPhaseChange() {
 // ── STATS / BANNER ───────────────────────────────────────────
 function updateStats() {
   const declinedPhases=['rejected','qc_rejected','declined','lp_rejected'];
-  const closedPhases=['qc_passed','accepted','payment_requested','payment_received','lp_payment_done'];
+  const closedPhases=['qc_passed','accepted','payment_requested','payment_received','lp_payment_done','vendor_info_received'];
   const actionPhases=['quotations_shared','grn_pending','vendor_info_shared','lp_submitted'];
   const allTerminal=[...declinedPhases,...closedPhases];
   document.getElementById('sTotal').textContent=myRequests.length;
@@ -630,13 +635,13 @@ function filterEngPartsTable() {
   ));
 }
 
-function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterPhase').value='';const uf=document.getElementById('filterUrgency');if(uf)uf.value='';filterTable();}
+function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterPhase').value='';const uf=document.getElementById('filterUrgency');if(uf)uf.value='';clearDynamicFilters('dynamicFilterBar','engineer','filterTable');}
 
 function filterTable() {
   const s=document.getElementById('searchInput').value.toLowerCase(), ph=document.getElementById('filterPhase').value;
   const urg=document.getElementById('filterUrgency')?.value||'';
   const declinedPhases=['rejected','qc_rejected','declined','lp_rejected'];
-  const closedPhases=['qc_passed','accepted','payment_requested','payment_received','lp_payment_done'];
+  const closedPhases=['qc_passed','accepted','payment_requested','payment_received','lp_payment_done','vendor_info_received'];
   const actionPhases=['quotations_shared','grn_pending','vendor_info_shared','lp_submitted'];
   const allTerminal=[...declinedPhases,...closedPhases];
   let reqs=myRequests;
@@ -647,6 +652,7 @@ function filterTable() {
   if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s)||(r.item_note||'').toLowerCase().includes(s));
   if(ph) reqs=reqs.filter(r=>r.phase===ph);
   if(urg) reqs=reqs.filter(r=>(r.urgency||'normal')===urg);
+  reqs=applyDynamicFilters(reqs,'dynamicFilterBar','engineer',['project_name']);
   renderTable(reqs);
 }
 
@@ -813,6 +819,7 @@ async function handleBOMFile(e) {
   refreshPMOptions();
   initPartsEditor('partsEditorContainer',[{_id:1,part_number:'',name:'',qty:1,spec:''}],false);
   onCategoryChange();
+  renderCustomFieldInputs('customFieldsContainer');
   openModal('prFormModal');
 }
 
@@ -825,7 +832,7 @@ async function submitPR() {
   if(!isEditMode&&!isVI&&!isLP&&selectedPMApproval==='already_approved'&&!pmScreenshotBase64){showToast('Please upload Project Manager approval screenshot','error');return;}
   const requestFor=document.getElementById('fRequestFor')?.value||'npd';
   const discipline=document.getElementById('fDiscipline')?.value||'';
-  if(!isVI&&!isLP&&!discipline){showToast('Please select a Discipline','error');return;}
+  if(!isVI&&!isLP&&!discipline){showToast('Please select a Discipline (Elec / Mechanical)','error');return;}
   const pmId=document.getElementById('fPMSelect').value;
   if(!pmId){showToast(requestFor==='production'?'Please select a Project Manager-Production (add one in Master Admin if none listed)':'Please select a Project Manager','error');return;}
   const projectId=document.getElementById('fProjectSelect').value;
@@ -839,6 +846,8 @@ async function submitPR() {
   if(!isVI&&!isLP&&!orderType){showToast('Please select an order type','error');return;}
   const parts=getPartsFromEditor();
   if(!parts.length){showToast('Please add at least one part or item','error');return;}
+  const{values:customFieldValues, missingRequired}=collectCustomFieldValues();
+  if(missingRequired){showToast(`Please fill "${missingRequired}"`,'error');return;}
   // In production phase, every part must have a part number
   if(_partsEditorProductionMode){
     const missing=parts.filter(p=>!p.part_number||!p.part_number.trim());
@@ -910,6 +919,7 @@ async function submitPR() {
     pm_approval_screenshot:selectedPMApproval==='already_approved'?pmScreenshotBase64:null,
     parts,
     attachments:attachedFiles.map(f=>({name:f.name,type:f.type,url:f.url})),
+    custom_field_values:customFieldValues,
     created_by:currentUser.id,
     phase:basePhase,
     initial_pm_approval:isEditMode?'already_approved':(isLP?'needs_approval':isVI?null:selectedPMApproval),
@@ -1105,7 +1115,7 @@ async function openPR(id) {
 async function resolveVendorInfo(action) {
   showLoader(true);
   let updates={updated_at:new Date().toISOString()},comment='';
-  if(action==='close'){updates.phase='qc_passed';updates.phase_timestamps=addPhaseTimestamp(currentPR,'qc_passed');comment='✓ Engineer closed request after reviewing vendor information.';}
+  if(action==='close'){updates.phase='vendor_info_received';updates.is_closed=true;updates.closed_at=new Date().toISOString();updates.phase_timestamps=addPhaseTimestamp(currentPR,'vendor_info_received');comment='✓ Engineer closed request after reviewing vendor information.';}
   else if(action==='more_vendors'){updates.phase='procurement_active';updates.vendor_info_details=null;comment='↻ Engineer requested more vendor options.';}
   else if(action==='convert_to_rfq'){updates.phase='procurement_active';updates.request_category='RFQ';comment='→ Engineer converted to RFQ.';}
   const{error}=await db.from('procurement_requests').update(updates).eq('id',currentPR.id);

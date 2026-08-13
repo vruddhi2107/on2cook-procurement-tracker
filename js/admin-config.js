@@ -69,9 +69,58 @@ const BUILTIN_FIELD_DEFS = [
   { field: 'item_note', label: 'Item Note', kind: 'text' },
 ];
 
-function allFilterableFields() {
+// Fields that exist on a request but are never useful as a filter/column
+// (ids, foreign keys, big JSON blobs, long free text, internal bookkeeping).
+const FIELD_DISCOVERY_EXCLUDE = new Set([
+  'id', 'created_by', 'assigned_pm_id', 'assigned_vendor_id', 'selected_quotation_id',
+  'initial_approver_id', 'deviation_target_id', 'parent_request_id', 'request_number',
+  'parts', 'attachments', 'phase_timestamps', 'qc_criteria', 'approval_path',
+  'description', 'product_link', 'rejection_reason', 'client_approval_notes',
+  'pm_final_approval_notes', 'modification_note', 'order_notes', 'hold_reason',
+  'vendor_info_details', 'qc_notes', 'custom_field_values', 'sourcing',
+  'is_modification', 'is_closed', 'closed_at', 'hold_started_at', 'total_hold_seconds',
+]);
+
+function humanizeFieldName(key) {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// "Whatever is written in the request" → scan real request records so any
+// field actually used in the data (not just a hand-picked shortlist) shows
+// up as an available filter/column, with type auto-detected from the values.
+function discoverRequestFields(sampleRequests) {
+  const seen = new Map(); // field -> Set of sample values
+  (sampleRequests || []).slice(0, 300).forEach(r => {
+    Object.keys(r).forEach(k => {
+      if (FIELD_DISCOVERY_EXCLUDE.has(k)) return;
+      const v = r[k];
+      if (v === null || v === undefined) return;
+      if (typeof v === 'object') return; // skip nested objects/arrays (e.g. users, vendors joins)
+      if (!seen.has(k)) seen.set(k, new Set());
+      if (seen.get(k).size < 25) seen.get(k).add(String(v));
+    });
+  });
+  const out = [];
+  seen.forEach((vals, key) => {
+    if (BUILTIN_FIELD_DEFS.some(f => f.field === key)) return; // already covered, avoid dupes
+    let kind = 'text';
+    if (/_at$|_date$/.test(key)) kind = 'date';
+    else if (vals.size > 0 && vals.size <= 12) kind = 'enum';
+    out.push({ field: key, label: humanizeFieldName(key), kind, sampleValues: [...vals] });
+  });
+  return out.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function allFilterableFields(sampleRequests) {
   const custom = (AdminConfig.custom_fields || []).map(c => ({ field: 'custom:' + c.key, label: c.label, kind: c.type === 'select' ? 'enum' : (c.type === 'date' ? 'date' : 'text') }));
-  return [...BUILTIN_FIELD_DEFS, ...custom];
+  const discovered = sampleRequests ? discoverRequestFields(sampleRequests) : (AdminConfig._discovered || []);
+  return [...BUILTIN_FIELD_DEFS, ...discovered, ...custom];
+}
+
+// Call once after requests are loaded on any page that uses the filter/column
+// builders, so fieldOptionsFor() can offer real values for discovered fields.
+function refreshFieldCatalog(sampleRequests) {
+  AdminConfig._discovered = discoverRequestFields(sampleRequests);
 }
 
 // ── LOAD / SAVE ──────────────────────────────────────────────
@@ -152,6 +201,9 @@ function fieldOptionsFor(field) {
         const cf = (AdminConfig.custom_fields || []).find(c => c.key === field.slice(7));
         if (cf && Array.isArray(cf.options)) return cf.options.map(o => ({ value: o, label: o }));
       }
+      // Fall back to real sampled values discovered from the live data.
+      const disc = (AdminConfig._discovered || []).find(f => f.field === field);
+      if (disc && disc.sampleValues) return disc.sampleValues.sort().map(v => ({ value: v, label: humanizeFieldName(v) }));
       return [];
   }
 }
@@ -169,8 +221,26 @@ function fieldLabelFor(field) {
     const cf = (AdminConfig.custom_fields || []).find(c => c.key === field.slice(7));
     return cf ? cf.label : field;
   }
-  return field;
+  const disc = (AdminConfig._discovered || []).find(f => f.field === field);
+  if (disc) return disc.label;
+  return humanizeFieldName(field);
 }
+
+// ── ROLE-SCOPED FILTER VISIBILITY ──────────────────────────────
+// A filter with no visibleToRoles (undefined/empty) is Master-only, matching
+// the original behaviour. Add roles to also surface it on their dashboards.
+function filterVisibleForRole(f, role) {
+  if (!role || role === 'master') return true;
+  return Array.isArray(f.visibleToRoles) && f.visibleToRoles.includes(role);
+}
+function filtersForRole(role) {
+  return (AdminConfig.filters || []).filter(f => f.visible !== false && filterVisibleForRole(f, role)).sort((a, b) => (a.order || 0) - (b.order || 0));
+}
+window.filtersForRole = filtersForRole;
+window.filterVisibleForRole = filterVisibleForRole;
+window.refreshFieldCatalog = refreshFieldCatalog;
+window.discoverRequestFields = discoverRequestFields;
+window.humanizeFieldName = humanizeFieldName;
 
 // ── CUSTOM FIELDS: render inputs on a create-request form, collect values ──
 function renderCustomFieldInputs(containerId) {
@@ -219,3 +289,85 @@ window.fieldLabelFor = fieldLabelFor;
 window.allFilterableFields = allFilterableFields;
 window.renderCustomFieldInputs = renderCustomFieldInputs;
 window.collectCustomFieldValues = collectCustomFieldValues;
+
+// ══════════════════════════════════════════════════════════════
+// SHARED DYNAMIC FILTER BAR — used by master.html and (per Filter
+// Builder role-visibility settings) any other role dashboard.
+// ══════════════════════════════════════════════════════════════
+function renderDynamicFilterBar(containerId, role, onChange, opts) {
+  opts = opts || {};
+  const includeSearch = opts.includeSearch !== false;
+  const includeClear = opts.includeClear !== false;
+  const bar = document.getElementById(containerId); if (!bar) return;
+  const defs = filtersForRole(role);
+  let html = includeSearch ? `<input type="text" id="${containerId}_search" placeholder="Search by project, PR #, team member, item note..." oninput="${onChange}()"/>` : '';
+  defs.forEach(f => {
+    const opts = fieldOptionsFor(f.field);
+    const domId = containerId + '_' + f.id;
+    if (f.type === 'multi') {
+      html += `<div class="ms-filter" data-field="${f.field}">
+        <button type="button" class="form-control ms-filter-btn" onclick="toggleMsFilter(event,'${domId}')">${escHtml(f.label)} <span class="ms-filter-count" id="${domId}_count"></span></button>
+        <div class="ms-filter-panel" id="${domId}_panel" style="display:none">
+          ${opts.map(o => `<label class="ms-filter-opt"><input type="checkbox" value="${escHtml(o.value)}" onchange="${onChange}()"/> ${escHtml(o.label)}</label>`).join('') || '<div style="font-size:0.78rem;color:var(--gray-4);padding:4px">No options</div>'}
+        </div></div>`;
+    } else if (f.type === 'date_range') {
+      html += `<input type="date" id="${domId}_from" onchange="${onChange}()" title="${escHtml(f.label)} from" style="max-width:140px"/>
+              <input type="date" id="${domId}_to" onchange="${onChange}()" title="${escHtml(f.label)} to" style="max-width:140px"/>`;
+    } else if (f.type === 'search') {
+      html += `<input type="text" id="${domId}" placeholder="${escHtml(f.label)}" oninput="${onChange}()" style="max-width:160px"/>`;
+    } else {
+      html += `<select id="${domId}" onchange="${onChange}()"><option value="">All ${escHtml(f.label)}</option>${opts.map(o => `<option value="${escHtml(o.value)}">${escHtml(o.label)}</option>`).join('')}</select>`;
+    }
+  });
+  html += includeClear ? `<button class="btn btn-ghost btn-sm" onclick="clearDynamicFilters('${containerId}','${role}','${onChange}')">✕ Clear</button>` : '';
+  bar.innerHTML = html;
+}
+function toggleMsFilter(e, domId) {
+  e.stopPropagation();
+  document.querySelectorAll('.ms-filter-panel').forEach(p => { if (p.id !== domId + '_panel') p.style.display = 'none'; });
+  const p = document.getElementById(domId + '_panel'); if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', e => {
+  document.querySelectorAll('.ms-filter').forEach(el => { if (!el.contains(e.target)) { const p = el.querySelector('.ms-filter-panel'); if (p) p.style.display = 'none'; } });
+});
+function applyDynamicFilters(reqs, containerId, role, searchFields) {
+  const s = (document.getElementById(containerId + '_search')?.value || '').toLowerCase();
+  if (s) {
+    reqs = reqs.filter(r => (searchFields || ['project_name']).some(sf => String(fieldValueGetter(r, sf) || '').toLowerCase().includes(s))
+      || String(r.request_number).includes(s) || (r.team_member_name || '').toLowerCase().includes(s) || (r.users?.name || '').toLowerCase().includes(s) || (r.item_note || '').toLowerCase().includes(s));
+  }
+  const defs = filtersForRole(role);
+  defs.forEach(f => {
+    const domId = containerId + '_' + f.id;
+    if (f.type === 'multi') {
+      const p = document.getElementById(domId + '_panel');
+      const vals = p ? [...p.querySelectorAll('input:checked')].map(i => i.value) : [];
+      const cnt = document.getElementById(domId + '_count'); if (cnt) cnt.textContent = vals.length ? `(${vals.length})` : '';
+      if (vals.length) reqs = reqs.filter(r => vals.includes(String(fieldValueGetter(r, f.field))));
+    } else if (f.type === 'date_range') {
+      const from = document.getElementById(domId + '_from')?.value;
+      const to = document.getElementById(domId + '_to')?.value;
+      if (from) reqs = reqs.filter(r => new Date(fieldValueGetter(r, f.field) || r.created_at) >= new Date(from));
+      if (to) reqs = reqs.filter(r => new Date(fieldValueGetter(r, f.field) || r.created_at) <= new Date(to + 'T23:59:59'));
+    } else if (f.type === 'search') {
+      const v = (document.getElementById(domId)?.value || '').toLowerCase();
+      if (v) reqs = reqs.filter(r => String(fieldValueGetter(r, f.field) || '').toLowerCase().includes(v));
+    } else {
+      const v = document.getElementById(domId)?.value;
+      if (v) reqs = reqs.filter(r => String(fieldValueGetter(r, f.field)) === v);
+    }
+  });
+  return reqs;
+}
+function clearDynamicFilters(containerId, role, onChange) {
+  const bar = document.getElementById(containerId); if (!bar) return;
+  bar.querySelectorAll('select').forEach(s => s.value = '');
+  bar.querySelectorAll('input[type=text],input[type=date]').forEach(i => i.value = '');
+  bar.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = false);
+  bar.querySelectorAll('.ms-filter-count').forEach(c => c.textContent = '');
+  if (typeof window[onChange] === 'function') window[onChange]();
+}
+window.renderDynamicFilterBar = renderDynamicFilterBar;
+window.applyDynamicFilters = applyDynamicFilters;
+window.clearDynamicFilters = clearDynamicFilters;
+window.toggleMsFilter = toggleMsFilter;

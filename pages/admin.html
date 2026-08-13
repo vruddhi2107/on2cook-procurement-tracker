@@ -49,6 +49,37 @@
     .admin-stat-label{font-size:0.72rem;color:var(--gray-3);text-transform:uppercase;letter-spacing:0.05em}
     /* pipeline phase badge */
     .p-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-family:var(--font-mono);font-weight:600;border:1px solid}
+    /* Customization builders */
+    .cfg-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:white;border:1px solid var(--border);border-radius:6px;margin-bottom:8px}
+    .cfg-row.hidden-row{opacity:0.45}
+    .cfg-row-main{flex:1;font-size:0.84rem}
+    .cfg-row-sub{font-size:0.7rem;color:var(--gray-4);font-family:var(--font-mono)}
+    .cfg-row-actions{display:flex;gap:4px;align-items:center}
+    .cfg-icon-btn{background:none;border:1px solid var(--border);border-radius:5px;width:26px;height:26px;cursor:pointer;font-size:0.8rem;display:flex;align-items:center;justify-content:center;color:var(--gray-3)}
+    .cfg-icon-btn:hover{background:var(--off-white)}
+    .cfg-add-card{background:var(--off-white);border:1.5px dashed var(--border);border-radius:var(--radius);padding:16px;margin-top:10px}
+    .cfg-add-card .form-grid{margin-bottom:10px}
+    .cfg-toggle{width:34px;height:19px;border-radius:999px;background:var(--border);position:relative;cursor:pointer;flex-shrink:0;transition:background 0.15s}
+    .cfg-toggle.on{background:#22c55e}
+    .cfg-toggle::after{content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:white;transition:left 0.15s}
+    .cfg-toggle.on::after{left:17px}
+    .cfg-section-label{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--gray-4);margin:18px 0 8px}
+    .cfg-section-label:first-of-type{margin-top:0}
+    .cfg-preview-card{background:linear-gradient(180deg,#fafafa,white);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:6px}
+    .cfg-hint{font-weight:400;text-transform:none;letter-spacing:0;color:var(--gray-4);font-size:0.72rem}
+    .cfg-role-chips{display:flex;flex-wrap:wrap;gap:6px}
+    .cfg-chip{display:flex;align-items:center;gap:5px;font-size:0.74rem;padding:5px 9px;border:1px solid var(--border);border-radius:999px;cursor:pointer;background:white}
+    .cfg-chip:has(input:checked){background:#eef2ff;border-color:#6366f1;color:#4338ca;font-weight:600}
+    .cfg-role-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
+    .cfg-role-badge{font-size:0.62rem;padding:1px 6px;border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:600}
+    .wf-track{display:flex;align-items:stretch;flex-wrap:wrap;gap:0;margin-bottom:4px}
+    .wf-step{background:white;border:1px solid var(--border);border-radius:8px;padding:9px 12px;min-width:132px;display:flex;flex-direction:column;gap:3px}
+    .wf-step.wf-optional{border-style:dashed;opacity:0.75}
+    .wf-step-label{font-size:0.76rem;font-weight:600;color:var(--black)}
+    .wf-step-owner{font-size:0.68rem;color:#4338ca;font-weight:600}
+    .wf-step-owner.wf-closed{color:#15803d}
+    .wf-step-count{font-size:0.66rem;color:var(--gray-4);font-family:var(--font-mono)}
+    .wf-arrow{display:flex;align-items:center;justify-content:center;color:var(--gray-4);padding:0 6px;font-size:0.9rem}
   </style>
 </head>
 <body>
@@ -79,6 +110,17 @@
 
       <div class="admin-sidebar-title">Local Purchase</div>
       <div class="admin-nav-item" onclick="switchPanel('lp_queue')">🛒 LP Approval Queue <span class="nav-badge" id="lpBadge">0</span></div>
+
+      <div class="admin-sidebar-title">🎛 Customization</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_filters')">🔍 Filter Builder</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_workflow')">🗺 Workflow Map</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_columns')">📊 Column Manager</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_statcards')">🧮 Stat Cards</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_customfields')">🧩 Custom Fields</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_departments')">🏷 Departments</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_phases')">🔀 Phase Display</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_export')">⬇ Export Config</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_navvis')">🧭 Nav Visibility</div>
 
       <div class="admin-sidebar-title">System</div>
       <div class="admin-nav-item" onclick="window.location.href='master.html'">← Back to Dashboard</div>
@@ -226,6 +268,178 @@
         </div>
       </div>
 
+      <!-- FILTER BUILDER PANEL -->
+      <div id="panel-cfg_filters" class="admin-panel">
+        <div class="panel-title">Filter Builder</div>
+        <div class="panel-sub">Controls the filter bar on request-list pages. Add a filter for any field — including anything actually written on your requests, auto-detected from live data — choose single-select, multi-select, text search, or date range, decide which roles see it, then reorder or hide it.</div>
+
+        <div class="cfg-section-label">Live preview</div>
+        <div class="cfg-preview-card">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <label class="form-label" style="margin:0">Preview as:</label>
+            <select class="form-control" id="cfgPreviewRole" style="max-width:220px" onchange="renderFilterPreview()">
+              <option value="master">Master Admin</option>
+              <option value="engineer">Engineer</option>
+              <option value="procurement_manager">Procurement Manager</option>
+              <option value="project_manager">Project Manager</option>
+              <option value="store_manager">Store Manager</option>
+              <option value="qc_inspector">QC Inspector</option>
+              <option value="accounts">Accounts</option>
+              <option value="director">Director</option>
+            </select>
+          </div>
+          <div class="filter-bar" id="cfgFilterPreviewBar" style="margin:0"></div>
+        </div>
+
+        <div class="cfg-section-label">Active filters</div>
+        <div id="cfgFiltersList"></div>
+        <div class="cfg-add-card">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">Field <span class="cfg-hint">— pick anything, including fields discovered from your live requests</span></label><select class="form-control" id="cfgFilterField"></select></div>
+            <div class="form-group"><label class="form-label">Label</label><input class="form-control" id="cfgFilterLabel" placeholder="e.g. Urgency"/></div>
+            <div class="form-group"><label class="form-label">Type</label>
+              <select class="form-control" id="cfgFilterType">
+                <option value="single">Single-select</option>
+                <option value="multi">Multi-select</option>
+                <option value="search">Text search</option>
+                <option value="date_range">Date range</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:10px">
+            <label class="form-label">Show this filter to <span class="cfg-hint">— Master Admin always sees every filter</span></label>
+            <div class="cfg-role-chips" id="cfgFilterRoles">
+              <label class="cfg-chip"><input type="checkbox" value="engineer"/> Engineer</label>
+              <label class="cfg-chip"><input type="checkbox" value="procurement_manager"/> Procurement Manager</label>
+              <label class="cfg-chip"><input type="checkbox" value="project_manager"/> Project Manager</label>
+              <label class="cfg-chip"><input type="checkbox" value="store_manager"/> Store Manager</label>
+              <label class="cfg-chip"><input type="checkbox" value="qc_inspector"/> QC Inspector</label>
+              <label class="cfg-chip"><input type="checkbox" value="accounts"/> Accounts</label>
+              <label class="cfg-chip"><input type="checkbox" value="director"/> Director</label>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addFilterConfig()">+ Add Filter</button>
+        </div>
+      </div>
+
+      <!-- COLUMN MANAGER PANEL -->
+      <div id="panel-cfg_columns" class="admin-panel">
+        <div class="panel-title">Column Manager</div>
+        <div class="panel-sub">Controls which columns show in the Master Dashboard requests table, and their order. "Actions" always stays last.</div>
+        <div id="cfgColumnsList"></div>
+        <div class="cfg-add-card">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">Add column</label><select class="form-control" id="cfgColumnField"></select></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addColumnConfig()">+ Add Column</button>
+        </div>
+      </div>
+
+      <!-- STAT CARDS PANEL -->
+      <div id="panel-cfg_statcards" class="admin-panel">
+        <div class="panel-title">Stat Cards</div>
+        <div class="panel-sub">Controls the KPI cards row at the top of the Master Dashboard. Toggle the built-in ones, or add a custom "count where field = value" card.</div>
+        <div id="cfgStatCardsList"></div>
+        <div class="cfg-add-card">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">Field</label><select class="form-control" id="cfgStatField" onchange="refreshCfgStatValueOptions()"></select></div>
+            <div class="form-group"><label class="form-label">Equals value</label><select class="form-control" id="cfgStatValue"></select></div>
+            <div class="form-group"><label class="form-label">Card label</label><input class="form-control" id="cfgStatLabel" placeholder="e.g. Urgent Requests"/></div>
+            <div class="form-group"><label class="form-label">Accent color</label><input class="form-control" id="cfgStatColor" type="color" value="#6366f1" style="height:38px;padding:2px"/></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addStatCardConfig()">+ Add Custom Stat Card</button>
+        </div>
+      </div>
+
+      <!-- CUSTOM FIELDS PANEL -->
+      <div id="panel-cfg_customfields" class="admin-panel">
+        <div class="panel-title">Custom Fields</div>
+        <div class="panel-sub">Fields you add here appear on the Engineer's "New Request" form and are saved per-request. They're also selectable as filters, table columns, and export columns.</div>
+        <div id="cfgCustomFieldsList"></div>
+        <div class="cfg-add-card">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">Field key (snake_case)</label><input class="form-control" id="cfgCFKey" placeholder="e.g. cost_center" style="font-family:var(--font-mono)"/></div>
+            <div class="form-group"><label class="form-label">Display label</label><input class="form-control" id="cfgCFLabel" placeholder="e.g. Cost Center"/></div>
+            <div class="form-group"><label class="form-label">Type</label>
+              <select class="form-control" id="cfgCFType" onchange="document.getElementById('cfgCFOptionsWrap').style.display=this.value==='select'?'block':'none'">
+                <option value="text">Text</option>
+                <option value="number">Number</option>
+                <option value="date">Date</option>
+                <option value="select">Dropdown</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="cfgCFRequired"/> Required on submit</label></div>
+          </div>
+          <div class="form-group" id="cfgCFOptionsWrap" style="display:none;margin-bottom:10px">
+            <label class="form-label">Dropdown options (comma-separated)</label>
+            <input class="form-control" id="cfgCFOptions" placeholder="e.g. CapEx, OpEx, R&D"/>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addCustomFieldConfig()">+ Add Custom Field</button>
+        </div>
+      </div>
+
+      <!-- DEPARTMENTS PANEL -->
+      <div id="panel-cfg_departments" class="admin-panel">
+        <div class="panel-title">Departments</div>
+        <div class="panel-sub">Add departments beyond the built-in list. New ones appear immediately in the "Add User" department dropdown, filters, and table columns everywhere in the app.</div>
+        <div id="cfgDeptBuiltinList" style="margin-bottom:18px"></div>
+        <div style="font-weight:700;font-size:0.8rem;margin-bottom:8px">Admin-added departments</div>
+        <div id="cfgDeptList"></div>
+        <div class="cfg-add-card">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">Key (snake_case)</label><input class="form-control" id="cfgDeptKey" placeholder="e.g. r_and_d" style="font-family:var(--font-mono)"/></div>
+            <div class="form-group"><label class="form-label">Display label</label><input class="form-control" id="cfgDeptLabel" placeholder="e.g. R&D"/></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addDepartmentConfig()">+ Add Department</button>
+        </div>
+      </div>
+
+      <!-- PHASE DISPLAY PANEL -->
+      <div id="panel-cfg_phases" class="admin-panel">
+        <div class="panel-title">Phase Display</div>
+        <div class="panel-sub">Rename, recolor, or re-icon any existing phase's label everywhere it appears (badges, filters, exports). This only changes display — it can't add/remove phases or change what triggers a phase transition, since that's wired into the live workflow logic. To add a genuinely new phase, use the Pipeline Editor's "document a new phase" form, which needs a short code change.</div>
+        <div id="cfgPhaseList"></div>
+      </div>
+
+      <!-- EXPORT CONFIG PANEL -->
+      <div id="panel-cfg_export" class="admin-panel">
+        <div class="panel-title">Export Config</div>
+        <div class="panel-sub">Choose which columns are included when Master Admin clicks "Export CSV" on the Dashboard.</div>
+        <div id="cfgExportList"></div>
+        <div class="cfg-add-card">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">Add column to export</label><select class="form-control" id="cfgExportField"></select></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addExportConfig()">+ Add to Export</button>
+        </div>
+      </div>
+
+      <!-- NAV VISIBILITY PANEL -->
+      <div id="panel-cfg_navvis" class="admin-panel">
+        <div class="panel-title">Nav Visibility</div>
+        <div class="panel-sub">Hide top-nav links for a role. This only hides the link in the UI — it does not change database permissions, so it's not a security control. Use it to declutter, not to restrict access to sensitive data.</div>
+        <div style="margin-bottom:14px">
+          <select class="form-control" id="cfgNavRole" style="max-width:260px" onchange="renderNavVisibilityPanel()">
+            <option value="project_manager">Project Manager</option>
+            <option value="procurement_manager">Procurement Manager</option>
+            <option value="engineer">Engineer</option>
+            <option value="accounts">Accounts</option>
+            <option value="director">Director</option>
+          </select>
+        </div>
+        <div id="cfgNavVisList"></div>
+      </div>
+
+      <!-- WORKFLOW MAP PANEL -->
+      <div id="panel-cfg_workflow" class="admin-panel">
+        <div class="panel-title">Workflow Map</div>
+        <div class="panel-sub">For every phase in every pipeline: which role's action moves it forward, and how many live requests are sitting there right now. This is a read-only map, not an editor — the actual phase-to-phase logic lives in code (see the note below), so this is the safe way to get full visibility without risking a live workflow change. Rename a phase's display label from the Phase Display panel; it'll update here too.</div>
+        <div id="cfgWorkflowMap"></div>
+        <div style="margin-top:16px;padding:12px 14px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius);font-size:0.78rem;color:#4338ca;line-height:1.6">
+          <strong>Why isn't this editable?</strong> Every "what happens next" rule (who approves what, which phase comes after which) is written directly into each role's page — that's what keeps a live procurement system predictable. Turning this into a true drag-and-drop workflow editor means replacing that code with a data-driven rules engine everywhere at once, which is a real, riskier project of its own. Flag it if you want to scope that properly — it shouldn't be done as a quiet add-on to a customization panel.
+        </div>
+      </div>
+
     </div><!-- /admin-content -->
   </div><!-- /admin-grid -->
 </main>
@@ -250,6 +464,7 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="../js/supabase-config.js"></script>
 <script src="../js/shared.js"></script>
+<script src="../js/admin-config.js"></script>
 <script>
 let currentUser, allRequests=[], closedRequests=[], currentLPPR=null, overrideTargetPR=null;
 
@@ -272,9 +487,11 @@ async function init() {
   document.getElementById('footerMount').innerHTML = buildFooter();
   initNavbar(currentUser);
   showLoader(true);
-  await loadAllRequests();
+  await Promise.all([loadAllRequests(), applyAdminConfigOverrides()]);
+  refreshFieldCatalog(allRequests);
   showLoader(false);
   renderOverridePhaseOptions();
+  renderAllCustomizationPanels();
 }
 
 async function loadAllRequests() {
@@ -627,6 +844,381 @@ function switchPanel(name) {
   document.querySelectorAll('.admin-nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('panel-' + name)?.classList.add('active');
   event.currentTarget.classList.add('active');
+}
+
+// ══════════════════════════════════════════════════════════════
+// CUSTOMIZATION PANELS
+// ══════════════════════════════════════════════════════════════
+function renderAllCustomizationPanels() {
+  renderFilterConfigList();
+  renderColumnConfigList();
+  renderStatCardConfigList();
+  renderCustomFieldConfigList();
+  renderDepartmentConfigList();
+  renderPhaseDisplayList();
+  renderExportConfigList();
+  renderNavVisibilityPanel();
+  renderWorkflowMap();
+  populateFieldSelect('cfgFilterField', allFilterableFields(allRequests));
+  populateFieldSelect('cfgColumnField', columnableFields());
+  populateFieldSelect('cfgStatField', allFilterableFields(allRequests).filter(f => f.kind === 'enum'));
+  populateFieldSelect('cfgExportField', columnableFields());
+  refreshCfgStatValueOptions();
+}
+
+// ── WORKFLOW MAP (read-only — reflects what's actually wired in the code) ──
+// Sourced from grepping each role page for `phase===` action blocks, not guessed.
+const PHASE_OWNER = {
+  submitted: 'Master / PM (routing)', pending_master_reassignment: 'Master Admin',
+  pending_initial_pm_approval: 'Project Manager', procurement_active: 'Procurement Manager',
+  vendor_info_shared: 'Engineer', vendor_info_received: '— Closed —',
+  quotations_shared: 'Engineer (validates)', quotes_revision_requested: 'Procurement Manager',
+  pending_pm_final_approval: 'Project Manager', pending_sandy_approval: 'Director',
+  approved: 'Procurement Manager', advance_requested: 'Accounts',
+  advance_raised_to_accounts: 'Accounts', advance_payment_received: 'Procurement Manager',
+  order_placed: 'Store Manager', grn_initiated: 'QC Inspector', grn_pending: 'Engineer',
+  qc_pending: 'QC Inspector', rework_store_form: 'Store Manager', rework_pending: 'QC Inspector',
+  rework_returned: 'QC Inspector', rework2_pending: 'QC Inspector', rework2_returned: 'QC Inspector',
+  qc_deviated: 'Director', deviation_approval: 'Director', qc_passed: 'Accounts',
+  payment_raised_to_accounts: 'Accounts', payment_requested: 'Accounts',
+  accepted: '— Closed —', rejected: '— Closed —', declined: '— Closed —',
+  lp_pending_pm_approval: 'Project Manager', lp_procurement_processing: 'Procurement Manager',
+  lp_payment_pending: 'Procurement Manager', lp_payment_done: '— Closed —', lp_rejected: '— Closed —',
+  qc_rejected: '— Closed —', payment_received: '— Closed —',
+};
+function renderWorkflowMap() {
+  const el = document.getElementById('cfgWorkflowMap'); if (!el) return;
+  el.innerHTML = Object.entries(PIPELINE_WF_STEPS).map(([pipelineKey, steps]) => {
+    const pipeline = PIPELINES[pipelineKey];
+    const rows = steps.map(s => {
+      const count = allRequests.filter(r => r.phase === s.key).length;
+      const owner = PHASE_OWNER[s.key] || '—';
+      const isClosed = owner === '— Closed —';
+      return `<div class="wf-step ${s.optional ? 'wf-optional' : ''}">
+        <div class="wf-step-label">${escHtml(PHASES[s.key]?.label || s.label)}${s.optional ? ' <span class="cfg-hint">optional</span>' : ''}</div>
+        <div class="wf-step-owner ${isClosed ? 'wf-closed' : ''}">${isClosed ? '✔ Closed' : '👤 ' + escHtml(owner)}</div>
+        <div class="wf-step-count">${count} live</div>
+      </div>`;
+    }).join('<div class="wf-arrow">→</div>');
+    return `<div class="cfg-section-label" style="margin-top:20px">${escHtml(pipeline.label)}</div>
+      <div class="wf-track">${rows}</div>`;
+  }).join('');
+}
+
+function populateFieldSelect(id, fields) {
+  const el = document.getElementById(id); if (!el) return;
+  el.innerHTML = fields.map(f => `<option value="${f.field}">${escHtml(f.label)}</option>`).join('');
+}
+
+function columnableFields() {
+  const custom = (AdminConfig.custom_fields || []).map(c => ({ field: 'custom:' + c.key, label: c.label }));
+  const discovered = discoverRequestFields(allRequests).map(f => ({ field: f.field, label: f.label }));
+  return [
+    { field: 'request_number', label: 'PR #' }, { field: 'project_name', label: 'Project' },
+    { field: 'request_category', label: 'Category' }, { field: 'department', label: 'Department' },
+    { field: 'vendor', label: 'Vendor' }, { field: 'phase', label: 'Phase' },
+    { field: 'lead_time', label: 'Lead Time' }, { field: 'updated_at', label: 'Updated' },
+    { field: 'created_at', label: 'Created' }, { field: 'requester', label: 'Requester' },
+    { field: 'urgency', label: 'Urgency' }, ...discovered, ...custom
+  ];
+}
+
+function moveItem(arr, idx, dir) {
+  const j = idx + dir;
+  if (j < 0 || j >= arr.length) return arr;
+  [arr[idx], arr[j]] = [arr[j], arr[idx]];
+  return arr;
+}
+
+// ── FILTERS ──────────────────────────────────────────────────
+const CUSTOMIZABLE_ROLES = ['engineer','procurement_manager','project_manager','store_manager','qc_inspector','accounts','director'];
+function renderFilterConfigList() {
+  const list = [...(AdminConfig.filters || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const el = document.getElementById('cfgFiltersList');
+  if (!list.length) { el.innerHTML = '<div style="color:var(--gray-4);font-size:0.82rem;padding:8px 0">No custom filters yet — the search box is always shown by default.</div>'; renderFilterPreview(); return; }
+  el.innerHTML = list.map((f, i) => `
+    <div class="cfg-row ${f.visible === false ? 'hidden-row' : ''}">
+      <div class="cfg-row-main">${escHtml(f.label)} <span class="cfg-row-sub">${f.field} · ${f.type}</span>
+        <div class="cfg-role-badges">
+          <span class="cfg-role-badge">Master</span>
+          ${(f.visibleToRoles || []).map(r => `<span class="cfg-role-badge">${roleLabel(r)}</span>`).join('')}
+        </div>
+      </div>
+      <div class="cfg-row-actions">
+        <button class="cfg-icon-btn" onclick="reorderFilter('${f.id}',-1)" title="Move up">↑</button>
+        <button class="cfg-icon-btn" onclick="reorderFilter('${f.id}',1)" title="Move down">↓</button>
+        <div class="cfg-toggle ${f.visible !== false ? 'on' : ''}" onclick="toggleFilterVisible('${f.id}')" title="Show/hide"></div>
+        <button class="cfg-icon-btn" onclick="removeFilterConfig('${f.id}')" title="Remove">✕</button>
+      </div>
+    </div>`).join('');
+  renderFilterPreview();
+}
+function renderFilterPreview() {
+  const role = document.getElementById('cfgPreviewRole')?.value || 'master';
+  renderDynamicFilterBar('cfgFilterPreviewBar', role, 'renderFilterPreview'); // preview re-renders itself on interaction, doesn't touch real data
+}
+function addFilterConfig() {
+  const field = document.getElementById('cfgFilterField').value;
+  const label = document.getElementById('cfgFilterLabel').value.trim() || fieldLabelFor(field);
+  const type = document.getElementById('cfgFilterType').value;
+  const visibleToRoles = [...document.querySelectorAll('#cfgFilterRoles input:checked')].map(i => i.value);
+  if (!field) return;
+  const list = AdminConfig.filters || [];
+  list.push({ id: 'f_' + Date.now(), field, label, type, visible: true, order: list.length + 1, visibleToRoles });
+  saveAdminConfigType('filters', list, currentUser).then(() => {
+    renderFilterConfigList();
+    document.getElementById('cfgFilterLabel').value = '';
+    document.querySelectorAll('#cfgFilterRoles input').forEach(i => i.checked = false);
+  });
+}
+function removeFilterConfig(id) {
+  saveAdminConfigType('filters', (AdminConfig.filters || []).filter(f => f.id !== id), currentUser).then(renderFilterConfigList);
+}
+function toggleFilterVisible(id) {
+  const list = (AdminConfig.filters || []).map(f => f.id === id ? { ...f, visible: f.visible === false ? true : false } : f);
+  saveAdminConfigType('filters', list, currentUser).then(renderFilterConfigList);
+}
+function reorderFilter(id, dir) {
+  const list = [...(AdminConfig.filters || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const idx = list.findIndex(f => f.id === id);
+  moveItem(list, idx, dir).forEach((f, i) => f.order = i + 1);
+  saveAdminConfigType('filters', list, currentUser).then(renderFilterConfigList);
+}
+
+// ── COLUMNS ──────────────────────────────────────────────────
+function renderColumnConfigList() {
+  const list = [...(AdminConfig.columns || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const el = document.getElementById('cfgColumnsList');
+  el.innerHTML = list.map((c, i) => `
+    <div class="cfg-row ${c.visible === false ? 'hidden-row' : ''}">
+      <div class="cfg-row-main">${escHtml(fieldLabelFor(c.field))} <span class="cfg-row-sub">${c.field}</span></div>
+      <div class="cfg-row-actions">
+        <button class="cfg-icon-btn" onclick="reorderColumn(${i},-1)" title="Move up">↑</button>
+        <button class="cfg-icon-btn" onclick="reorderColumn(${i},1)" title="Move down">↓</button>
+        <div class="cfg-toggle ${c.visible !== false ? 'on' : ''}" onclick="toggleColumnVisible(${i})" title="Show/hide"></div>
+        <button class="cfg-icon-btn" onclick="removeColumnConfig(${i})" title="Remove">✕</button>
+      </div>
+    </div>`).join('') || '<div style="color:var(--gray-4);font-size:0.82rem">No columns configured.</div>';
+}
+function addColumnConfig() {
+  const field = document.getElementById('cfgColumnField').value; if (!field) return;
+  const list = AdminConfig.columns || [];
+  if (list.some(c => c.field === field)) { showToast('That column is already in the table', 'error'); return; }
+  list.push({ field, order: list.length + 1, visible: true });
+  saveAdminConfigType('columns', list, currentUser).then(renderColumnConfigList);
+}
+function removeColumnConfig(i) {
+  const list = [...(AdminConfig.columns || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  list.splice(i, 1);
+  list.forEach((c, j) => c.order = j + 1);
+  saveAdminConfigType('columns', list, currentUser).then(renderColumnConfigList);
+}
+function toggleColumnVisible(i) {
+  const list = [...(AdminConfig.columns || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  list[i].visible = list[i].visible === false ? true : false;
+  saveAdminConfigType('columns', list, currentUser).then(renderColumnConfigList);
+}
+function reorderColumn(i, dir) {
+  const list = [...(AdminConfig.columns || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  moveItem(list, i, dir).forEach((c, j) => c.order = j + 1);
+  saveAdminConfigType('columns', list, currentUser).then(renderColumnConfigList);
+}
+
+// ── STAT CARDS ───────────────────────────────────────────────
+const BUILTIN_STAT_CARD_LABELS = { total: 'Total Requests', active: 'Active', closed: 'Accepted & Closed', users: 'Users', vendors: 'Vendors', rejected: 'Rejected', onhold: 'On Hold' };
+function renderStatCardConfigList() {
+  const list = [...(AdminConfig.stat_cards || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const el = document.getElementById('cfgStatCardsList');
+  el.innerHTML = list.map((c, i) => `
+    <div class="cfg-row ${c.visible === false ? 'hidden-row' : ''}">
+      <div class="cfg-row-main">${escHtml(c.source === 'builtin' ? BUILTIN_STAT_CARD_LABELS[c.key] : c.label)} <span class="cfg-row-sub">${c.source === 'builtin' ? 'built-in' : `custom: ${c.field} = ${c.value}`}</span></div>
+      <div class="cfg-row-actions">
+        <button class="cfg-icon-btn" onclick="reorderStatCard(${i},-1)" title="Move up">↑</button>
+        <button class="cfg-icon-btn" onclick="reorderStatCard(${i},1)" title="Move down">↓</button>
+        <div class="cfg-toggle ${c.visible !== false ? 'on' : ''}" onclick="toggleStatCardVisible(${i})" title="Show/hide"></div>
+        ${c.source !== 'builtin' ? `<button class="cfg-icon-btn" onclick="removeStatCardConfig(${i})" title="Remove">✕</button>` : ''}
+      </div>
+    </div>`).join('');
+}
+function refreshCfgStatValueOptions() {
+  const field = document.getElementById('cfgStatField')?.value; if (!field) return;
+  const opts = fieldOptionsFor(field);
+  document.getElementById('cfgStatValue').innerHTML = opts.map(o => `<option value="${escHtml(o.value)}">${escHtml(o.label)}</option>`).join('');
+}
+function addStatCardConfig() {
+  const field = document.getElementById('cfgStatField').value;
+  const value = document.getElementById('cfgStatValue').value;
+  const label = document.getElementById('cfgStatLabel').value.trim() || `${fieldLabelFor(field)}: ${value}`;
+  const color = document.getElementById('cfgStatColor').value;
+  if (!field || !value) return;
+  const list = AdminConfig.stat_cards || [];
+  list.push({ id: 'sc_' + Date.now(), source: 'custom', field, value, label, color, icon: '📊', order: list.length + 1, visible: true });
+  saveAdminConfigType('stat_cards', list, currentUser).then(() => { renderStatCardConfigList(); document.getElementById('cfgStatLabel').value = ''; });
+}
+function removeStatCardConfig(i) {
+  const list = [...(AdminConfig.stat_cards || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  list.splice(i, 1);
+  saveAdminConfigType('stat_cards', list, currentUser).then(renderStatCardConfigList);
+}
+function toggleStatCardVisible(i) {
+  const list = [...(AdminConfig.stat_cards || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  list[i].visible = list[i].visible === false ? true : false;
+  saveAdminConfigType('stat_cards', list, currentUser).then(renderStatCardConfigList);
+}
+function reorderStatCard(i, dir) {
+  const list = [...(AdminConfig.stat_cards || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  moveItem(list, i, dir).forEach((c, j) => c.order = j + 1);
+  saveAdminConfigType('stat_cards', list, currentUser).then(renderStatCardConfigList);
+}
+
+// ── CUSTOM FIELDS ────────────────────────────────────────────
+function renderCustomFieldConfigList() {
+  const list = AdminConfig.custom_fields || [];
+  const el = document.getElementById('cfgCustomFieldsList');
+  el.innerHTML = list.map((f, i) => `
+    <div class="cfg-row">
+      <div class="cfg-row-main">${escHtml(f.label)}${f.required ? ' <span style="color:var(--red)">*</span>' : ''} <span class="cfg-row-sub">${f.key} · ${f.type}${f.options ? ' (' + f.options.join(', ') + ')' : ''}</span></div>
+      <div class="cfg-row-actions"><button class="cfg-icon-btn" onclick="removeCustomFieldConfig(${i})" title="Remove">✕</button></div>
+    </div>`).join('') || '<div style="color:var(--gray-4);font-size:0.82rem">No custom fields yet.</div>';
+}
+function addCustomFieldConfig() {
+  const key = document.getElementById('cfgCFKey').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  const label = document.getElementById('cfgCFLabel').value.trim();
+  const type = document.getElementById('cfgCFType').value;
+  const required = document.getElementById('cfgCFRequired').checked;
+  const optionsRaw = document.getElementById('cfgCFOptions').value.trim();
+  if (!key || !label) { showToast('Key and label are required', 'error'); return; }
+  const list = AdminConfig.custom_fields || [];
+  if (list.some(f => f.key === key)) { showToast('That field key already exists', 'error'); return; }
+  const field = { key, label, type, required };
+  if (type === 'select') field.options = optionsRaw.split(',').map(s => s.trim()).filter(Boolean);
+  list.push(field);
+  saveAdminConfigType('custom_fields', list, currentUser).then(() => {
+    renderCustomFieldConfigList();
+    ['cfgCFKey', 'cfgCFLabel', 'cfgCFOptions'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('cfgCFRequired').checked = false;
+    populateFieldSelect('cfgFilterField', allFilterableFields(allRequests));
+    populateFieldSelect('cfgColumnField', columnableFields());
+    populateFieldSelect('cfgExportField', columnableFields());
+  });
+}
+function removeCustomFieldConfig(i) {
+  const list = [...(AdminConfig.custom_fields || [])];
+  list.splice(i, 1);
+  saveAdminConfigType('custom_fields', list, currentUser).then(renderCustomFieldConfigList);
+}
+
+// ── DEPARTMENTS ──────────────────────────────────────────────
+function renderDepartmentConfigList() {
+  const builtinEl = document.getElementById('cfgDeptBuiltinList');
+  builtinEl.innerHTML = Object.entries(DEPARTMENTS).filter(([k]) => !(AdminConfig.departments || []).some(d => d.key === k))
+    .map(([k, v]) => `<div class="cfg-row" style="background:var(--off-white)"><div class="cfg-row-main">${escHtml(v)} <span class="cfg-row-sub">${k} · built-in</span></div></div>`).join('');
+  const list = AdminConfig.departments || [];
+  document.getElementById('cfgDeptList').innerHTML = list.map((d, i) => `
+    <div class="cfg-row">
+      <div class="cfg-row-main">${escHtml(d.label)} <span class="cfg-row-sub">${d.key}</span></div>
+      <div class="cfg-row-actions"><button class="cfg-icon-btn" onclick="removeDepartmentConfig(${i})" title="Remove">✕</button></div>
+    </div>`).join('') || '<div style="color:var(--gray-4);font-size:0.82rem">None added yet.</div>';
+}
+function addDepartmentConfig() {
+  const key = document.getElementById('cfgDeptKey').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  const label = document.getElementById('cfgDeptLabel').value.trim();
+  if (!key || !label) { showToast('Key and label are required', 'error'); return; }
+  if (DEPARTMENTS[key]) { showToast('That key already exists', 'error'); return; }
+  const list = AdminConfig.departments || [];
+  list.push({ key, label });
+  saveAdminConfigType('departments', list, currentUser).then(() => {
+    renderDepartmentConfigList();
+    document.getElementById('cfgDeptKey').value = ''; document.getElementById('cfgDeptLabel').value = '';
+  });
+}
+function removeDepartmentConfig(i) {
+  const list = [...(AdminConfig.departments || [])];
+  const removed = list.splice(i, 1)[0];
+  if (removed) delete DEPARTMENTS[removed.key];
+  saveAdminConfigType('departments', list, currentUser).then(renderDepartmentConfigList);
+}
+
+// ── PHASE DISPLAY ────────────────────────────────────────────
+function renderPhaseDisplayList() {
+  const overrides = AdminConfig.phase_display || {};
+  const el = document.getElementById('cfgPhaseList');
+  el.innerHTML = Object.entries(PHASES).map(([key, p]) => `
+    <div class="cfg-row">
+      <span style="font-size:1.1rem;width:24px;text-align:center">${p.icon}</span>
+      <input class="form-control" style="max-width:220px" value="${escHtml(p.label)}" onchange="setPhaseOverride('${key}','label',this.value)"/>
+      <input type="color" value="${p.color}" style="width:40px;height:34px;padding:2px;border:1px solid var(--border);border-radius:5px" onchange="setPhaseOverride('${key}','color',this.value)"/>
+      <span class="cfg-row-sub" style="flex:1">${key}</span>
+      ${overrides[key] ? `<button class="cfg-icon-btn" onclick="resetPhaseOverride('${key}')" title="Reset to default">↺</button>` : ''}
+    </div>`).join('');
+}
+function setPhaseOverride(key, prop, value) {
+  const overrides = AdminConfig.phase_display || {};
+  overrides[key] = { ...(overrides[key] || {}), [prop]: value };
+  saveAdminConfigType('phase_display', overrides, currentUser).then(renderPhaseDisplayList);
+}
+function resetPhaseOverride(key) {
+  const overrides = { ...(AdminConfig.phase_display || {}) };
+  delete overrides[key];
+  saveAdminConfigType('phase_display', overrides, currentUser).then(() => window.location.reload());
+}
+
+// ── EXPORT CONFIG ────────────────────────────────────────────
+function renderExportConfigList() {
+  const list = AdminConfig.export_columns || [];
+  const el = document.getElementById('cfgExportList');
+  el.innerHTML = list.map((field, i) => `
+    <div class="cfg-row">
+      <div class="cfg-row-main">${escHtml(fieldLabelFor(field) || field)} <span class="cfg-row-sub">${field}</span></div>
+      <div class="cfg-row-actions">
+        <button class="cfg-icon-btn" onclick="reorderExport(${i},-1)" title="Move up">↑</button>
+        <button class="cfg-icon-btn" onclick="reorderExport(${i},1)" title="Move down">↓</button>
+        <button class="cfg-icon-btn" onclick="removeExportConfig(${i})" title="Remove">✕</button>
+      </div>
+    </div>`).join('') || '<div style="color:var(--gray-4);font-size:0.82rem">No columns configured — export will be empty.</div>';
+}
+function addExportConfig() {
+  const field = document.getElementById('cfgExportField').value; if (!field) return;
+  const list = AdminConfig.export_columns || [];
+  if (list.includes(field)) { showToast('Already included', 'error'); return; }
+  list.push(field);
+  saveAdminConfigType('export_columns', list, currentUser).then(renderExportConfigList);
+}
+function removeExportConfig(i) {
+  const list = [...(AdminConfig.export_columns || [])];
+  list.splice(i, 1);
+  saveAdminConfigType('export_columns', list, currentUser).then(renderExportConfigList);
+}
+function reorderExport(i, dir) {
+  const list = [...(AdminConfig.export_columns || [])];
+  moveItem(list, i, dir);
+  saveAdminConfigType('export_columns', list, currentUser).then(renderExportConfigList);
+}
+
+// ── NAV VISIBILITY ───────────────────────────────────────────
+const ROLE_NAV_LINKS = {
+  project_manager: [{ href: 'pm.html', label: 'My Requests' }, { href: 'projects.html', label: 'Manage Projects' }],
+  procurement_manager: [{ href: 'procurement.html', label: 'Procurement' }],
+  engineer: [{ href: 'engineer.html', label: 'My Requests' }],
+  accounts: [{ href: 'accounts.html', label: 'Payments' }],
+  director: [{ href: 'master.html', label: 'Dashboard' }, { href: 'projects.html', label: 'Projects' }, { href: 'pm.html', label: 'PM Portal' }],
+};
+function renderNavVisibilityPanel() {
+  const role = document.getElementById('cfgNavRole')?.value; if (!role) return;
+  const cfg = (AdminConfig.nav_visibility || {})[role] || {};
+  const links = ROLE_NAV_LINKS[role] || [];
+  document.getElementById('cfgNavVisList').innerHTML = links.map(l => `
+    <div class="cfg-row">
+      <div class="cfg-row-main">${escHtml(l.label)} <span class="cfg-row-sub">${l.href}</span></div>
+      <div class="cfg-row-actions"><div class="cfg-toggle ${cfg[l.href] !== false ? 'on' : ''}" onclick="toggleNavVisibility('${role}','${l.href}')" title="Show/hide"></div></div>
+    </div>`).join('');
+}
+function toggleNavVisibility(role, href) {
+  const all = AdminConfig.nav_visibility || {};
+  const cfg = all[role] || {};
+  cfg[href] = cfg[href] === false ? true : false;
+  all[role] = cfg;
+  saveAdminConfigType('nav_visibility', all, currentUser).then(renderNavVisibilityPanel);
 }
 
 init();

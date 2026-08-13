@@ -50,48 +50,11 @@
 
   <!-- REQUESTS TAB -->
   <div id="tab-requests">
-    <div class="filter-bar">
-      <input type="text" id="searchInput" placeholder="Search by project, PR #, team member, item note..." oninput="filterRequests()"/>
-      <select id="filterPhase" onchange="filterRequests()">
-        <option value="">All Phases</option>
-        <option value="submitted">📋 Submitted</option>
-        <option value="pending_initial_pm_approval">🔐 Awaiting PM Clearance</option>
-        <option value="procurement_active">⚙️ Procurement Active</option>
-        <option value="vendor_info_shared">🏢 Vendor Info Shared</option>
-        <option value="quotations_shared">📨 Awaiting Engineer Verification</option>
-        <option value="pending_pm_final_approval">✍️ Pending PM Final Approval</option>
-        <option value="pending_sandy_approval">👤 Pending Director Approval</option>
-        <option value="approved">✅ Approved</option>
-        <option value="advance_requested">💳 Advance Requested</option>
-        <option value="advance_approved">💳 Advance Approved</option>
-        <option value="advance_rejected">💳 Advance Rejected</option>
-        <option value="order_placed">🛒 Order Placed</option>
-        <option value="grn_pending">📦 GRN / QC Pending</option>
-        <option value="qc_passed">✔️ QC Passed</option>
-        <option value="payment_requested">💰 Payment Requested</option>
-        <option value="accepted">✔️ Accepted &amp; Closed</option>
-        <option value="rejected">✖️ Rejected</option>
-        <option value="lp_rejected">✖️ LP Rejected</option>
-      </select>
-      <select id="filterDept" onchange="filterRequests()">
-        <option value="">All Departments</option>
-        <option value="npd">Production &amp; Operations - NPD</option>
-        <option value="electronics">Production &amp; Operations - Electronics</option>
-        <option value="id">Industrial Design</option>
-        <option value="assembly">Production &amp; Operations - Assembly</option>
-        <option value="scm_stores">SCM - Stores &amp; Logistics</option>
-        <option value="service">Production &amp; Operations - Service</option>
-        <option value="machine_shop">Production &amp; Operations - Machine Shop</option>
-        <option value="quality">Production &amp; Operations - Quality</option>
-        <option value="mech_design">Mechanical Design Engineering</option>
-        <option value="other">Other</option>
-      </select>
-      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Clear</button>
-    </div>
+    <div class="filter-bar" id="dynamicFilterBar"></div>
     <div class="card">
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>PR #</th><th>Project</th><th>Category</th><th>Dept</th><th>Vendor</th><th>Phase</th><th>Lead Time</th><th>Updated</th><th>Requester</th><th>Actions</th></tr></thead>
+          <thead><tr id="requestsTableHead"><th>PR #</th><th>Project</th><th>Category</th><th>Dept</th><th>Vendor</th><th>Phase</th><th>Lead Time</th><th>Updated</th><th>Requester</th><th>Actions</th></tr></thead>
           <tbody id="requestsBody"><tr><td colspan="10" style="text-align:center;padding:48px;color:var(--gray-4)">Loading...</td></tr></tbody>
         </table>
       </div>
@@ -335,16 +298,6 @@
         <div class="form-group"><label class="form-label">Department</label>
           <select class="form-control" id="uDept">
             <option value="">—</option>
-            <option value="npd">Production &amp; Operations - NPD</option>
-            <option value="electronics">Production &amp; Operations - Electronics</option>
-            <option value="id">Industrial Design</option>
-            <option value="assembly">Production &amp; Operations - Assembly</option>
-            <option value="scm_stores">SCM - Stores &amp; Logistics</option>
-            <option value="service">Production &amp; Operations - Service</option>
-            <option value="machine_shop">Production &amp; Operations - Machine Shop</option>
-            <option value="quality">Production &amp; Operations - Quality</option>
-            <option value="mech_design">Mechanical Design Engineering</option>
-            <option value="other">Other</option>
           </select>
         </div>
         <div class="form-group full" style="display:flex;align-items:center;gap:8px;margin-top:4px">
@@ -380,6 +333,7 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="../js/supabase-config.js"></script>
 <script src="../js/shared.js"></script>
+<script src="../js/admin-config.js"></script>
 <script>
 let currentUser, allRequests=[], allUsers=[], allVendors=[], activeTab='requests', editingUserId=null, viewingPRId=null;
 Chart.defaults.animation = false;
@@ -413,10 +367,21 @@ async function init() {
   document.getElementById('footerMount').innerHTML=buildFooter();
   initNavbar(currentUser);
   showLoader(true);
+  await applyAdminConfigOverrides();
+  renderTableHead();
+  renderDynamicFilterBar('dynamicFilterBar', 'master', 'filterRequests');
   await Promise.all([loadRequests(), loadUsers(), loadVendors(), loadRoutingConfig()]);
+  refreshFieldCatalog(allRequests);
+  renderDynamicFilterBar('dynamicFilterBar', 'master', 'filterRequests'); // re-render now that discovered-field options have real data
+  filterRequests();
   showLoader(false);
   window.initNotifBell && window.initNotifBell(currentUser, function(prId){ openPRDetail(prId); });
 }
+
+// ── DYNAMIC FILTER BAR ──
+// Rendering, toggling, and applying is handled by the shared engine in
+// admin-config.js (renderDynamicFilterBar / applyDynamicFilters / clearDynamicFilters)
+// so the same Filter Builder config works identically on every role's dashboard.
 
 async function loadRequests() {
   allRequests = await dbFetch(() => db.from('procurement_requests')
@@ -437,19 +402,18 @@ async function loadRequests() {
 
 async function loadUsers() {
   allUsers = await dbFetch(() => db.from('users').select('*').order('created_at'), 'users');
-  document.getElementById('sUsers').textContent=allUsers.length;
+  renderStatCards();
   renderUsers();
 }
 
 async function loadVendors() {
   allVendors = await dbFetch(() => db.from('vendors').select('*').order('name'), 'vendors');
-  document.getElementById('sVendors').textContent=allVendors.length;
+  renderStatCards();
   renderVendorGrid(allVendors);
 }
 
 let deptRouting=[], antunesRouting=[], routingOverrides=[], routingProjects=[];
-const ROUTING_COMBOS=[['npd','elec'],['npd','mechanical'],['npd','other'],['production','elec'],['production','mechanical'],['production','other']];
-const DISCIPLINE_LABELS={elec:'Elec',mechanical:'Mechanical',other:'Other'};
+const ROUTING_COMBOS=[['npd','elec'],['npd','mechanical'],['production','elec'],['production','mechanical']];
 
 async function loadRoutingConfig() {
   const[dr,ar,ro,rp]=await Promise.all([
@@ -509,7 +473,7 @@ function renderRoutingTab() {
     const row=deptRouting.find(r=>r.request_for===rf&&r.discipline===disc);
     return `<tr>
       <td>${rf==='npd'?'NPD':'Production'}</td>
-      <td>${DISCIPLINE_LABELS[disc]||disc}</td>
+      <td>${disc==='elec'?'Elec':'Mechanical'}</td>
       <td><select class="form-control" id="dr-${rf}-${disc}" style="max-width:280px">${userPickerOptions(row?.manager_id)}</select></td>
       <td><button class="btn btn-primary btn-sm" onclick="saveDeptRouting('${rf}','${disc}')">Save</button></td>
     </tr>`;
@@ -519,7 +483,7 @@ function renderRoutingTab() {
     const row=antunesRouting.find(r=>r.request_for===rf&&r.discipline===disc);
     return `<tr>
       <td>${rf==='npd'?'NPD':'Production'}</td>
-      <td>${DISCIPLINE_LABELS[disc]||disc}</td>
+      <td>${disc==='elec'?'Elec':'Mechanical'}</td>
       <td><select class="form-control" id="ar-${rf}-${disc}" style="max-width:280px">${userPickerOptions(row?.manager_id)}</select></td>
       <td><button class="btn btn-primary btn-sm" onclick="saveAntunesRouting('${rf}','${disc}')">Save</button></td>
     </tr>`;
@@ -628,7 +592,7 @@ function renderReassignQueue() {
   body.innerHTML=pending.map(r=>`<tr>
     <td>PR-${String(r.request_number).padStart(4,'0')}</td>
     <td>${r.project_name}</td>
-    <td>${r.request_category}${r.discipline?` · ${DISCIPLINE_LABELS[r.discipline]||r.discipline}`:''}</td>
+    <td>${r.request_category}${r.discipline?` · ${r.discipline==='elec'?'Elec':'Mechanical'}`:''}</td>
     <td>${r.users?.name||r.team_member_name||'—'}</td>
     <td>${new Date(r.created_at).toLocaleDateString()}</td>
     <td><select class="form-control" id="reassign-${r.id}" style="max-width:260px">${userPickerOptions(null)}</select></td>
@@ -654,12 +618,31 @@ async function assignApprover(prId) {
   renderReassignQueue();
 }
 
+// ── DYNAMIC STAT CARDS (driven by AdminConfig.stat_cards, set in Admin → Customize → Stat Cards) ──
+const BUILTIN_STAT_CARDS = {
+  total:{label:'Total Requests', icon:'📋', color:'', compute:()=>allRequests.length},
+  active:{label:'Active', icon:'⚡', color:'#f59e0b', compute:()=>allRequests.filter(x=>!['accepted','rejected'].includes(x.phase)).length},
+  closed:{label:'Accepted & Closed', icon:'✔', color:'#22c55e', compute:()=>allRequests.filter(x=>x.is_closed||CLOSED_PHASES.has(x.phase)).length},
+  users:{label:'Users', icon:'👥', color:'#3b82f6', compute:()=>allUsers.length},
+  vendors:{label:'Vendors', icon:'🏢', color:'#8b5cf6', compute:()=>allVendors.length},
+  rejected:{label:'Rejected', icon:'✖', color:'#ef4444', compute:()=>allRequests.filter(x=>['rejected','declined','qc_rejected','lp_rejected'].includes(x.phase)).length},
+  onhold:{label:'On Hold', icon:'⏸', color:'#dc2626', compute:()=>allRequests.filter(x=>x.is_on_hold).length, onclick:"switchTab('onhold')"},
+};
+function renderStatCards(){
+  const grid=document.querySelector('.stats-grid'); if(!grid) return;
+  const cfg=(AdminConfig.stat_cards||[]).filter(c=>c.visible!==false).sort((a,b)=>(a.order||0)-(b.order||0));
+  grid.innerHTML=cfg.map(c=>{
+    if(c.source==='builtin'){
+      const b=BUILTIN_STAT_CARDS[c.key]; if(!b) return '';
+      return `<div class="stat-card" ${b.color?`style="--accent:${b.color}${b.onclick?';cursor:pointer':''}"`:''} ${b.onclick?`onclick="${b.onclick}"`:''}><div class="stat-card-value">${b.compute()}</div><div class="stat-card-label">${escHtml(b.label)}</div><div class="stat-card-icon">${b.icon}</div></div>`;
+    }
+    const val=allRequests.filter(r=>String(fieldValueGetter(r,c.field))===String(c.value)).length;
+    return `<div class="stat-card" style="--accent:${c.color||'#6366f1'}"><div class="stat-card-value">${val}</div><div class="stat-card-label">${escHtml(c.label)}</div><div class="stat-card-icon">${c.icon||'📊'}</div></div>`;
+  }).join('');
+}
+
 function updateStats() {
-  document.getElementById('sTotal').textContent=allRequests.length;
-  document.getElementById('sActive').textContent=allRequests.filter(r=>!['accepted','rejected'].includes(r.phase)).length;
-  document.getElementById('sClosed').textContent=allRequests.filter(r=>r.is_closed||CLOSED_PHASES.has(r.phase)).length;
-  document.getElementById('sRejected').textContent=allRequests.filter(r=>['rejected','declined','qc_rejected','lp_rejected'].includes(r.phase)).length;
-  document.getElementById('sOnHold').textContent=allRequests.filter(r=>r.is_on_hold).length;
+  renderStatCards();
   // Director badge
   const directorPending=allRequests.filter(r=>['pending_sandy_approval','deviation_approval','pending_decline_approval'].includes(r.phase));
   const badge=document.getElementById('directorBadge');
@@ -693,40 +676,47 @@ function switchTab(tab) {
 }
 
 function clearFilters() {
-  document.getElementById('searchInput').value='';
-  document.getElementById('filterPhase').value='';
-  document.getElementById('filterDept').value='';
-  filterRequests();
+  clearDynamicFilters('dynamicFilterBar', 'master', 'filterRequests');
 }
 
 function filterRequests() {
-  const s=document.getElementById('searchInput').value.toLowerCase();
-  const ph=document.getElementById('filterPhase').value;
-  const dp=document.getElementById('filterDept').value;
-  let reqs=allRequests;
-  if(s) reqs=reqs.filter(r=>r.project_name.toLowerCase().includes(s)||String(r.request_number).includes(s)||(r.team_member_name||'').toLowerCase().includes(s)||(r.users?.name||'').toLowerCase().includes(s)||(r.item_note||'').toLowerCase().includes(s));
-  if(ph) reqs=reqs.filter(r=>r.phase===ph);
-  if(dp) reqs=reqs.filter(r=>r.department===dp);
+  const reqs = applyDynamicFilters(allRequests, 'dynamicFilterBar', 'master', ['project_name']);
   renderTable(reqs);
 }
 
+// ── DYNAMIC COLUMNS (driven by AdminConfig.columns, set in Admin → Customize → Column Manager) ──
+const COLUMN_RENDERERS = {
+  request_number: {header:'PR #', cell:r=>`<span class="pr-number">PR-${String(r.request_number).padStart(4,'0')}</span>`},
+  project_name: {header:'Project', cell:r=>`<strong>${escHtml(r.project_name)}</strong><br/><span style="font-size:0.74rem;color:var(--gray-4)">${escHtml(r.project_phase||'')}</span>${r.item_note?`<br/><span style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${escHtml(r.item_note)}</span>`:''}`},
+  request_category: {header:'Category', cell:r=>`<span class="mono">${escHtml(r.request_category)}</span>`},
+  department: {header:'Dept', cell:r=>`<span style="font-size:0.82rem">${escHtml(DEPARTMENTS[r.department]||r.department)}</span>`},
+  vendor: {header:'Vendor', cell:r=>`<span style="font-size:0.8rem;max-width:110px;overflow:hidden;text-overflow:ellipsis;display:inline-block">${escHtml(r.vendors?.name||'—')}</span>`},
+  phase: {header:'Phase', cell:r=>`${getPhaseBadge(r.phase)}${r.is_on_hold?' <span style="background:#f59e0b18;color:#b45309;border:1px solid #f59e0b35;border-radius:3px;font-size:0.6rem;font-family:var(--font-mono);font-weight:700;padding:1px 5px;vertical-align:middle">⏸ HOLD</span>':''}`},
+  lead_time: {header:'Lead Time', cell:r=>leadTimeBadge(r.created_at, r.closed_at, r.total_hold_seconds, r.is_on_hold, r.hold_started_at)},
+  updated_at: {header:'Updated', cell:r=>`<span class="mono" style="font-size:0.75rem">${formatDate(r.updated_at||r.created_at)}</span>`},
+  created_at: {header:'Created', cell:r=>`<span class="mono" style="font-size:0.75rem">${formatDate(r.created_at)}</span>`},
+  requester: {header:'Requester', cell:r=>`<span style="font-size:0.82rem">${escHtml(r.users?.name||'—')}</span>`},
+  urgency: {header:'Urgency', cell:r=>getUrgencyBadge(r.urgency)||'<span style="color:var(--gray-4)">—</span>'},
+};
+function getColumnDef(field){
+  if(COLUMN_RENDERERS[field]) return COLUMN_RENDERERS[field];
+  if(field.startsWith('custom:')){
+    const key=field.slice(7);
+    const cf=(AdminConfig.custom_fields||[]).find(c=>c.key===key);
+    return {header:cf?cf.label:key, cell:r=>escHtml(String((r.custom_field_values||{})[key] ?? '—'))};
+  }
+  return {header:field, cell:()=>'—'};
+}
+function activeColumns(){ return (AdminConfig.columns||[]).filter(c=>c.visible!==false).sort((a,b)=>(a.order||0)-(b.order||0)); }
+function renderTableHead(){
+  const thead=document.getElementById('requestsTableHead'); if(!thead) return;
+  thead.innerHTML=activeColumns().map(c=>`<th>${escHtml(getColumnDef(c.field).header)}</th>`).join('')+'<th>Actions</th>';
+}
 function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
-  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="10"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>No requests found</h3><p>No procurement requests match your current filters.</p></div></td></tr>`;return;}
-  tbody.innerHTML=reqs.map(r=>`<tr>
-    <td><span class="pr-number">PR-${String(r.request_number).padStart(4,'0')}</span></td>
-    <td><strong>${r.project_name}</strong><br/><span style="font-size:0.74rem;color:var(--gray-4)">${r.project_phase}</span>${r.item_note?`<br/><span style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${r.item_note}</span>`:''}</td>
-    <td class="mono">${r.request_category}</td>
-    <td style="font-size:0.82rem">${DEPARTMENTS[r.department]||r.department}</td>
-    <td style="font-size:0.8rem;max-width:110px;overflow:hidden;text-overflow:ellipsis">${r.vendors?.name||'—'}</td>
-    <td>${getPhaseBadge(r.phase)}${r.is_on_hold?' <span style="background:#f59e0b18;color:#b45309;border:1px solid #f59e0b35;border-radius:3px;font-size:0.6rem;font-family:var(--font-mono);font-weight:700;padding:1px 5px;vertical-align:middle">⏸ HOLD</span>':''}</td>
-    <td>${leadTimeBadge(r.created_at, r.closed_at, r.total_hold_seconds, r.is_on_hold, r.hold_started_at)}</td>
-    <td class="mono" style="font-size:0.75rem">${formatDate(r.updated_at||r.created_at)}</td>
-    <td style="font-size:0.82rem">${r.users?.name||'—'}</td>
-    <td style="white-space:nowrap">
-      <button class="btn btn-ghost btn-sm" onclick='viewPR("${r.id}")'>View</button>
-    </td>
-  </tr>`).join('');
+  const cols=activeColumns();
+  if(!reqs.length){tbody.innerHTML=`<tr><td colspan="${cols.length+1}"><div class="empty-state"><div class="empty-state-icon">📭</div><h3>No requests found</h3><p>No procurement requests match your current filters.</p></div></td></tr>`;return;}
+  tbody.innerHTML=reqs.map(r=>`<tr>${cols.map(c=>`<td>${getColumnDef(c.field).cell(r)}</td>`).join('')}<td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick='viewPR("${r.id}")'>View</button></td></tr>`).join('');
 }
 
 // ── ON HOLD TAB ────────────────────────────────────────────────
@@ -1281,8 +1271,16 @@ function onUserRoleChange() {
   if(role==='project_manager'&&!document.getElementById('uPMType').value){document.getElementById('uPMType').value='npd';}
 }
 
+function populateDeptSelect() {
+  const el=document.getElementById('uDept'); if(!el) return;
+  const current=el.value;
+  el.innerHTML='<option value="">—</option>'+Object.entries(DEPARTMENTS).map(([k,v])=>`<option value="${k}">${escHtml(v)}</option>`).join('');
+  el.value=current;
+}
+
 function openAddUser() {
   editingUserId=null;
+  populateDeptSelect();
   document.getElementById('userModalTitle').textContent='Add New User';
   ['uName','uEmail','uRole','uDept'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('uPassword').value='12345';
@@ -1303,6 +1301,7 @@ function editUser(id) {
   document.getElementById('uEmail').value=u.email;
   document.getElementById('uPassword').value=u.password;
   document.getElementById('uRole').value=u.role;
+  populateDeptSelect();
   document.getElementById('uDept').value=u.department||'';
   document.getElementById('uPMType').value=u.pm_type||'npd';
   document.getElementById('uManualRouting').checked=!!u.manual_routing;
@@ -1349,13 +1348,26 @@ async function deleteUser(id) {
   await loadUsers();
 }
 
+// Export columns are configured in Admin → Customize → Export Config.
+function exportCSVValueFor(r, field){
+  switch(field){
+    case 'request_number': return `PR-${String(r.request_number).padStart(4,'0')}`;
+    case 'phase': return PHASES[r.phase]?.label||r.phase;
+    case 'department': return DEPARTMENTS[r.department]||r.department;
+    case 'vendor': return r.vendors?.name||'—';
+    case 'requester': return r.users?.name||'—';
+    case 'updated_at': return formatDate(r.updated_at||r.created_at);
+    case 'created_at': return formatDate(r.created_at);
+    case 'lead_time': return leadTimeBadge(r.created_at,r.closed_at,r.total_hold_seconds,r.is_on_hold,r.hold_started_at).replace(/<[^>]+>/g,'');
+    default:
+      if(field.startsWith('custom:')) return (r.custom_field_values||{})[field.slice(7)] ?? '';
+      return r[field] ?? '';
+  }
+}
 function exportCSV() {
-  const headers=['PR#','Project','Phase','Category','Department','Vendor','Status','Updated','Requester'];
-  const rows=allRequests.map(r=>[
-    `PR-${String(r.request_number).padStart(4,'0')}`,r.project_name,r.project_phase,r.request_category,
-    DEPARTMENTS[r.department]||r.department,r.vendors?.name||'—',
-    PHASES[r.phase]?.label||r.phase,formatDate(r.updated_at||r.created_at),r.users?.name||'—'
-  ]);
+  const fields=(AdminConfig.export_columns&&AdminConfig.export_columns.length) ? AdminConfig.export_columns : ADMIN_CONFIG_DEFAULTS.export_columns;
+  const headers=fields.map(f=>fieldLabelFor(f)||f);
+  const rows=allRequests.map(r=>fields.map(f=>exportCSVValueFor(r,f)));
   const csv=[headers,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv,'+encodeURIComponent(csv);

@@ -373,6 +373,7 @@ function getPhaseBadge(phase){
     lp_procurement_processing:['LP — Processing','badge-blue'],
     lp_payment_pending:['LP — Payment Pending','badge-orange'],
     lp_payment_done:['LP — Payment Done','badge-green'],
+    vendor_info_received:['Vendor Info Received — Closed','badge-green'],
   };
   const[label,cls]=map[phase]||[phase,'badge-gray'];
   return `<span class="badge ${cls}">${label}</span>`;
