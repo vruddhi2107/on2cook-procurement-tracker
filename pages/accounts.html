@@ -43,8 +43,8 @@
   </div>
 
   <div class="stats-grid">
-    <div class="stat-card"><div class="stat-card-value" id="sPending">—</div><div class="stat-card-label">Payment Due</div><div class="stat-card-icon">💰</div></div>
-    <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sAdvance">—</div><div class="stat-card-label">Advance Pending</div><div class="stat-card-icon">📤</div></div>
+    <div class="stat-card"><div class="stat-card-value" id="sPending">—</div><div class="stat-card-label">Payment Due</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sAdvance">—</div><div class="stat-card-label">Advance Pending</div><div class="stat-card-icon"></div></div>
     <div class="stat-card" style="--accent:#f59e0b"><div class="stat-card-value" id="sPartial">—</div><div class="stat-card-label">Partial Paid</div><div class="stat-card-icon">⏳</div></div>
     <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sPaid">—</div><div class="stat-card-label">Fully Paid</div><div class="stat-card-icon"></div></div>
   </div>
@@ -52,8 +52,8 @@
   <div id="advanceBanner" style="display:none;margin-bottom:16px"></div>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('due')">💰 Payment Due</button>
-    <button class="tab-btn" onclick="switchTab('advance')">📤 Smartsheet Advances <span id="advBadge" style="display:none;background:var(--red);color:white;border-radius:10px;padding:0 6px;font-size:0.65rem;font-family:var(--font-mono);margin-left:4px"></span></button>
+    <button class="tab-btn active" onclick="switchTab('due')"> Payment Due</button>
+    <button class="tab-btn" onclick="switchTab('advance')"> Smartsheet Advances <span id="advBadge" style="display:none;background:var(--red);color:white;border-radius:10px;padding:0 6px;font-size:0.65rem;font-family:var(--font-mono);margin-left:4px"></span></button>
     <button class="tab-btn" onclick="switchTab('all')">All Payments</button>
   </div>
 
@@ -62,11 +62,11 @@
       <input type="text" id="searchInput" placeholder="Search by project or vendor..." oninput="filterPayments()"/>
       <select id="filterUrgency" onchange="filterPayments()">
         <option value="">All Urgency</option>
-        <option value="critical">🔴 Within 48 hours</option>
-        <option value="urgent">🟡 Within 24 hours</option>
-        <option value="normal">🟢 Within 1 Week</option>
+        <option value="critical"> Within 48 hours</option>
+        <option value="urgent"> Within 24 hours</option>
+        <option value="normal"> Within 1 Week</option>
       </select>
-      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear Filters</button>
     </div>
     <div class="card">
       <div class="table-wrap">
@@ -88,7 +88,7 @@
   <div class="modal" style="max-width:860px">
     <div class="modal-header">
       <div><div class="modal-title" id="payDetailTitle">Payment Request</div><div class="modal-title-sub" id="payDetailSub"></div></div>
-      <button class="modal-close" onclick="closeModal('payDetailModal')">✕</button>
+      <button class="modal-close" onclick="closeModal('payDetailModal')"></button>
     </div>
     <div class="modal-body" id="payDetailBody" style="max-height:82vh;overflow-y:auto"></div>
     <div class="modal-footer" id="payDetailFooter"><button class="btn btn-secondary" onclick="closeModal('payDetailModal')">Close</button></div>
@@ -100,10 +100,10 @@
   <div class="modal" style="max-width:520px">
     <div class="modal-header">
       <div>
-        <div class="modal-title">📤 Review Advance Request</div>
+        <div class="modal-title"> Review Advance Request</div>
         <div class="modal-title-sub" id="advConfirmSub"></div>
       </div>
-      <button class="modal-close" onclick="closeModal('advConfirmModal')">✕</button>
+      <button class="modal-close" onclick="closeModal('advConfirmModal')"></button>
     </div>
     <div class="modal-body" id="advConfirmBody"></div>
     <div class="modal-footer">
@@ -135,7 +135,7 @@ let _attRegistry = [], _previewUrl = null, _previewName = null;
 
 function _registerAtts(arr) { _attRegistry = arr; }
 
-function _attIcon(name) { return (name||'').toLowerCase().includes('.pdf') ? '📄' : '🖼️'; }
+function _attIcon(name) { return (name||'').toLowerCase().includes('.pdf') ? '' : ''; }
 
 function _attTypeLabel(t) {
   return {quotation:'Quotation',approval_screenshot:'Approval',grn_doc:'GRN',other:'Document',engineer_upload:'Engineer Upload'}[t] || t || 'doc';
@@ -146,7 +146,7 @@ function _buildAttRow(a, i) {
     <span style="font-size:1.1rem;flex-shrink:0">${_attIcon(a.file_name)}</span>
     <span style="font-size:0.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${a.file_name||'Attachment'}</span>
     <span style="font-size:0.62rem;padding:2px 6px;background:white;border:1px solid var(--border,#e5e7eb);border-radius:3px;color:#6b7280;font-family:monospace;flex-shrink:0">${_attTypeLabel(a.attachment_type)}</span>
-    <button class="btn btn-secondary btn-sm" style="flex-shrink:0" onclick="previewAttByIndex(${i})">👁 Preview</button>
+    <button class="btn btn-secondary btn-sm" style="flex-shrink:0" onclick="previewAttByIndex(${i})"> Preview</button>
     <button class="btn btn-secondary btn-sm" style="flex-shrink:0" onclick="downloadAttByIndex(${i})">⬇ Download</button>
   </div>`;
 }
@@ -155,7 +155,7 @@ function _buildAttsSection(atts, title) {
   if (!atts || !atts.length) return '';
   _registerAtts(atts);
   return `<div style="margin-top:16px;padding:14px;background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.15);border-radius:8px">
-    <div style="color:#6366f1;font-weight:600;font-size:0.82rem;margin-bottom:10px">📎 ${title||'Attachments'} (${atts.length})</div>
+    <div style="color:#6366f1;font-weight:600;font-size:0.82rem;margin-bottom:10px"> ${title||'Attachments'} (${atts.length})</div>
     <div style="display:flex;flex-direction:column;gap:6px">${atts.map((a,i)=>_buildAttRow(a,i)).join('')}</div>
   </div>`;
 }
@@ -194,7 +194,7 @@ function openAttPreview(url, name) {
   } else if (isPDF) {
     content.innerHTML=`<iframe src="${url}" style="width:82vw;height:76vh;border:none" title="${name}"></iframe>`;
   } else {
-    content.innerHTML=`<div style="padding:48px;text-align:center;color:#6b7280"><div style="font-size:3rem;margin-bottom:12px">📄</div><div style="font-size:0.9rem;font-weight:600">${name}</div><div style="font-size:0.78rem;margin-top:8px">Preview not available — please use Download</div></div>`;
+    content.innerHTML=`<div style="padding:48px;text-align:center;color:#6b7280"><div style="font-size:3rem;margin-bottom:12px"></div><div style="font-size:0.9rem;font-weight:600">${name}</div><div style="font-size:0.78rem;margin-top:8px">Preview not available — please use Download</div></div>`;
   }
   ov.style.display='flex';
 }
@@ -259,7 +259,7 @@ function renderAdvanceBanner() {
   if(!pending.length){b.style.display='none';return;}
   b.style.display='block';
   b.innerHTML=`<div style="background:rgba(245,158,11,0.07);border:1.5px solid rgba(245,158,11,0.3);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <span style="font-size:1.1rem">📤</span>
+    <span style="font-size:1.1rem"></span>
     <div style="flex:1"><strong style="font-size:0.85rem">${pending.length} advance payment request${pending.length>1?'s':''} awaiting approval</strong>
     <div style="font-size:0.75rem;color:var(--gray-3);margin-top:2px">${pending.map(a=>a.procurement_requests?.project_name||'Unknown project').join(' · ')}</div></div>
     <button class="btn btn-primary btn-sm" onclick="switchTab('advance')">Review Now →</button>
@@ -292,7 +292,7 @@ function filterPayments() {
 function renderPaymentsTable(pays) {
   const tbody=document.getElementById('paymentsBody');
   if(!pays.length){
-    tbody.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">💰</div><h3>${activeTab==='due'?'No payments due!':'No payment requests'}</h3><p>${activeTab==='due'?'All payments are up to date.':'No payment requests have been created yet.'}</p></div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon"></div><h3>${activeTab==='due'?'No payments due!':'No payment requests'}</h3><p>${activeTab==='due'?'All payments are up to date.':'No payment requests have been created yet.'}</p></div></td></tr>`;
     return;
   }
   const ptMap=Object.fromEntries(PAYMENT_TERMS_OPTIONS.map(p=>[p.value,p.label]));
@@ -302,7 +302,7 @@ function renderPaymentsTable(pays) {
     const stBadge={
       pending:`<span class="badge badge-orange">Pending</span>`,
       partial:`<span class="badge badge-blue">Partial Paid</span>`,
-      paid:`<span class="badge badge-green">Paid ✓</span>`
+      paid:`<span class="badge badge-green">Paid </span>`
     }[p.status]||'';
     const paidPct=p.amount_paid&&p.invoice_amount?Math.min(100,Math.round(Number(p.amount_paid)/Number(p.invoice_amount)*100)):0;
     return `<tr style="${isCritPending?'background:rgba(214,43,43,0.025)':''}">
@@ -330,7 +330,7 @@ function renderPaymentsTable(pays) {
 function renderAdvanceTab() {
   const el=document.getElementById('advanceContent');
   if(!allAdvances.length){
-    el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">📤</div><h3>No advance requests</h3><p>Advance payment requests from the procurement team will appear here.</p></div>`;
+    el.innerHTML=`<div class="empty-state"><div class="empty-state-icon"></div><h3>No advance requests</h3><p>Advance payment requests from the procurement team will appear here.</p></div>`;
     return;
   }
   const pending=allAdvances.filter(a=>a.status==='pending');
@@ -354,15 +354,15 @@ function advCardHTML(a) {
     rejected:'var(--red)'
   }[a.status]||'#6b7280';
   const stLabel={
-    pending:'⏳ Pending', raised:'📤 Raised via Smartsheet',
-    approved:'✅ Approved', payment_received:'💳 Payment Received',
-    rejected:'✗ Rejected'
+    pending:'⏳ Pending', raised:' Raised via Smartsheet',
+    approved:' Approved', payment_received:' Payment Received',
+    rejected:' Rejected'
   }[a.status]||a.status;
   const projectName=a.procurement_requests?.project_name||'Unknown Project';
   const prNum=a.procurement_requests?.request_number?`PR-${String(a.procurement_requests.request_number).padStart(4,'0')}`:'';
   const reqName=a.users?.name||'Procurement';
   return `<div class="adv-card ${a.status}">
-    <div style="width:38px;height:38px;border-radius:8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">📤</div>
+    <div style="width:38px;height:38px;border-radius:8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0"></div>
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:4px">
         <div>
@@ -375,13 +375,13 @@ function advCardHTML(a) {
         <div style="font-weight:800;font-size:1rem;font-family:var(--font-mono)">AED ${Number(a.amount||0).toLocaleString()}</div>
         ${a.notes?`<div style="font-size:0.76rem;color:var(--gray-3);flex:1">${a.notes}</div>`:''}
       </div>
-      ${a.smartsheet_payment_id?`<div style="font-size:0.72rem;color:#6366f1;margin-top:4px;font-family:var(--font-mono)">📋 Smartsheet ID: ${a.smartsheet_payment_id}</div>`:''}
+      ${a.smartsheet_payment_id?`<div style="font-size:0.72rem;color:#6366f1;margin-top:4px;font-family:var(--font-mono)"> Smartsheet ID: ${a.smartsheet_payment_id}</div>`:''}
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        ${a.pr_id?`<button class="btn btn-ghost btn-sm" onclick="openAdvancePRDetail('${a.pr_id}')">📋 View PR</button>`:''}
-        ${a.smartsheet_screenshot?`<button class="btn btn-ghost btn-sm" onclick="openAttPreview('${a.smartsheet_screenshot}','Smartsheet Screenshot')">🖼 View Screenshot</button>`:''}
+        ${a.pr_id?`<button class="btn btn-ghost btn-sm" onclick="openAdvancePRDetail('${a.pr_id}')"> View PR</button>`:''}
+        ${a.smartsheet_screenshot?`<button class="btn btn-ghost btn-sm" onclick="openAttPreview('${a.smartsheet_screenshot}','Smartsheet Screenshot')"> View Screenshot</button>`:''}
       </div>
-      ${(a.status==='payment_received')?`<div style="font-size:0.72rem;color:#16a34a;font-weight:600;margin-top:6px">✅ Payment received confirmed by Procurement</div>`:''}
-      ${(a.status==='rejected')?`<div style="font-size:0.72rem;color:var(--red);margin-top:6px">✗ Rejected — ${fmtDate(a.confirmed_at)}</div>`:''}
+      ${(a.status==='payment_received')?`<div style="font-size:0.72rem;color:#16a34a;font-weight:600;margin-top:6px"> Payment received confirmed by Procurement</div>`:''}
+      ${(a.status==='rejected')?`<div style="font-size:0.72rem;color:var(--red);margin-top:6px"> Rejected — ${fmtDate(a.confirmed_at)}</div>`:''}
     </div>
   </div>`;
 }
@@ -422,12 +422,12 @@ async function openAdvancePRDetail(prId) {
   ov.innerHTML = `<div class="modal" style="max-width:800px">
     <div class="modal-header">
       <div><div class="modal-title">PR-${String(pr.request_number).padStart(4,'0')} — ${pr.project_name}</div><div class="modal-title-sub">Full procurement context for advance review</div></div>
-      <button class="modal-close" onclick="document.getElementById('_advPRDetailModal').classList.remove('active')">✕</button>
+      <button class="modal-close" onclick="document.getElementById('_advPRDetailModal').classList.remove('active')"></button>
     </div>
     <div class="modal-body" style="max-height:78vh;overflow-y:auto">
       ${buildPRDetailHTML(pr, quotes, '', pr.project_manager_name||'', {poData:po||null, advPayRec:advRes.data||null, payRec:payRes.data||null, clearanceManagerName})}
       ${po ? `<div class="detail-section">
-        <div class="detail-section-title">📄 Purchase Order</div>
+        <div class="detail-section-title"> Purchase Order</div>
         <div class="po-summary-card">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             <div>
@@ -465,7 +465,7 @@ function openAdvanceConfirm(advId, decision) {
       background:${isApprove?'rgba(22,163,74,0.07)':'rgba(214,43,43,0.06)'};
       border:1.5px solid ${isApprove?'rgba(22,163,74,0.3)':'rgba(214,43,43,0.25)'}">
       <div style="font-size:0.95rem;font-weight:700;color:${isApprove?'#16a34a':'var(--red)'};margin-bottom:4px">
-        ${isApprove?' Approve Advance Payment':'✗ Reject Advance Payment'}
+        ${isApprove?' Approve Advance Payment':' Reject Advance Payment'}
       </div>
       <div style="font-size:0.8rem;color:var(--gray-3)">
         ${isApprove
@@ -500,18 +500,18 @@ function openAdvanceConfirm(advId, decision) {
     <div style="padding:12px 14px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:16px;font-size:0.78rem">
       <div style="font-weight:600;margin-bottom:6px;font-size:0.74rem;text-transform:uppercase;letter-spacing:0.4px;color:var(--gray-4)">This action will update:</div>
       <div style="display:flex;flex-direction:column;gap:4px">
-        <div>✔ <strong>Advance request</strong> status → <span style="color:${isApprove?'#16a34a':'var(--red)'}"><strong>${isApprove?'Approved':'Rejected'}</strong></span></div>
-        <div>✔ <strong>Procurement request</strong> phase → <span style="color:${isApprove?'#16a34a':'var(--red)'}"><strong>${isApprove?'Advance Approved — ready to order':'Advance Rejected — procurement notified'}</strong></span></div>
+        <div> <strong>Advance request</strong> status → <span style="color:${isApprove?'#16a34a':'var(--red)'}"><strong>${isApprove?'Approved':'Rejected'}</strong></span></div>
+        <div> <strong>Procurement request</strong> phase → <span style="color:${isApprove?'#16a34a':'var(--red)'}"><strong>${isApprove?'Advance Approved — ready to order':'Advance Rejected — procurement notified'}</strong></span></div>
       </div>
     </div>
-    ${adv?.pr_id?`<div style="margin-bottom:14px"><button class="btn btn-ghost btn-sm" onclick="openAdvancePRDetail('${adv.pr_id}')">📋 View Full PR Context & Documents</button></div>`:''}
+    ${adv?.pr_id?`<div style="margin-bottom:14px"><button class="btn btn-ghost btn-sm" onclick="openAdvancePRDetail('${adv.pr_id}')"> View Full PR Context & Documents</button></div>`:''}
     <div class="form-group">
       <label class="form-label">Remarks <span style="color:var(--gray-4);font-weight:400">(optional — visible to procurement)</span></label>
       <textarea class="form-control" id="advConfirmRemarks" placeholder="${isApprove?'e.g. Approved, funds transferred on DD/MM/YYYY...':'e.g. Budget not available, please seek alternative...'}" style="min-height:72px"></textarea>
     </div>`;
 
   const btn = document.getElementById('advConfirmBtn');
-  btn.textContent = isApprove ? ' Confirm Approval' : '✗ Confirm Rejection';
+  btn.textContent = isApprove ? ' Confirm Approval' : ' Confirm Rejection';
   btn.className = `btn ${isApprove?'btn-success':'btn-danger'}`;
   openModal('advConfirmModal');
 }
@@ -546,7 +546,7 @@ async function confirmAdvanceDecision() {
       await window.postComment(adv.pr_id, currentUser.id,
         decision === 'approved'
           ? ` Accounts approved advance payment of AED ${Number(adv.amount||0).toLocaleString()}.${remarks?' Note: '+remarks:''}`
-          : `✗ Accounts rejected advance payment request.${remarks?' Reason: '+remarks:''}`
+          : ` Accounts rejected advance payment request.${remarks?' Reason: '+remarks:''}`
       );
     } catch(e) { console.warn('Comment post failed:', e); }
   }
@@ -632,14 +632,14 @@ async function openPayDetail(id) {
       <div class="detail-item"><div class="detail-key">Project Phase</div><div class="detail-value">${pay.project_phase||'—'}</div></div>
       <div class="detail-item"><div class="detail-key">Project Manager</div><div class="detail-value">${pay.project_manager_name||'—'}</div></div>
       <div class="detail-item"><div class="detail-key">Payment Terms</div><div class="detail-value" style="color:#6366f1">${ptMap[pay.payment_terms]||pay.payment_terms||'—'}</div></div>
-      <div class="detail-item"><div class="detail-key">Shipping</div><div class="detail-value">${{yes:'✓ Included in invoice',no:'No — separate',na:'N/A'}[pay.shipping_included]||'—'}</div></div>
+      <div class="detail-item"><div class="detail-key">Shipping</div><div class="detail-value">${{yes:' Included in invoice',no:'No — separate',na:'N/A'}[pay.shipping_included]||'—'}</div></div>
       <div class="detail-item"><div class="detail-key">Request Date</div><div class="detail-value">${fmtDateTime(pay.request_date)}</div></div>
       ${pay.notes?`<div class="detail-item" style="grid-column:1/-1"><div class="detail-key">Notes from Procurement</div><div class="detail-value">${pay.notes}</div></div>`:''}
     </div>
 
     <!-- ── VENDOR DETAILS ── -->
     ${vendorData?`<div class="detail-section">
-      <div class="detail-section-title">🏢 Vendor Details</div>
+      <div class="detail-section-title"> Vendor Details</div>
       <div style="padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm)">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div>
@@ -648,7 +648,7 @@ async function openPayDetail(id) {
             ${vendorData.address?`<div style="font-size:0.71rem;color:var(--gray-4);margin-top:2px">${vendorData.address}</div>`:''}
           </div>
           ${vendorData.payment_terms?`<div style="font-size:0.72rem;padding:3px 9px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:4px;color:#6366f1">
-            💳 ${ptMap[vendorData.payment_terms]||vendorData.payment_terms}
+             ${ptMap[vendorData.payment_terms]||vendorData.payment_terms}
           </div>`:''}
         </div>
       </div>
@@ -656,7 +656,7 @@ async function openPayDetail(id) {
 
     <!-- ── PURCHASE ORDER ── -->
     ${prPO?`<div class="detail-section">
-      <div class="detail-section-title">📄 Purchase Order</div>
+      <div class="detail-section-title"> Purchase Order</div>
       <div class="po-summary-card">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
           <div>
@@ -669,7 +669,7 @@ async function openPayDetail(id) {
         </div>
       </div>
     </div>` : `<div class="detail-section">
-      <div class="detail-section-title">📄 Purchase Order</div>
+      <div class="detail-section-title"> Purchase Order</div>
       <div style="padding:10px 12px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius-sm);font-size:0.78rem;color:#b45309">No PO on record for this request.</div>
     </div>`}
 
@@ -681,7 +681,7 @@ async function openPayDetail(id) {
 
     <!-- ── ALL QUOTATIONS ── -->
     ${prQuotes.length>1?`<div class="detail-section">
-      <div class="detail-section-title">📎 All Quotations (${prQuotes.length})</div>
+      <div class="detail-section-title"> All Quotations (${prQuotes.length})</div>
       <div style="display:flex;flex-direction:column;gap:8px">
         ${prQuotes.map(q=>renderQuotationCard(q, false, prData?.selected_quotation_id)).join('')}
       </div>
@@ -689,16 +689,16 @@ async function openPayDetail(id) {
 
     <!-- ── ADVANCE PAYMENT RECORD ── -->
     ${advanceData?`<div class="detail-section">
-      <div class="detail-section-title">💳 Advance Payment Record</div>
+      <div class="detail-section-title"> Advance Payment Record</div>
       <div style="padding:12px 14px;border-radius:var(--radius-sm);background:${['payment_received','approved'].includes(advanceData.status)?'rgba(22,163,74,0.06)':advanceData.status==='rejected'?'rgba(214,43,43,0.06)':'rgba(245,158,11,0.06)'};border:1px solid ${['payment_received','approved'].includes(advanceData.status)?'rgba(22,163,74,0.22)':advanceData.status==='rejected'?'rgba(214,43,43,0.22)':'rgba(245,158,11,0.22)'}">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div>
             <div style="font-weight:700;font-family:var(--font-mono)">AED ${Number(advanceData.amount||0).toLocaleString()}</div>
             ${advanceData.notes?`<div style="font-size:0.73rem;color:var(--gray-3);margin-top:2px">${advanceData.notes}</div>`:''}
-            ${advanceData.smartsheet_payment_id?`<div style="font-size:0.72rem;color:#6366f1;margin-top:3px;font-family:var(--font-mono)">📋 Smartsheet ID: ${advanceData.smartsheet_payment_id}</div>`:''}
+            ${advanceData.smartsheet_payment_id?`<div style="font-size:0.72rem;color:#6366f1;margin-top:3px;font-family:var(--font-mono)"> Smartsheet ID: ${advanceData.smartsheet_payment_id}</div>`:''}
           </div>
           <span style="font-size:0.72rem;font-weight:700;color:${{payment_received:'#16a34a',approved:'#22c55e',rejected:'var(--red)',raised:'#b45309',pending:'#b45309'}[advanceData.status]||'#6b7280'}">
-            ${{payment_received:'💳 Payment Received',approved:'✅ Confirmed',rejected:'✗ Rejected',raised:'📤 Raised via Smartsheet',pending:'⏳ Pending'}[advanceData.status]||advanceData.status}
+            ${{payment_received:' Payment Received',approved:' Confirmed',rejected:' Rejected',raised:' Raised via Smartsheet',pending:'⏳ Pending'}[advanceData.status]||advanceData.status}
           </span>
         </div>
         ${advanceData.raised_at?`<div style="font-size:0.71rem;color:var(--gray-4);margin-top:4px">Raised: ${fmtDate(advanceData.raised_at)}</div>`:''}
@@ -720,7 +720,7 @@ async function openPayDetail(id) {
         ${prData?.pm_final_approval_status?`<div class="approval-chain-item">
           <div class="approval-chain-dot" style="background:${prData.pm_final_approval_status==='approved'?'#16a34a':'var(--red)'}"></div>
           <div style="flex:1">
-            <div style="font-size:0.78rem;font-weight:600">PM Final Approval — ${prData.pm_final_approval_status==='approved'?' Approved':'✗ Rejected'}</div>
+            <div style="font-size:0.78rem;font-weight:600">PM Final Approval — ${prData.pm_final_approval_status==='approved'?' Approved':' Rejected'}</div>
             ${prData.pm_final_approval_notes?`<div style="font-size:0.72rem;color:var(--gray-3)">${prData.pm_final_approval_notes}</div>`:''}
           </div>
         </div>`:''}
@@ -748,7 +748,7 @@ async function openPayDetail(id) {
         ${prData?.qc_result?`<div class="approval-chain-item">
           <div class="approval-chain-dot" style="background:${prData.qc_result==='accepted'||prData.qc_result==='qc_passed'?'#16a34a':'var(--red)'}"></div>
           <div>
-            <div style="font-size:0.78rem;font-weight:600">QC Inspection — ${prData.qc_result==='accepted'||prData.qc_result==='qc_passed'?' Passed':'✗ Failed'}</div>
+            <div style="font-size:0.78rem;font-weight:600">QC Inspection — ${prData.qc_result==='accepted'||prData.qc_result==='qc_passed'?' Passed':' Failed'}</div>
             ${prData.qc_notes?`<div style="font-size:0.72rem;color:var(--gray-3)">${prData.qc_notes}</div>`:''}
           </div>
         </div>`:''}
@@ -760,13 +760,13 @@ async function openPayDetail(id) {
 
     <!-- ── BOM ── -->
     ${prData?.parts?.length?`<div class="detail-section">
-      <div class="detail-section-title">📋 Bill of Materials</div>
+      <div class="detail-section-title"> Bill of Materials</div>
       ${renderPartsTable(prData.parts)}
     </div>`:''}
 
     <!-- ── TIMELINE / COMMENTS ── -->
     ${prComments.length?`<div class="detail-section">
-      <div class="detail-section-title">💬 Activity Log (${prComments.length} entries)</div>
+      <div class="detail-section-title"> Activity Log (${prComments.length} entries)</div>
       <div style="max-height:200px;overflow-y:auto">
         ${renderComments(prComments)}
       </div>
@@ -775,7 +775,7 @@ async function openPayDetail(id) {
     <!-- ── PAYMENT HISTORY ── -->
     ${isPartial||isPaid?`<div class="detail-section">
       <div style="padding:12px;background:rgba(22,163,74,0.05);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius)">
-        <div class="detail-key" style="color:#16a34a;margin-bottom:6px">${isPaid?' Fully Paid':'💛 Partial Payment Made'}</div>
+        <div class="detail-key" style="color:#16a34a;margin-bottom:6px">${isPaid?' Fully Paid':' Partial Payment Made'}</div>
         <div style="font-family:var(--font-mono);font-weight:700">${pay.currency||'AED'} ${Number(pay.amount_paid||0).toLocaleString()} paid</div>
         ${isPartial?`<div class="payment-status-bar" style="margin-top:6px"><div class="payment-status-fill" style="width:${paidPct}%"></div></div><div style="font-size:0.7rem;color:var(--gray-4);margin-top:3px">${paidPct}% of invoice paid</div>`:''}
         ${pay.payment_notes?`<p style="font-size:0.78rem;color:var(--gray-3);margin-top:6px">${pay.payment_notes}</p>`:''}
@@ -784,16 +784,16 @@ async function openPayDetail(id) {
 
     <!-- ── SMARTSHEET PAYMENT INFO (view only for accounts) ── -->
     ${pay.smartsheet_payment_id?`<div class="detail-section">
-      <div class="detail-section-title">📋 Smartsheet Payment Details</div>
+      <div class="detail-section-title"> Smartsheet Payment Details</div>
       <div style="padding:10px 12px;background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius-sm)">
         <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:0.84rem">
           <div><span class="detail-key">Smartsheet ID</span><div style="font-weight:700;color:#4f46e5;font-family:var(--font-mono)">${pay.smartsheet_payment_id}</div></div>
           ${pay.raised_at?`<div><span class="detail-key">Raised On</span><div style="font-weight:600">${fmtDate(pay.raised_at)}</div></div>`:''}
           ${pay.paid_at?`<div><span class="detail-key">Received On</span><div style="font-weight:600">${fmtDate(pay.paid_at)}</div></div>`:''}
         </div>
-        ${pay.smartsheet_screenshot?`<div style="margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="openAttPreview('${pay.smartsheet_screenshot}','Payment Screenshot')">🖼 View Payment Screenshot</button></div>`:''}
+        ${pay.smartsheet_screenshot?`<div style="margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="openAttPreview('${pay.smartsheet_screenshot}','Payment Screenshot')"> View Payment Screenshot</button></div>`:''}
       </div>
-      <div style="margin-top:8px;font-size:0.75rem;color:var(--gray-4)">ℹ️ Payment raised and confirmed by Procurement Manager via Smartsheet. This is view-only for Accounts.</div>
+      <div style="margin-top:8px;font-size:0.75rem;color:var(--gray-4)">ℹ Payment raised and confirmed by Procurement Manager via Smartsheet. This is view-only for Accounts.</div>
     </div>`:''}
     ${!pay.smartsheet_payment_id && !isPaid?`<div class="detail-section">
       <div style="font-size:0.8rem;color:var(--gray-3);padding:10px;background:var(--off-white);border-radius:var(--radius-sm);border:1px solid var(--border)">
@@ -822,7 +822,7 @@ async function recordPayment(payId) {
   // by the Procurement Manager via markFullPaymentReceived().
   // Accounts only logs the payment amount for financial records.
   showLoader(false);
-  showToast(status==='paid'?'✅ Payment received & PR closed!':'Partial payment recorded.','success');
+  showToast(status==='paid'?' Payment received & PR closed!':'Partial payment recorded.','success');
   closeModal('payDetailModal');
   await loadPayments();
 }
@@ -846,11 +846,11 @@ async function confirmAdvanceReceived(advId) {
     }).eq('id', adv.pr_id);
     notifyPhaseChange(adv.pr_id, 'advance_payment_received', currentUser?.id);
     try { await window.postComment(adv.pr_id, currentUser.id,
-      `💳 Advance payment of AED ${Number(adv.amount||0).toLocaleString()} confirmed received by Accounts.`);
+      ` Advance payment of AED ${Number(adv.amount||0).toLocaleString()} confirmed received by Accounts.`);
     } catch(e) {}
   }
   showLoader(false);
-  showToast('✅ Advance payment received confirmed!', 'success');
+  showToast(' Advance payment received confirmed!', 'success');
   await loadAdvances(); renderAdvanceBanner();
 }
 

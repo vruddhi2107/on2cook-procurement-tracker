@@ -101,26 +101,26 @@
     <!-- Sidebar -->
     <div class="admin-sidebar">
       <div class="admin-sidebar-title">Overview</div>
-      <div class="admin-nav-item active" onclick="switchPanel('overview')">📊 Dashboard</div>
-      <div class="admin-nav-item" onclick="switchPanel('closed')">🔒 Closed Requests</div>
+      <div class="admin-nav-item active" onclick="switchPanel('overview')"> Dashboard</div>
+      <div class="admin-nav-item" onclick="switchPanel('closed')"> Closed Requests</div>
 
       <div class="admin-sidebar-title">Pipeline Config</div>
-      <div class="admin-nav-item" onclick="switchPanel('pipelines')">🔧 Pipeline Editor</div>
-      <div class="admin-nav-item" onclick="switchPanel('override')">⚡ Force Phase Override</div>
+      <div class="admin-nav-item" onclick="switchPanel('pipelines')"> Pipeline Editor</div>
+      <div class="admin-nav-item" onclick="switchPanel('override')"> Force Phase Override</div>
 
       <div class="admin-sidebar-title">Local Purchase</div>
-      <div class="admin-nav-item" onclick="switchPanel('lp_queue')">🛒 LP Approval Queue <span class="nav-badge" id="lpBadge">0</span></div>
+      <div class="admin-nav-item" onclick="switchPanel('lp_queue')"> LP Approval Queue <span class="nav-badge" id="lpBadge">0</span></div>
 
-      <div class="admin-sidebar-title">🎛 Customization</div>
-      <div class="admin-nav-item" onclick="switchPanel('cfg_filters')">🔍 Filter Builder</div>
-      <div class="admin-nav-item" onclick="switchPanel('cfg_workflow')">🗺 Workflow Map</div>
-      <div class="admin-nav-item" onclick="switchPanel('cfg_columns')">📊 Column Manager</div>
-      <div class="admin-nav-item" onclick="switchPanel('cfg_statcards')">🧮 Stat Cards</div>
-      <div class="admin-nav-item" onclick="switchPanel('cfg_customfields')">🧩 Custom Fields</div>
-      <div class="admin-nav-item" onclick="switchPanel('cfg_departments')">🏷 Departments</div>
-      <div class="admin-nav-item" onclick="switchPanel('cfg_phases')">🔀 Phase Display</div>
+      <div class="admin-sidebar-title"> Customization</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_filters')"> Filter Builder</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_workflow')"> Workflow Map</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_columns')"> Column Manager</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_statcards')"> Stat Cards</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_customfields')"> Custom Fields</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_departments')"> Departments</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_phases')"> Phase Display</div>
       <div class="admin-nav-item" onclick="switchPanel('cfg_export')">⬇ Export Config</div>
-      <div class="admin-nav-item" onclick="switchPanel('cfg_navvis')">🧭 Nav Visibility</div>
+      <div class="admin-nav-item" onclick="switchPanel('cfg_navvis')"> Nav Visibility</div>
 
       <div class="admin-sidebar-title">System</div>
       <div class="admin-nav-item" onclick="window.location.href='master.html'">← Back to Dashboard</div>
@@ -141,15 +141,15 @@
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
           <div style="background:white;border:1px solid var(--border);border-radius:var(--radius);padding:16px">
-            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#6366f1">📋 RFQ Pipeline</div>
+            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#6366f1"> RFQ Pipeline</div>
             <div id="rfqBreakdown" style="font-size:0.78rem;color:var(--gray-3)">Loading...</div>
           </div>
           <div style="background:white;border:1px solid var(--border);border-radius:var(--radius);padding:16px">
-            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#22c55e">🛒 Local Purchase Pipeline</div>
+            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#22c55e"> Local Purchase Pipeline</div>
             <div id="lpBreakdown" style="font-size:0.78rem;color:var(--gray-3)">Loading...</div>
           </div>
           <div style="background:white;border:1px solid var(--border);border-radius:var(--radius);padding:16px">
-            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#8b5cf6">🏢 Vendor Info Pipeline</div>
+            <div style="font-weight:700;font-size:0.82rem;margin-bottom:12px;color:#8b5cf6"> Vendor Info Pipeline</div>
             <div id="viBreakdown" style="font-size:0.78rem;color:var(--gray-3)">Loading...</div>
           </div>
         </div>
@@ -187,7 +187,7 @@
         <div class="panel-title">Force Phase Override</div>
         <div class="panel-sub">Move any request to any phase — bypasses the normal workflow. Use only when a request is stuck or data needs correction.</div>
 
-        <div class="override-warning">⚠️ This directly modifies the database. Use sparingly. All overrides are logged as comments on the request.</div>
+        <div class="override-warning"> This directly modifies the database. Use sparingly. All overrides are logged as comments on the request.</div>
 
         <div class="override-form">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -217,7 +217,7 @@
             </div>
           </div>
           <div style="display:flex;gap:10px;align-items:center">
-            <button class="btn btn-danger" onclick="executeOverride()" style="min-width:180px">⚡ Execute Override</button>
+            <button class="btn btn-danger" onclick="executeOverride()" style="min-width:180px"> Execute Override</button>
             <span style="font-size:0.75rem;color:var(--gray-4)">A comment will be posted on the request with your name, timestamp, and reason.</span>
           </div>
         </div>
@@ -449,7 +449,7 @@
   <div class="modal" style="max-width:680px">
     <div class="modal-header">
       <div><div class="modal-title" id="lpModalTitle">LP Request Review</div><div class="modal-title-sub" id="lpModalSub"></div></div>
-      <button class="modal-close" onclick="closeModal('lpModal')">✕</button>
+      <button class="modal-close" onclick="closeModal('lpModal')"></button>
     </div>
     <div class="modal-body" id="lpModalBody" style="max-height:70vh;overflow-y:auto"></div>
     <div class="modal-footer">
@@ -556,7 +556,7 @@ function renderClosedTable(reqs) {
       <td><strong style="font-size:0.82rem">${r.project_name}</strong><br><span style="font-size:0.7rem;color:var(--gray-4)">${r.project_phase||''}</span></td>
       <td style="font-size:0.78rem">${DEPARTMENTS[r.department]||r.department}</td>
       <td>${getPhaseBadge(r.phase)}</td>
-      <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--gray-3)">${leadDays !== null ? leadDays+'d ✓' : '—'}</td>
+      <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--gray-3)">${leadDays !== null ? leadDays+'d ' : '—'}</td>
       <td style="font-family:var(--font-mono);font-size:0.72rem">${fmtDate(r.created_at)}</td>
       <td style="font-family:var(--font-mono);font-size:0.72rem">${r.closed_at ? fmtDate(r.closed_at) : '<span style="color:var(--gray-4)">—</span>'}</td>
     </tr>`;
@@ -591,7 +591,7 @@ function renderPipelineEditor() {
         <span class="phase-key">${phase}</span>
         <span class="phase-label">${phaseMeta.label || phase}</span>
         <span class="phase-tag${isTerminal ? ' terminal' : (isOptional ? ' optional' : '')}">${isTerminal ? 'TERMINAL' : isOptional ? 'OPTIONAL' : ''}</span>
-        ${isTerminal ? '' : `<button onclick="removePhaseFromPipeline('${key}','${phase}')" title="Remove from pipeline" style="background:none;border:none;cursor:pointer;color:var(--gray-4);font-size:0.8rem;padding:0 4px">✕</button>`}
+        ${isTerminal ? '' : `<button onclick="removePhaseFromPipeline('${key}','${phase}')" title="Remove from pipeline" style="background:none;border:none;cursor:pointer;color:var(--gray-4);font-size:0.8rem;padding:0 4px"></button>`}
       </li>`;
     }).join('');
     return `<div class="pipeline-card">
@@ -606,7 +606,7 @@ function renderPipelineEditor() {
       <div class="pipeline-card-body" id="pipeline-body-${key}">
         <ul class="phase-list">${rows}</ul>
         <div style="margin-top:12px;font-size:0.75rem;color:var(--gray-4)">
-          Red border = terminal phase (auto-closes request and freezes lead time). Click ✕ to remove a phase from this pipeline view (does not delete data).
+          Red border = terminal phase (auto-closes request and freezes lead time). Click  to remove a phase from this pipeline view (does not delete data).
         </div>
       </div>
     </div>`;
@@ -640,7 +640,7 @@ function addPhaseToConfig() {
   if (isTerminal) runtimePipelines[pipelineKey].terminal.push(key);
   // Also register in PHASES for badge rendering
   if (!PHASES[key]) {
-    PHASES[key] = { label: label, color: '#6b7280', icon: '📌' };
+    PHASES[key] = { label: label, color: '#6b7280', icon: '' };
   }
   savePipelineConfig();
   renderPipelineEditor();
@@ -721,7 +721,7 @@ async function executeOverride() {
     await db.from('pr_comments').insert({
       pr_id: prId,
       user_id: currentUser.id,
-      comment: `⚡ [MASTER ADMIN OVERRIDE] Phase forced to "${newPhase}" by ${currentUser.name}. Reason: ${reason}`
+      comment: ` [MASTER ADMIN OVERRIDE] Phase forced to "${newPhase}" by ${currentUser.name}. Reason: ${reason}`
     });
   }
   showLoader(false);
@@ -739,7 +739,7 @@ function renderLPQueue() {
   const pending = allRequests.filter(r => ['lp_submitted','lp_pending_pm_approval'].includes(r.phase));
   const mount = document.getElementById('lpQueueMount');
   if (!pending.length) {
-    mount.innerHTML = `<div style="text-align:center;padding:40px;color:var(--gray-4)">✅ No LP requests pending approval.</div>`;
+    mount.innerHTML = `<div style="text-align:center;padding:40px;color:var(--gray-4)"> No LP requests pending approval.</div>`;
     return;
   }
   mount.innerHTML = `<div style="background:white;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
@@ -780,15 +780,15 @@ async function openLPModal(id) {
   document.getElementById('lpModalBody').innerHTML =
     buildPRDetailHTML(currentLPPR, quotations||[], '', currentLPPR.project_manager_name||'', {clearanceManagerName}) +
     `<div class="action-section" style="border-color:#15803d;background:rgba(34,197,94,0.04);margin-top:16px">
-      <div class="action-section-title" style="color:#15803d">🔑 Master Admin — LP Decision <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
+      <div class="action-section-title" style="color:#15803d"> Master Admin — LP Decision <span class="action-badge" style="background:#15803d">ACTION REQUIRED</span></div>
       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">You are acting as Master Admin, overriding the Project Manager approval step.</p>
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Decision Notes (optional for approval)</label>
         <textarea class="form-control" id="adminLPNotes" rows="2" placeholder="Approval rationale or rejection reason..."></textarea>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-success" onclick="adminApproveLPRequest()" style="flex:1">✓ Approve — Send to Procurement</button>
-        <button class="btn btn-danger" onclick="adminRejectLPRequest()" style="flex:1">✗ Reject & Close</button>
+        <button class="btn btn-success" onclick="adminApproveLPRequest()" style="flex:1"> Approve — Send to Procurement</button>
+        <button class="btn btn-danger" onclick="adminRejectLPRequest()" style="flex:1"> Reject & Close</button>
       </div>
     </div>`;
   openModal('lpModal');
@@ -804,7 +804,7 @@ async function adminApproveLPRequest() {
     phase_timestamps: addPhaseTimestamp(currentLPPR, 'lp_procurement_processing')
   }).eq('id', currentLPPR.id);
   if (!error) {
-    await db.from('pr_comments').insert({ pr_id: currentLPPR.id, user_id: currentUser.id, comment: `✓ [Master Admin] LP approved: ${notes}` });
+    await db.from('pr_comments').insert({ pr_id: currentLPPR.id, user_id: currentUser.id, comment: ` [Master Admin] LP approved: ${notes}` });
     notifyPhaseChange(currentLPPR.id, 'lp_procurement_processing', currentUser.id);
   }
   showLoader(false);
@@ -829,7 +829,7 @@ async function adminRejectLPRequest() {
     phase_timestamps: addPhaseTimestamp(currentLPPR, 'lp_rejected')
   }).eq('id', currentLPPR.id);
   if (!error) {
-    await db.from('pr_comments').insert({ pr_id: currentLPPR.id, user_id: currentUser.id, comment: `✗ [Master Admin] LP rejected & closed: ${notes}` });
+    await db.from('pr_comments').insert({ pr_id: currentLPPR.id, user_id: currentUser.id, comment: ` [Master Admin] LP rejected & closed: ${notes}` });
     notifyPhaseChange(currentLPPR.id, 'lp_rejected', currentUser.id);
   }
   showLoader(false);
@@ -896,7 +896,7 @@ function renderWorkflowMap() {
       const isClosed = owner === '— Closed —';
       return `<div class="wf-step ${s.optional ? 'wf-optional' : ''}">
         <div class="wf-step-label">${escHtml(PHASES[s.key]?.label || s.label)}${s.optional ? ' <span class="cfg-hint">optional</span>' : ''}</div>
-        <div class="wf-step-owner ${isClosed ? 'wf-closed' : ''}">${isClosed ? '✔ Closed' : '👤 ' + escHtml(owner)}</div>
+        <div class="wf-step-owner ${isClosed ? 'wf-closed' : ''}">${isClosed ? ' Closed' : ' ' + escHtml(owner)}</div>
         <div class="wf-step-count">${count} live</div>
       </div>`;
     }).join('<div class="wf-arrow">→</div>');
@@ -948,7 +948,7 @@ function renderFilterConfigList() {
         <button class="cfg-icon-btn" onclick="reorderFilter('${f.id}',-1)" title="Move up">↑</button>
         <button class="cfg-icon-btn" onclick="reorderFilter('${f.id}',1)" title="Move down">↓</button>
         <div class="cfg-toggle ${f.visible !== false ? 'on' : ''}" onclick="toggleFilterVisible('${f.id}')" title="Show/hide"></div>
-        <button class="cfg-icon-btn" onclick="removeFilterConfig('${f.id}')" title="Remove">✕</button>
+        <button class="cfg-icon-btn" onclick="removeFilterConfig('${f.id}')" title="Remove"></button>
       </div>
     </div>`).join('');
   renderFilterPreview();
@@ -996,7 +996,7 @@ function renderColumnConfigList() {
         <button class="cfg-icon-btn" onclick="reorderColumn(${i},-1)" title="Move up">↑</button>
         <button class="cfg-icon-btn" onclick="reorderColumn(${i},1)" title="Move down">↓</button>
         <div class="cfg-toggle ${c.visible !== false ? 'on' : ''}" onclick="toggleColumnVisible(${i})" title="Show/hide"></div>
-        <button class="cfg-icon-btn" onclick="removeColumnConfig(${i})" title="Remove">✕</button>
+        <button class="cfg-icon-btn" onclick="removeColumnConfig(${i})" title="Remove"></button>
       </div>
     </div>`).join('') || '<div style="color:var(--gray-4);font-size:0.82rem">No columns configured.</div>';
 }
@@ -1036,7 +1036,7 @@ function renderStatCardConfigList() {
         <button class="cfg-icon-btn" onclick="reorderStatCard(${i},-1)" title="Move up">↑</button>
         <button class="cfg-icon-btn" onclick="reorderStatCard(${i},1)" title="Move down">↓</button>
         <div class="cfg-toggle ${c.visible !== false ? 'on' : ''}" onclick="toggleStatCardVisible(${i})" title="Show/hide"></div>
-        ${c.source !== 'builtin' ? `<button class="cfg-icon-btn" onclick="removeStatCardConfig(${i})" title="Remove">✕</button>` : ''}
+        ${c.source !== 'builtin' ? `<button class="cfg-icon-btn" onclick="removeStatCardConfig(${i})" title="Remove"></button>` : ''}
       </div>
     </div>`).join('');
 }
@@ -1052,7 +1052,7 @@ function addStatCardConfig() {
   const color = document.getElementById('cfgStatColor').value;
   if (!field || !value) return;
   const list = AdminConfig.stat_cards || [];
-  list.push({ id: 'sc_' + Date.now(), source: 'custom', field, value, label, color, icon: '📊', order: list.length + 1, visible: true });
+  list.push({ id: 'sc_' + Date.now(), source: 'custom', field, value, label, color, icon: '', order: list.length + 1, visible: true });
   saveAdminConfigType('stat_cards', list, currentUser).then(() => { renderStatCardConfigList(); document.getElementById('cfgStatLabel').value = ''; });
 }
 function removeStatCardConfig(i) {
@@ -1078,7 +1078,7 @@ function renderCustomFieldConfigList() {
   el.innerHTML = list.map((f, i) => `
     <div class="cfg-row">
       <div class="cfg-row-main">${escHtml(f.label)}${f.required ? ' <span style="color:var(--red)">*</span>' : ''} <span class="cfg-row-sub">${f.key} · ${f.type}${f.options ? ' (' + f.options.join(', ') + ')' : ''}</span></div>
-      <div class="cfg-row-actions"><button class="cfg-icon-btn" onclick="removeCustomFieldConfig(${i})" title="Remove">✕</button></div>
+      <div class="cfg-row-actions"><button class="cfg-icon-btn" onclick="removeCustomFieldConfig(${i})" title="Remove"></button></div>
     </div>`).join('') || '<div style="color:var(--gray-4);font-size:0.82rem">No custom fields yet.</div>';
 }
 function addCustomFieldConfig() {
@@ -1117,7 +1117,7 @@ function renderDepartmentConfigList() {
   document.getElementById('cfgDeptList').innerHTML = list.map((d, i) => `
     <div class="cfg-row">
       <div class="cfg-row-main">${escHtml(d.label)} <span class="cfg-row-sub">${d.key}</span></div>
-      <div class="cfg-row-actions"><button class="cfg-icon-btn" onclick="removeDepartmentConfig(${i})" title="Remove">✕</button></div>
+      <div class="cfg-row-actions"><button class="cfg-icon-btn" onclick="removeDepartmentConfig(${i})" title="Remove"></button></div>
     </div>`).join('') || '<div style="color:var(--gray-4);font-size:0.82rem">None added yet.</div>';
 }
 function addDepartmentConfig() {
@@ -1173,7 +1173,7 @@ function renderExportConfigList() {
       <div class="cfg-row-actions">
         <button class="cfg-icon-btn" onclick="reorderExport(${i},-1)" title="Move up">↑</button>
         <button class="cfg-icon-btn" onclick="reorderExport(${i},1)" title="Move down">↓</button>
-        <button class="cfg-icon-btn" onclick="removeExportConfig(${i})" title="Remove">✕</button>
+        <button class="cfg-icon-btn" onclick="removeExportConfig(${i})" title="Remove"></button>
       </div>
     </div>`).join('') || '<div style="color:var(--gray-4);font-size:0.82rem">No columns configured — export will be empty.</div>';
 }

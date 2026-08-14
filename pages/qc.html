@@ -70,16 +70,16 @@
   </div>
 
   <div class="stats-grid">
-    <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sQcPending">—</div><div class="stat-card-label">QC Pending</div><div class="stat-card-icon">🔍</div></div>
-    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sQcPassed">—</div><div class="stat-card-label">QC Passed</div><div class="stat-card-icon">✅</div></div>
-    <div class="stat-card" style="--accent:#ef4444"><div class="stat-card-value" id="sRework">—</div><div class="stat-card-label">Rework Raised</div><div class="stat-card-icon">🔄</div></div>
-    <div class="stat-card" style="--accent:#7c3aed"><div class="stat-card-value" id="sQcRejected">—</div><div class="stat-card-label">QC Rejected</div><div class="stat-card-icon">🚫</div></div>
+    <div class="stat-card" style="--accent:#f97316"><div class="stat-card-value" id="sQcPending">—</div><div class="stat-card-label">QC Pending</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sQcPassed">—</div><div class="stat-card-label">QC Passed</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#ef4444"><div class="stat-card-value" id="sRework">—</div><div class="stat-card-label">Rework Raised</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#7c3aed"><div class="stat-card-value" id="sQcRejected">—</div><div class="stat-card-label">QC Rejected</div><div class="stat-card-icon"></div></div>
   </div>
 
   <div class="tabs">
-    <button class="tab-btn active" data-tab="action" onclick="switchTab('action')">🔔 Pending QC</button>
+    <button class="tab-btn active" data-tab="action" onclick="switchTab('action')"> Pending QC</button>
     <button class="tab-btn" data-tab="all" onclick="switchTab('all')">All Inspected</button>
-    <button class="tab-btn" data-tab="myrequests" onclick="switchTab('myrequests')">📋 My Requests</button>
+    <button class="tab-btn" data-tab="myrequests" onclick="switchTab('myrequests')"> My Requests</button>
   </div>
 
   <div id="tabMain">
@@ -122,7 +122,7 @@
   <div class="modal" style="max-width:900px">
     <div class="modal-header">
       <div class="modal-title" id="modalTitle">Request Detail</div>
-      <button class="modal-close" onclick="closeModal('prModal')">✕</button>
+      <button class="modal-close" onclick="closeModal('prModal')"></button>
     </div>
     <div class="modal-body" id="modalBody"></div>
   </div>
@@ -132,13 +132,13 @@
 <div class="modal-overlay" id="jwcModal">
   <div class="modal" style="max-width:900px">
     <div class="modal-header">
-      <div class="modal-title">📄 Job Work Challan — Preview</div>
-      <button class="modal-close" onclick="closeModal('jwcModal')">✕</button>
+      <div class="modal-title"> Job Work Challan — Preview</div>
+      <button class="modal-close" onclick="closeModal('jwcModal')"></button>
     </div>
     <div class="modal-body">
       <div id="jwcPreviewBody"></div>
       <div style="display:flex;gap:10px;margin-top:16px">
-        <button class="btn btn-primary" onclick="printJWC()">🖨️ Print JWC</button>
+        <button class="btn btn-primary" onclick="printJWC()"> Print JWC</button>
         <button class="btn btn-secondary" onclick="closeModal('jwcModal')">Close</button>
       </div>
     </div>

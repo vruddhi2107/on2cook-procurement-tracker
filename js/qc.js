@@ -281,7 +281,7 @@ function renderModal() {
 
   } else if (pr.phase === 'rework2_returned') {
     var jwcRework2Data = (pr.qc_criteria && pr.qc_criteria.jwc2) ? pr.qc_criteria.jwc2 : (pr.qc_criteria && pr.qc_criteria.jwc ? pr.qc_criteria.jwc : {});
-    actionSection = '<div class="action-section">'      + '<div class="action-section-title">🔄 Final Post-Rework QC Inspection <span class="action-badge">ACTION REQUIRED</span></div>'      + grnSummary      + (jwcRework2Data.jwc_number          ? '<div style="margin-bottom:14px;padding:10px 12px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);font-size:0.82rem">'            + '<div style="font-weight:700;color:#dc2626;margin-bottom:4px">📄 2nd Rework History — JWC ' + jwcRework2Data.jwc_number + '</div>'            + '<div>Rework Vendor: <strong>' + (jwcRework2Data.rework_vendor || '—') + '</strong></div>'            + (jwcRework2Data.notes ? '<div>Notes: ' + jwcRework2Data.notes + '</div>' : '')            + '</div>'          : '')      + '<div style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;font-size:0.82rem">'        + '<strong>⚠️ This is the final rework cycle.</strong> If goods still fail QC, they will be outright rejected.'      + '</div>'      + '<div style="margin-bottom:12px"><label class="form-label">Re-QC Attachments <span style="font-size:0.72rem;color:var(--gray-4);font-weight:400">(optional)</span></label>'        + '<div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center;cursor:pointer" onclick="document.getElementById(\'finalReQcAttachFile\').click()">'        + '<input type="file" id="finalReQcAttachFile" accept="image/*,.pdf" multiple style="display:none" onchange="handleFinalReQCAttach(event)"/>'        + '<div style="font-size:0.78rem;font-weight:600">📎 Click to attach photos / reports</div>'        + '</div><div id="finalReQcAttachList" style="margin-top:6px"></div></div>'      + '<div class="qc-result-row" style="grid-template-columns:1fr 1fr;max-width:480px">'        + '<div class="qc-option pass" id="rw2OptPass" onclick="selectRework2QC(\'pass\')">'          + '<div class="qc-icon">✅</div><div class="qc-label">QC Passed</div>'          + '<div class="qc-desc">Final rework accepted</div></div>'        + '<div class="qc-option reject" id="rw2OptReject" onclick="selectRework2QC(\'reject\')">'          + '<div class="qc-icon">🚫</div><div class="qc-label">QC Rejected</div>'          + '<div class="qc-desc">Still defective — outright rejection</div></div>'      + '</div>'      + '<div id="rw2SamplesSection" style="display:none" class="samples-section">'        + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px">📦 Final Rejection Quantities</div>'        + '<table class="samples-table"><thead><tr><th>#</th><th style="text-align:left">Item</th><th>Received</th><th>Rejected Qty</th><th>Accepted (auto)</th></tr></thead>'        + '<tbody id="rw2SamplesBody"></tbody></table>'      + '</div>'      + '<div><label class="form-label">Final Post-Rework Inspection Notes *</label>'        + '<textarea class="form-control" id="qcNotesRework2" rows="3" placeholder="Describe final rework quality findings..."></textarea></div>'      + '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'        + '<button class="btn btn-primary" onclick="submitFinalReworkQC()">Submit Final Re-QC Result →</button>'      + '</div>'      + '</div>';
+    actionSection = '<div class="action-section">'      + '<div class="action-section-title">🔄 Final Post-Rework QC Inspection <span class="action-badge">ACTION REQUIRED</span></div>'      + grnSummary      + (jwcRework2Data.jwc_number          ? '<div style="margin-bottom:14px;padding:10px 12px;background:rgba(237,28,36,0.04);border:1px solid var(--red-border);border-radius:var(--radius-sm);font-size:0.82rem">'            + '<div style="font-weight:700;color:var(--red);margin-bottom:4px">📄 2nd Rework History — JWC ' + jwcRework2Data.jwc_number + '</div>'            + '<div>Rework Vendor: <strong>' + (jwcRework2Data.rework_vendor || '—') + '</strong></div>'            + (jwcRework2Data.notes ? '<div>Notes: ' + jwcRework2Data.notes + '</div>' : '')            + '</div>'          : '')      + '<div style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:14px;font-size:0.82rem">'        + '<strong>⚠️ This is the final rework cycle.</strong> If goods still fail QC, they will be outright rejected.'      + '</div>'      + '<div style="margin-bottom:12px"><label class="form-label">Re-QC Attachments <span style="font-size:0.72rem;color:var(--gray-4);font-weight:400">(optional)</span></label>'        + '<div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center;cursor:pointer" onclick="document.getElementById(\'finalReQcAttachFile\').click()">'        + '<input type="file" id="finalReQcAttachFile" accept="image/*,.pdf" multiple style="display:none" onchange="handleFinalReQCAttach(event)"/>'        + '<div style="font-size:0.78rem;font-weight:600">📎 Click to attach photos / reports</div>'        + '</div><div id="finalReQcAttachList" style="margin-top:6px"></div></div>'      + '<div class="qc-result-row" style="grid-template-columns:1fr 1fr;max-width:480px">'        + '<div class="qc-option pass" id="rw2OptPass" onclick="selectRework2QC(\'pass\')">'          + '<div class="qc-icon">✅</div><div class="qc-label">QC Passed</div>'          + '<div class="qc-desc">Final rework accepted</div></div>'        + '<div class="qc-option reject" id="rw2OptReject" onclick="selectRework2QC(\'reject\')">'          + '<div class="qc-icon">🚫</div><div class="qc-label">QC Rejected</div>'          + '<div class="qc-desc">Still defective — outright rejection</div></div>'      + '</div>'      + '<div id="rw2SamplesSection" style="display:none" class="samples-section">'        + '<div style="font-size:0.84rem;font-weight:700;color:var(--gray-2);margin-bottom:6px">📦 Final Rejection Quantities</div>'        + '<table class="samples-table"><thead><tr><th>#</th><th style="text-align:left">Item</th><th>Received</th><th>Rejected Qty</th><th>Accepted (auto)</th></tr></thead>'        + '<tbody id="rw2SamplesBody"></tbody></table>'      + '</div>'      + '<div><label class="form-label">Final Post-Rework Inspection Notes *</label>'        + '<textarea class="form-control" id="qcNotesRework2" rows="3" placeholder="Describe final rework quality findings..."></textarea></div>'      + '<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">'        + '<button class="btn btn-primary" onclick="submitFinalReworkQC()">Submit Final Re-QC Result →</button>'      + '</div>'      + '</div>';
 
   } else if (pr.phase === 'deviation_approval') {
     var devTarget = allPMsAndDirector.find(function(u){ return u.id === pr.deviation_target_id; });
@@ -308,7 +308,7 @@ function renderModal() {
             return '<tr>'
               + '<td>' + (d.item_name || '—') + '</td>'
               + '<td style="text-align:center">' + (d.received || 0) + '</td>'
-              + '<td style="text-align:center;color:#dc2626;font-weight:600">' + (d.rejected || 0) + '</td>'
+              + '<td style="text-align:center;color:var(--red);font-weight:600">' + (d.rejected || 0) + '</td>'
               + '<td style="text-align:center;color:#16a34a;font-weight:600">' + (d.accepted || 0) + '</td>'
               + '</tr>';
           }).join('') + '</tbody></table></div>'
@@ -323,8 +323,8 @@ function renderModal() {
   } else if (pr.phase === 'rework_store_form') {
     // QC marked fail → store manager needs to fill dispatch form
     var sfJwcData = (pr.qc_criteria && pr.qc_criteria.jwc) ? pr.qc_criteria.jwc : {};
-    actionSection = '<div class="action-section" style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius);padding:14px">'
-      + '<div class="action-section-title" style="color:#b45309">🔄 Rework — Awaiting Store Manager Dispatch Form</div>'
+    actionSection = '<div class="action-section" style="background:rgba(237,28,36,0.04);border:1px solid var(--red-border);border-radius:var(--radius);padding:14px">'
+      + '<div class="action-section-title" style="color:var(--red)">🔄 Rework — Awaiting Store Manager Dispatch Form</div>'
       + (sfJwcData.jwc_number
           ? '<div style="margin:10px 0;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.82rem">'
             + '<div style="font-weight:700;color:#b45309;margin-bottom:4px">📄 JWC Details (filled by QC)</div>'
@@ -489,7 +489,7 @@ window.onSampleRejChange = function onSampleRejChange(i, received) {
   var rej = Math.min(Math.max(parseInt(rejEl.value || '0', 10) || 0, 0), received);
   rejEl.value = rej;
   accEl.textContent = received - rej;
-  accEl.style.color = (received - rej) > 0 ? '#16a34a' : '#dc2626';
+  accEl.style.color = (received - rej) > 0 ? '#15803d' : 'var(--red)';
   if (qcSelection === 'fail') syncJWCFromSamples();
 };
 
@@ -750,7 +750,7 @@ window.onReworkSampleChange = function onReworkSampleChange(i, received) {
   var rej = Math.min(Math.max(parseInt(rejEl.value || '0', 10) || 0, 0), received);
   rejEl.value = rej;
   accEl.textContent = received - rej;
-  accEl.style.color = (received - rej) > 0 ? '#16a34a' : '#dc2626';
+  accEl.style.color = (received - rej) > 0 ? '#15803d' : 'var(--red)';
 };
 
 function readReworkSampleRejections() {
@@ -1114,7 +1114,7 @@ window.onRw2SampleChange = function(i, received) {
   var rej = Math.min(Math.max(parseInt(rejEl.value||'0',10)||0, 0), received);
   rejEl.value = rej;
   accEl.textContent = received - rej;
-  accEl.style.color = (received - rej) > 0 ? '#16a34a' : '#dc2626';
+  accEl.style.color = (received - rej) > 0 ? '#15803d' : 'var(--red)';
 };
 
 // ─── Submit Final Post-Rework QC (rework2_returned) ──────────────────────────

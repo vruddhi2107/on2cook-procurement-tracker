@@ -45,22 +45,22 @@
   </div>
 
   <div class="stats-grid">
-    <div class="stat-card"><div class="stat-card-value" id="sTotal">—</div><div class="stat-card-label">Total Requests</div><div class="stat-card-icon">📋</div></div>
-    <div class="stat-card" style="--accent:#3b82f6"><div class="stat-card-value" id="sOngoing">—</div><div class="stat-card-label">Ongoing</div><div class="stat-card-icon">⚙️</div></div>
-    <div class="stat-card" style="--accent:#D62B2B"><div class="stat-card-value" id="sAction">—</div><div class="stat-card-label">Needs Action</div><div class="stat-card-icon">🔔</div></div>
-    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sClosed">—</div><div class="stat-card-label">Closed</div><div class="stat-card-icon">✅</div></div>
-    <div class="stat-card" style="--accent:#dc2626"><div class="stat-card-value" id="sDeclined">—</div><div class="stat-card-label">Declined / Rejected</div><div class="stat-card-icon">❌</div></div>
+    <div class="stat-card"><div class="stat-card-value" id="sTotal">—</div><div class="stat-card-label">Total Requests</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#3b82f6"><div class="stat-card-value" id="sOngoing">—</div><div class="stat-card-label">Ongoing</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#D62B2B"><div class="stat-card-value" id="sAction">—</div><div class="stat-card-label">Needs Action</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sClosed">—</div><div class="stat-card-label">Closed</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#dc2626"><div class="stat-card-value" id="sDeclined">—</div><div class="stat-card-label">Declined / Rejected</div><div class="stat-card-icon"></div></div>
   </div>
 
   <div id="actionBanner" style="display:none;margin-bottom:16px"></div>
 
   <div class="tabs">
     <button class="tab-btn active" data-tab="all" onclick="switchTab('all')">All Requests</button>
-    <button class="tab-btn" data-tab="ongoing" onclick="switchTab('ongoing')">⚙️ Ongoing</button>
-    <button class="tab-btn" data-tab="action" onclick="switchTab('action')">🔔 Action Needed</button>
-    <button class="tab-btn" data-tab="declined" onclick="switchTab('declined')">❌ Declined / Rejected</button>
-    <button class="tab-btn" data-tab="closed" onclick="switchTab('closed')">✅ Closed</button>
-    <button class="tab-btn" data-tab="parts" onclick="switchTab('parts')">🔩 Parts Catalog</button>
+    <button class="tab-btn" data-tab="ongoing" onclick="switchTab('ongoing')"> Ongoing</button>
+    <button class="tab-btn" data-tab="action" onclick="switchTab('action')"> Action Needed</button>
+    <button class="tab-btn" data-tab="declined" onclick="switchTab('declined')"> Declined / Rejected</button>
+    <button class="tab-btn" data-tab="closed" onclick="switchTab('closed')"> Closed</button>
+    <button class="tab-btn" data-tab="parts" onclick="switchTab('parts')"> Parts Catalog</button>
   </div>
 
   <div id="tabRequests">
@@ -86,12 +86,12 @@
       </select>
       <select id="filterUrgency" onchange="filterTable()" style="min-width:130px">
         <option value="">All Urgencies</option>
-        <option value="urgent">⚡ Within 24 hours</option>
-        <option value="critical">🔴 Within 48 hours</option>
+        <option value="urgent"> Within 24 hours</option>
+        <option value="critical"> Within 48 hours</option>
         <option value="normal">Within 1 Week</option>
       </select>
       <span id="dynamicFilterBar" style="display:contents"></span>
-      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Clear</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear Filters</button>
     </div>
     <div class="card">
       <div class="table-wrap">
@@ -113,7 +113,7 @@
   <div id="tabParts" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px">
       <input type="text" id="partsSearchEng" class="form-control" placeholder="Search part number or name..." style="max-width:340px" oninput="filterEngPartsTable()"/>
-      <span style="font-size:0.78rem;color:var(--gray-4)">🔒 Read-only — managed by Procurement</span>
+      <span style="font-size:0.78rem;color:var(--gray-4)"> Read-only — managed by Procurement</span>
     </div>
     <div class="card">
       <div class="table-wrap">
@@ -125,7 +125,7 @@
             </tr>
           </thead>
           <tbody id="engPartsBody">
-            <tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">🔩</div><h3>Loading...</h3></div></td></tr>
+            <tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon"></div><h3>Loading...</h3></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -140,7 +140,7 @@
   <div class="modal" style="max-width:820px">
     <div class="modal-header">
       <div><div class="modal-title" id="prFormTitle">New Procurement Request</div><div class="modal-title-sub" id="prFormSub">All starred fields are required</div></div>
-      <button class="modal-close" onclick="closeModal('prFormModal')">✕</button>
+      <button class="modal-close" onclick="closeModal('prFormModal')"></button>
     </div>
     <div class="modal-body" style="max-height:82vh;overflow-y:auto;padding-right:4px">
 
@@ -154,7 +154,7 @@
             <div class="pm-approval-option-sub">Procurement starts immediately</div>
           </div>
           <div class="pm-approval-option" id="pmOptNo" onclick="selectPMApproval('needs_approval')">
-            <div class="pm-approval-option-icon">📋</div>
+            <div class="pm-approval-option-icon"></div>
             <div class="pm-approval-option-label">No — Need Project Manager approval first</div>
             <div class="pm-approval-option-sub">Project Manager will be notified to approve</div>
           </div>
@@ -163,23 +163,23 @@
           ℹ Vendor Info requests go directly to the Procurement Manager — no Project Manager clearance needed.
         </div>
         <div id="localPurchaseNote" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.28);border-radius:var(--radius-sm);font-size:0.78rem;color:#15803d">
-          🛒 Local Purchase requests go directly to the Procurement Manager for payment processing — no Project Manager clearance needed.
+           Local Purchase requests go directly to the Procurement Manager for payment processing — no Project Manager clearance needed.
         </div>
       </div>
 
       <!-- ── Screenshot if Project Manager Already Approved ── -->
       <div id="pmScreenshotSection" style="display:none;padding:14px;border:1.5px solid rgba(99,102,241,0.25);border-radius:var(--radius);margin-bottom:18px;background:rgba(99,102,241,0.03)">
-        <div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;color:#6366f1">📎 Upload Project Manager Approval Screenshot <span style="color:var(--red)">*</span></div>
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;color:#6366f1"> Upload Project Manager Approval Screenshot <span style="color:var(--red)">*</span></div>
         <p style="font-size:0.76rem;color:var(--gray-3);margin-bottom:10px">Please attach the screenshot or proof of Project Manager approval (WhatsApp message, email, etc.)</p>
         <div class="screenshot-zone" id="pmSsZone">
           <input type="file" id="pmSsFile" accept="image/png,image/jpeg,image/jpg" onchange="handlePMScreenshot(event)"/>
-          <div style="font-size:1.4rem;margin-bottom:4px">📷</div>
+          <div style="font-size:1.4rem;margin-bottom:4px"></div>
           <div style="font-size:0.8rem;font-weight:600">Click or drag to upload</div>
           <div style="font-size:0.72rem;color:var(--gray-4)">PNG or JPG — max 5MB</div>
         </div>
         <div id="pmSsPreview" style="display:none;margin-top:8px">
           <img id="pmSsImg" style="max-width:100%;max-height:180px;object-fit:contain;border-radius:6px;border:1px solid var(--border)"/>
-          <button class="btn btn-ghost btn-sm" style="margin-top:4px" onclick="clearPMScreenshot()">✕ Remove</button>
+          <button class="btn btn-ghost btn-sm" style="margin-top:4px" onclick="clearPMScreenshot()"> Remove</button>
         </div>
       </div>
 
@@ -228,7 +228,7 @@
         <div class="form-group">
           <label class="form-label">Project Manager *</label>
           <div id="pmLockedDisplay" style="display:none;padding:8px 12px;background:var(--off-white);border:1.5px solid rgba(99,102,241,0.3);border-radius:var(--radius-sm);font-size:0.85rem;font-weight:600;color:#4338ca">
-            🔒 <span id="pmLockedName"></span><br>
+             <span id="pmLockedName"></span><br>
             <span style="font-size:0.71rem;font-weight:400;color:var(--gray-4)">Auto-assigned from project — cannot be changed</span>
           </div>
           <select class="form-control" id="fPMSelect" style="display:block">
@@ -248,9 +248,9 @@
         <div class="form-group">
           <label class="form-label">Urgency</label>
           <select class="form-control" id="fUrgency">
-            <option value="normal">🟢 Within 1 Week</option>
-            <option value="urgent">⚡ Within 24 hours</option>
-            <option value="critical">🔴 Within 48 hours</option>
+            <option value="normal"> Within 1 Week</option>
+            <option value="urgent"> Within 24 hours</option>
+            <option value="critical"> Within 48 hours</option>
           </select>
         </div>
 
@@ -286,10 +286,10 @@
           <label class="form-label">Sourcing</label>
           <div class="sourcing-options">
             <label class="sourcing-chip" id="srcDomestic" onclick="toggleSourcing('domestic')">
-              🏠 Domestic
+               Domestic
             </label>
             <label class="sourcing-chip" id="srcInternational" onclick="toggleSourcing('international')">
-              🌍 International
+               International
             </label>
           </div>
         </div>
@@ -302,7 +302,7 @@
 
       <!-- ── QC Criteria ── -->
       <div style="margin-top:14px;padding:14px;border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius);background:rgba(99,102,241,0.03)">
-        <div style="font-size:0.82rem;font-weight:600;margin-bottom:10px;color:#6366f1">🔍 QC Criteria <span style="color:var(--gray-4);font-weight:400;font-size:0.72rem">(optional — helps engineer during quality check)</span></div>
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:10px;color:#6366f1"> QC Criteria <span style="color:var(--gray-4);font-weight:400;font-size:0.72rem">(optional — helps engineer during quality check)</span></div>
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">Preferred Color / Finish</label>
@@ -324,7 +324,7 @@
         <label class="form-label" style="margin-bottom:6px;display:block">Attachments <span style="color:var(--gray-4);font-weight:400;font-size:0.72rem">(drawings, specs, reference images)</span></label>
         <div class="bom-upload-zone" id="attachZone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleAttachDrop(event)">
           <input type="file" id="attachFile" accept="*/*" multiple onchange="handleAttachFiles(event)"/>
-          <div style="font-size:1.3rem;margin-bottom:4px">📎</div>
+          <div style="font-size:1.3rem;margin-bottom:4px"></div>
           <div style="font-size:0.8rem;font-weight:600">Drag & drop or click to attach files</div>
           <div style="font-size:0.72rem;color:var(--gray-4)">Images, PDF, DOC — max 5MB each</div>
         </div>
@@ -334,13 +334,13 @@
       <!-- ── BOM Upload ── -->
       <div style="margin-top:14px;padding:14px;border:1.5px dashed rgba(34,197,94,0.4);border-radius:var(--radius);background:rgba(34,197,94,0.03)">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-          <div style="font-size:0.82rem;font-weight:600;color:#16a34a">📊 Upload BOM (Bill of Materials) — Auto-fills parts below</div>
+          <div style="font-size:0.82rem;font-weight:600;color:#16a34a"> Upload BOM (Bill of Materials) — Auto-fills parts below</div>
           <a id="bomTemplateLink" href="#" onclick="downloadBOMTemplate(event)" style="font-size:0.72rem;font-weight:600;color:#6366f1;text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border:1px solid #6366f130;border-radius:6px;background:#6366f108;white-space:nowrap">⬇ Download Template</a>
         </div>
         <p style="font-size:0.74rem;color:var(--gray-3);margin-bottom:10px">Use the template above, then upload your filled <strong>CSV or Excel (.xlsx)</strong>. Key columns: <code>Part Name</code> · <code>Quantity&nbsp;(per&nbsp;Set)</code> · <code>Unit&nbsp;of&nbsp;Measurement</code> · <code>Material&nbsp;Specifications</code>.</p>
         <div class="bom-upload-zone" id="bomZone" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleBOMDrop(event)">
           <input type="file" id="bomFile" accept=".csv,.xlsx,.xls,.xlsm" onchange="handleBOMFile(event)"/>
-          <div style="font-size:1.3rem;margin-bottom:4px">📊</div>
+          <div style="font-size:1.3rem;margin-bottom:4px"></div>
           <div style="font-size:0.8rem;font-weight:600">Upload BOM CSV</div>
           <div style="font-size:0.72rem;color:var(--gray-4)">CSV or Excel (.xlsx) — auto-parses into parts table</div>
         </div>
@@ -370,7 +370,7 @@
   <div class="modal" style="max-width:860px">
     <div class="modal-header">
       <div><div class="modal-title" id="prModalTitle">Request</div><div class="modal-title-sub" id="prModalSub"></div></div>
-      <button class="modal-close" onclick="closeModal('prModal')">✕</button>
+      <button class="modal-close" onclick="closeModal('prModal')"></button>
     </div>
     <div class="modal-body" id="prModalBody" style="max-height:80vh;overflow-y:auto"></div>
     <div class="modal-footer" id="prModalFooter"><button class="btn btn-secondary" onclick="closeModal('prModal')">Close</button></div>
@@ -561,7 +561,7 @@ function renderBanner() {
   if(!items.length){b.style.display='none';return;}
   b.style.display='block';
   b.innerHTML=`<div style="background:rgba(214,43,43,0.06);border:1.5px solid rgba(214,43,43,0.22);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <span style="font-size:1.1rem">🔔</span>
+    <span style="font-size:1.1rem"></span>
     <div style="flex:1"><strong style="font-size:0.85rem">${items.length} request${items.length>1?'s':''} need your attention</strong>
     <div style="font-size:0.75rem;color:var(--gray-3);margin-top:2px">${items.map(r=>`PR-${String(r.request_number).padStart(4,'0')}`).join(' · ')}</div></div>
     <button class="btn btn-primary btn-sm" onclick="switchTab('action')">Review Now</button>
@@ -600,7 +600,7 @@ async function loadEngPartsCatalog() {
 function renderEngPartsTable(parts) {
   const tbody = document.getElementById('engPartsBody');
   if (!parts.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">🔩</div><h3>No parts in catalog yet</h3></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon"></div><h3>No parts in catalog yet</h3></div></td></tr>`;
     return;
   }
   tbody.innerHTML = parts.map(p => {
@@ -658,7 +658,7 @@ function filterTable() {
 
 function renderTable(reqs) {
   const tbody=document.getElementById('requestsBody');
-  const emptyIcon={all:'📭',ongoing:'⚙️',action:'🔔',declined:'❌',closed:'✅'}[activeTab]||'📭';
+  const emptyIcon={all:'',ongoing:'',action:'',declined:'',closed:''}[activeTab]||'';
   const emptyTitle={all:'No requests found',ongoing:'No ongoing requests',action:'All caught up!',declined:'No declined requests',closed:'No closed requests'}[activeTab]||'No requests found';
   const emptySub={all:'Submit a new request to get started.',ongoing:'All your requests are either completed or need action.',action:'No actions needed right now.',declined:'None of your requests have been declined.',closed:'No requests have been completed yet.'}[activeTab]||'';
   if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${emptyIcon}</div><h3>${emptyTitle}</h3><p>${emptySub}</p></div></td></tr>`;return;}
@@ -672,7 +672,7 @@ function renderTable(reqs) {
         <span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span>
         ${needsAction?`<span style="margin-left:6px;font-size:0.6rem;background:var(--red);color:white;padding:1px 5px;border-radius:2px;font-family:var(--font-mono)">ACT</span>`:''}
       </td>
-      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)">🏷️ ${r.item_note}</div>`:''}</td>
+      <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)"> ${r.item_note}</div>`:''}</td>
       <td><span style="font-size:0.72rem;padding:1px 7px;border-radius:3px;border:1px solid;${typeBg}">${typeLabel}</span></td>
       <td>${getPhaseBadge(r.phase)}</td>
       <td>${getUrgencyBadge(r.urgency)}</td>
@@ -751,9 +751,9 @@ async function handleAttachFiles(e) {
 function renderAttachList() {
   document.getElementById('attachList').innerHTML=attachedFiles.map((f,i)=>`
     <div class="upload-item">
-      <span>${f.type.includes('pdf')?'📄':f.type.includes('image')?'🖼️':'📎'}</span>
+      <span>${f.type.includes('pdf')?'':f.type.includes('image')?'':''}</span>
       <span class="upload-item-name">${f.name}</span>
-      <button class="btn btn-danger btn-sm" onclick="removeAttach(${i})">✕</button>
+      <button class="btn btn-danger btn-sm" onclick="removeAttach(${i})"></button>
     </div>`).join('');
 }
 function removeAttach(i){attachedFiles.splice(i,1);renderAttachList();}
@@ -786,10 +786,10 @@ async function handleBOMFile(e) {
     const parts=await parseBOMFile(file);
     if(!parts.length){status.innerHTML=`<span style="color:var(--red)">No valid rows found in file</span>`;return;}
     initPartsEditor('partsEditorContainer',parts.map((p,i)=>({...p,_id:i+1})), _partsEditorProductionMode);
-    status.innerHTML=`<span style="color:#16a34a">✓ ${parts.length} part${parts.length>1?'s':''} imported from BOM!</span>`;
+    status.innerHTML=`<span style="color:#16a34a"> ${parts.length} part${parts.length>1?'s':''} imported from BOM!</span>`;
     showToast(`${parts.length} parts imported from BOM!`,'success');
   } catch(err) {
-    status.innerHTML=`<span style="color:var(--red)">⚠ ${err.message}</span>`;
+    status.innerHTML=`<span style="color:var(--red)"> ${err.message}</span>`;
   }
   document.getElementById('bomFile').value='';
 }
@@ -963,10 +963,10 @@ async function openPR(id) {
 
   if(currentPR.phase==='vendor_info_shared') {
     actionSection=`<div class="action-section">
-      <div class="action-section-title">🏢 Vendor Information Received <span class="action-badge">ACTION REQUIRED</span></div>
+      <div class="action-section-title"> Vendor Information Received <span class="action-badge">ACTION REQUIRED</span></div>
       <div style="background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.18);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px;white-space:pre-wrap;font-size:0.83rem;line-height:1.5">${currentPR.vendor_info_details||'No details provided.'}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-success" onclick="resolveVendorInfo('close')">✓ Close Request</button>
+        <button class="btn btn-success" onclick="resolveVendorInfo('close')"> Close Request</button>
         <button class="btn btn-secondary" onclick="resolveVendorInfo('more_vendors')">↻ Request More Vendors</button>
         <button class="btn btn-primary" onclick="resolveVendorInfo('convert_to_rfq')">→ Convert to RFQ</button>
       </div>
@@ -976,10 +976,10 @@ async function openPR(id) {
   // ── LOCAL PURCHASE STATUS VIEW (engineer read-only) ──
   if(currentPR.request_category==='local_purchase') {
     const lpPhaseInfo = {
-      lp_submitted:              {color:'#6366f1',bg:'rgba(99,102,241,0.05)',border:'rgba(99,102,241,0.25)',icon:'📋',title:'Local Purchase — Submitted',msg:'Your request has been submitted and is awaiting Project Manager review.'},
+      lp_submitted:              {color:'#6366f1',bg:'rgba(99,102,241,0.05)',border:'rgba(99,102,241,0.25)',icon:'',title:'Local Purchase — Submitted',msg:'Your request has been submitted and is awaiting Project Manager review.'},
       lp_pending_pm_approval:    {color:'#b45309',bg:'rgba(245,158,11,0.04)',border:'rgba(245,158,11,0.3)',icon:'⏳',title:'Local Purchase — Awaiting Project Manager Approval',msg:'Your request is pending approval by the assigned Project Manager.'},
-      lp_procurement_processing: {color:'#1d4ed8',bg:'rgba(59,130,246,0.04)',border:'rgba(59,130,246,0.25)',icon:'🛒',title:'Local Purchase — With Procurement Team',msg:'Project Manager approved. The Procurement Manager is processing this request.'},
-      lp_payment_pending:        {color:'#b45309',bg:'rgba(245,158,11,0.04)',border:'rgba(245,158,11,0.3)',icon:'💳',title:'Local Purchase — Payment Pending',msg:'Payment is being arranged by the Procurement Manager.'},
+      lp_procurement_processing: {color:'#1d4ed8',bg:'rgba(59,130,246,0.04)',border:'rgba(59,130,246,0.25)',icon:'',title:'Local Purchase — With Procurement Team',msg:'Project Manager approved. The Procurement Manager is processing this request.'},
+      lp_payment_pending:        {color:'#b45309',bg:'rgba(245,158,11,0.04)',border:'rgba(245,158,11,0.3)',icon:'',title:'Local Purchase — Payment Pending',msg:'Payment is being arranged by the Procurement Manager.'},
     };
     const lpInfo = lpPhaseInfo[currentPR.phase];
     if(lpInfo) {
@@ -991,8 +991,8 @@ async function openPR(id) {
     if(currentPR.phase==='lp_payment_done') {
       const billUrl=currentPR.lp_bill_url;
       actionSection=`<div style="padding:12px 14px;border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius);background:rgba(34,197,94,0.05)">
-        <div style="font-weight:700;color:#15803d;margin-bottom:6px">✅ Local Purchase — Payment Done & Closed</div>
-        ${billUrl?`<a href="${billUrl}" target="_blank" style="font-size:0.82rem;color:#15803d;text-decoration:underline">📄 ${currentPR.lp_bill_name||'View Bill'}</a>`:'<p style="font-size:0.78rem;color:var(--gray-3);margin:0">No bill attached.</p>'}
+        <div style="font-weight:700;color:#15803d;margin-bottom:6px"> Local Purchase — Payment Done & Closed</div>
+        ${billUrl?`<a href="${billUrl}" target="_blank" style="font-size:0.82rem;color:#15803d;text-decoration:underline"> ${currentPR.lp_bill_name||'View Bill'}</a>`:'<p style="font-size:0.78rem;color:var(--gray-3);margin:0">No bill attached.</p>'}
       </div>`;
     }
   }
@@ -1020,7 +1020,7 @@ async function openPR(id) {
       </tr>`).join('');
 
     actionSection=`<div class="action-section">
-      <div class="action-section-title">📦 Goods Receipt Note (GRN) &amp; Quality Check <span class="action-badge">ACTION REQUIRED</span></div>
+      <div class="action-section-title"> Goods Receipt Note (GRN) &amp; Quality Check <span class="action-badge">ACTION REQUIRED</span></div>
 
       <!-- GRN Header Info -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;padding:12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius)">
@@ -1040,7 +1040,7 @@ async function openPR(id) {
 
       ${qcCriteria&&(qcCriteria.preferred_color||qcCriteria.preferred_material||qcCriteria.custom)?`
       <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px">
-        <div style="font-size:0.75rem;font-weight:600;color:#6366f1;margin-bottom:4px">🔍 Expected QC Criteria</div>
+        <div style="font-size:0.75rem;font-weight:600;color:#6366f1;margin-bottom:4px"> Expected QC Criteria</div>
         ${qcCriteria.preferred_color?`<div style="font-size:0.78rem">Color/Finish: <strong>${qcCriteria.preferred_color}</strong></div>`:''}
         ${qcCriteria.preferred_material?`<div style="font-size:0.78rem">Material: <strong>${qcCriteria.preferred_material}</strong></div>`:''}
         ${qcCriteria.custom?`<div style="font-size:0.78rem">Other: ${qcCriteria.custom}</div>`:''}
@@ -1072,8 +1072,8 @@ async function openPR(id) {
           <label class="form-label">QC Result *</label>
           <select class="form-control" id="qcResult">
             <option value="">Select result</option>
-            <option value="qc_passed">✔ QC Passed — meets all specs</option>
-            <option value="rejected">✖ Rejected — does not meet specs</option>
+            <option value="qc_passed"> QC Passed — meets all specs</option>
+            <option value="rejected"> Rejected — does not meet specs</option>
           </select>
         </div>
         <div class="form-group full">
@@ -1097,7 +1097,7 @@ async function openPR(id) {
   document.getElementById('prModalBody').innerHTML=
     buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',pmName,{poData:poRes.data||null,advPayRec:advRes.data||null,payRec:payRes.data||null,clearanceManagerName})+actionSection+
     `<div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
-      <div class="section-title" style="margin-bottom:10px">💬 Comments</div>
+      <div class="section-title" style="margin-bottom:10px"> Comments</div>
       <div id="commentsList">${renderComments(comments)}</div>
       <div style="position:relative;display:flex;gap:8px;margin-top:10px">
         <div style="position:relative;flex:1">
@@ -1115,7 +1115,7 @@ async function openPR(id) {
 async function resolveVendorInfo(action) {
   showLoader(true);
   let updates={updated_at:new Date().toISOString()},comment='';
-  if(action==='close'){updates.phase='vendor_info_received';updates.is_closed=true;updates.closed_at=new Date().toISOString();updates.phase_timestamps=addPhaseTimestamp(currentPR,'vendor_info_received');comment='✓ Engineer closed request after reviewing vendor information.';}
+  if(action==='close'){updates.phase='vendor_info_received';updates.is_closed=true;updates.closed_at=new Date().toISOString();updates.phase_timestamps=addPhaseTimestamp(currentPR,'vendor_info_received');comment=' Engineer closed request after reviewing vendor information.';}
   else if(action==='more_vendors'){updates.phase='procurement_active';updates.vendor_info_details=null;comment='↻ Engineer requested more vendor options.';}
   else if(action==='convert_to_rfq'){updates.phase='procurement_active';updates.request_category='RFQ';comment='→ Engineer converted to RFQ.';}
   const{error}=await db.from('procurement_requests').update(updates).eq('id',currentPR.id);
@@ -1126,21 +1126,21 @@ async function resolveVendorInfo(action) {
 }
 
 function buildQuoteReview(quotations) {
-  if(!quotations.length) return `<div class="action-section"><div class="action-section-title">📨 Review Quotations <span class="action-badge">ACTION REQUIRED</span></div><p style="color:var(--gray-4);font-size:0.82rem">No quotations yet.</p></div>`;
+  if(!quotations.length) return `<div class="action-section"><div class="action-section-title"> Review Quotations <span class="action-badge">ACTION REQUIRED</span></div><p style="color:var(--gray-4);font-size:0.82rem">No quotations yet.</p></div>`;
   return `<div class="action-section">
-    <div class="action-section-title">📨 Validate Quotations <span class="action-badge">ACTION REQUIRED</span></div>
+    <div class="action-section-title"> Validate Quotations <span class="action-badge">ACTION REQUIRED</span></div>
     <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Review the ${quotations.length} quotation${quotations.length>1?'s':''} below and check if they meet the requirement. You cannot select a quotation — that will be done by the approver. Click <strong>Validate & Forward</strong> if the quotes are suitable, or use the issue options below if they are not.</p>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">${quotations.map(q=>renderQuotationCard(q,false,null)).join('')}</div>
     <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:0.8rem;color:#4338ca">
       <strong>ℹ Routing rule:</strong> Quotes below ₹5,000 go to the <strong>Project Manager</strong>. Quotes of ₹5,000 or above go to the <strong>Director</strong> for approval.
     </div>
 
-    <!-- ✅ VALIDATE -->
-    <button class="btn btn-primary" style="width:100%;margin-bottom:12px" onclick="submitEngineerVerification()">✓ Validate & Forward for Approval</button>
+    <!--  VALIDATE -->
+    <button class="btn btn-primary" style="width:100%;margin-bottom:12px" onclick="submitEngineerVerification()"> Validate & Forward for Approval</button>
 
-    <!-- ⚠️ ISSUES PANEL -->
+    <!--  ISSUES PANEL -->
     <div style="border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius);padding:14px;background:rgba(245,158,11,0.03)">
-      <div style="font-size:0.82rem;font-weight:700;color:#92400e;margin-bottom:10px">⚠️ Quotes don't meet requirements?</div>
+      <div style="font-size:0.82rem;font-weight:700;color:#92400e;margin-bottom:10px"> Quotes don't meet requirements?</div>
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label" style="font-size:0.78rem">Select action</label>
         <select class="form-control" id="engineerIssueAction" onchange="onEngineerIssueChange()" style="font-size:0.82rem">
@@ -1157,7 +1157,7 @@ function buildQuoteReview(quotations) {
           <label class="form-label" style="font-size:0.78rem">Reason for closing *</label>
           <textarea class="form-control" id="engineerCloseReason" rows="3" placeholder="Explain why this request is being closed…" style="font-size:0.82rem"></textarea>
         </div>
-        <button class="btn btn-danger" style="width:100%" onclick="submitEngineerClose()">🚫 Close Request</button>
+        <button class="btn btn-danger" style="width:100%" onclick="submitEngineerClose()"> Close Request</button>
       </div>
 
       <!-- keep going note -->
@@ -1166,7 +1166,7 @@ function buildQuoteReview(quotations) {
           <label class="form-label" style="font-size:0.78rem">Note (optional)</label>
           <textarea class="form-control" id="engineerKeepNote" rows="2" placeholder="Add any observation or note for the team…" style="font-size:0.82rem"></textarea>
         </div>
-        <button class="btn btn-secondary" style="width:100%" onclick="submitEngineerKeepGoing()">📌 Add Note & Keep Going</button>
+        <button class="btn btn-secondary" style="width:100%" onclick="submitEngineerKeepGoing()"> Add Note & Keep Going</button>
       </div>
 
       <!-- revise quotes -->
@@ -1175,7 +1175,7 @@ function buildQuoteReview(quotations) {
           <label class="form-label" style="font-size:0.78rem">What needs to change? *</label>
           <textarea class="form-control" id="engineerReviseNote" rows="3" placeholder="e.g. Need quotes from a different vendor, require spec sheet attached, pricing is too high — please get quotes under ₹4,000, wrong part quoted…" style="font-size:0.82rem"></textarea>
         </div>
-        <button class="btn btn-warning" style="width:100%;color:#fff" onclick="submitEngineerReviseRequest()">🔁 Send Back to Procurement for Revised Quotes</button>
+        <button class="btn btn-warning" style="width:100%;color:#fff" onclick="submitEngineerReviseRequest()"> Send Back to Procurement for Revised Quotes</button>
       </div>
     </div>
   </div>`;
@@ -1203,7 +1203,7 @@ async function submitEngineerClose() {
     updated_at: new Date().toISOString(),
     phase_timestamps: addPhaseTimestamp(currentPR,'rejected')
   }).eq('id',currentPR.id);
-  if(!error) await postComment(currentPR.id,currentUser.id,`🚫 Request closed by engineer: ${reason}`);
+  if(!error) await postComment(currentPR.id,currentUser.id,` Request closed by engineer: ${reason}`);
   if(!error) notifyPhaseChange(currentPR.id,'rejected',currentUser?.id);
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
@@ -1215,8 +1215,8 @@ async function submitEngineerClose() {
 async function submitEngineerKeepGoing() {
   const note = document.getElementById('engineerKeepNote')?.value?.trim();
   showLoader(true);
-  if(note) await postComment(currentPR.id,currentUser.id,`📌 Engineer note (keeping request active): ${note}`);
-  else await postComment(currentPR.id,currentUser.id,'📌 Engineer reviewed quotations — request kept active.');
+  if(note) await postComment(currentPR.id,currentUser.id,` Engineer note (keeping request active): ${note}`);
+  else await postComment(currentPR.id,currentUser.id,' Engineer reviewed quotations — request kept active.');
   showLoader(false);
   showToast('Note added. Request remains active.','success');
   closeModal('prModal');await loadRequests();
@@ -1232,7 +1232,7 @@ async function submitEngineerReviseRequest() {
     updated_at: new Date().toISOString(),
     phase_timestamps: addPhaseTimestamp(currentPR,'quotes_revision_requested')
   }).eq('id',currentPR.id);
-  if(!error) await postComment(currentPR.id,currentUser.id,`🔁 Engineer requested quote revision — ${note}`);
+  if(!error) await postComment(currentPR.id,currentUser.id,` Engineer requested quote revision — ${note}`);
   if(!error) notifyPhaseChange(currentPR.id,'quotes_revision_requested',currentUser?.id);
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
@@ -1278,15 +1278,15 @@ async function submitEngineerVerification() {
   if(!error){
     const routedTo = needsDirector ? 'Director (amount ≥ ₹5,000)' : 'Project Manager';
     await postComment(currentPR.id, currentUser.id,
-      `✅ Engineer validated quotations (${prQuotations.length} quote${prQuotations.length!==1?'s':''}). Forwarded to ${routedTo} for approval.`);
+      ` Engineer validated quotations (${prQuotations.length} quote${prQuotations.length!==1?'s':''}). Forwarded to ${routedTo} for approval.`);
     notifyPhaseChange(currentPR.id, newPhase, currentUser?.id);
   }
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
   const amtDisplay = amountINR ? `₹${amountINR.toLocaleString('en-IN')}` : '';
   showToast(needsDirector
-    ? `⬆️ ${amtDisplay ? amtDisplay+' — ' : ''}Forwarded to Director for approval.`
-    : `✅ Validated — forwarded to Project Manager.`,'success');
+    ? `⬆ ${amtDisplay ? amtDisplay+' — ' : ''}Forwarded to Director for approval.`
+    : ` Validated — forwarded to Project Manager.`,'success');
   closeModal('prModal');await loadRequests();
 }
 
@@ -1299,10 +1299,10 @@ function selectQuotation(qId) {
     const isNow=q.id===qId;
     card.classList.toggle('selected',isNow);
     const ob=card.querySelector('.sel-badge');if(ob)ob.remove();
-    if(isNow)card.querySelector('.quotation-card-header').insertAdjacentHTML('beforeend',`<span class="sel-badge" style="background:#22c55e14;color:#16a34a;border:1px solid #22c55e30;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-size:0.62rem;font-weight:600">✓ SELECTED</span>`);
+    if(isNow)card.querySelector('.quotation-card-header').insertAdjacentHTML('beforeend',`<span class="sel-badge" style="background:#22c55e14;color:#16a34a;border:1px solid #22c55e30;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-size:0.62rem;font-weight:600"> SELECTED</span>`);
     card.querySelectorAll('button').forEach(btn=>{
       if(btn.textContent.includes('Select as Final')||btn.textContent.includes('Deselect')){
-        btn.textContent=isNow?'Deselect':'✓ Select as Final';
+        btn.textContent=isNow?'Deselect':' Select as Final';
         btn.className=`btn btn-sm ${isNow?'btn-danger':'btn-primary'}`;
         btn.onclick=()=>selectQuotation(isNow?null:q.id);
       }
@@ -1370,7 +1370,7 @@ async function submitQC() {
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
   notifyPhaseChange(currentPR.id,result,currentUser?.id);
-  showToast(result==='qc_passed'?'✔ GRN submitted & QC Passed!':'✖ GRN submitted — QC rejected.','success');
+  showToast(result==='qc_passed'?' GRN submitted & QC Passed!':' GRN submitted — QC rejected.','success');
   closeModal('prModal');await loadRequests();
 }
 

@@ -41,6 +41,62 @@ async function dbFetch(queryFn, label = 'data', { retries = 2, retryDelayMs = 50
 }
 window.dbFetch = dbFetch;
 
+// ── MONOCHROME EMOJI / ICON REPLACER ─────────────────────────
+// Replaces common inline emoji characters in text nodes with simple
+// monochrome inline SVGs so the UI looks professional and consistent
+// across platforms. Runs on DOMContentLoaded and is intentionally
+// conservative — unmapped characters are left alone.
+(function(){
+  const EMOJI_MAP = {
+    '⬇': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12 16.5a1 1 0 0 1-.7-.3l-4-4a1 1 0 1 1 1.4-1.4L11 12.58V3a1 1 0 1 1 2 0v9.59l2.3-2.3a1 1 0 0 1 1.4 1.42l-4 4a1 1 0 0 1-.7.29z" fill="currentColor"/></svg>',
+    '⏳': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M6 2h12v2l-2 2v1a6 6 0 0 1-4 5.66V18a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-4.34A6 6 0 0 1 4 7V6L2 4V2h4zm2 4v1a4 4 0 0 0 2 3.46V11a1 1 0 0 0 2 0v-.54A4 4 0 0 0 16 7V6H8z" fill="currentColor"/></svg>',
+    '→': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M12 4l1.41 1.41L8.83 10H20v2H8.83l4.58 4.59L12 18l-8-8 8-8z" fill="currentColor"/></svg>',
+    '🔍': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M15.5 14h-.79l-.28-.27A6.5 6.5 0 1 0 14 15.5l.27.28v.79L20 21.49 21.49 20l-5.99-6zM6.5 11a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0z" fill="currentColor"/></svg>',
+    '📎': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M7 13a5 5 0 0 0 7 0l3-3a3 3 0 0 0-4.24-4.24l-3 3a1 1 0 1 0 1.41 1.41l3-3A1 1 0 0 1 16 7.59l-3 3a3 3 0 0 1-4.24-4.24l5-5A5 5 0 1 1 19 8l-3 3a7 7 0 1 1-9.9-9.9l5 5A9 9 0 1 0 20 11l3-3A11 11 0 1 1 4 20l3-3z" fill="currentColor"/></svg>',
+    '✅': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M9 16.2l-3.5-3.5L4 14.2 9 19l12-12-1.5-1.5L9 16.2z" fill="currentColor"/></svg>',
+    '✖': '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M18.3 5.71L12 12l6.3 6.29-1.41 1.41L10.59 13.41 4.29 19.71 2.88 18.3 9.17 12 2.88 5.71 4.29 4.3 10.59 10.59 16.88 4.3z" fill="currentColor"/></svg>'
+  };
+
+  function buildEmojiRegex(keys){
+    const esc = k => k.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&');
+    const joined = keys.map(esc).join('|');
+    return new RegExp('(' + joined + ')','g');
+  }
+
+  function replaceEmojiNodes(){
+    if (!document.body) return;
+    const keys = Object.keys(EMOJI_MAP);
+    if (!keys.length) return;
+    const re = buildEmojiRegex(keys);
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+    const nodes = [];
+    let n;
+    while(n = walker.nextNode()){
+      if (re.test(n.nodeValue)) nodes.push(n);
+    }
+    nodes.forEach(tn => {
+      const parts = tn.nodeValue.split(re);
+      const html = parts.map(p => EMOJI_MAP[p] || escHtml(p)).join('');
+      const span = document.createElement('span');
+      span.className = 'mono-emoji-replaced';
+      span.innerHTML = html;
+      tn.parentNode.replaceChild(span, tn);
+    });
+  }
+
+  // Add a tiny stylesheet to ensure SVGs are monochrome and align nicely
+  function injectStyle(){
+    try{
+      const css = '.mono-emoji-replaced svg{width:1em;height:1em;vertical-align:middle;fill:currentColor;display:inline-block;margin:0 .18em 0 .06em} .mono-emoji-replaced{line-height:1}';
+      const s = document.createElement('style'); s.setAttribute('data-generated','mono-emoji'); s.appendChild(document.createTextNode(css));
+      document.head && document.head.appendChild(s);
+    }catch(e){/*noop*/}
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){ injectStyle(); try{ replaceEmojiNodes(); }catch(e){ console.warn('emoji replacer error', e); } });
+})();
+
+
 // ══════════════════════════════════════════════════════════════
 // SAFE FILE REGISTRY — eliminates base64-in-HTML-attribute bugs
 // All large file URLs are stored here; buttons reference by index only.
@@ -1139,30 +1195,31 @@ function renderVendorCards(vendors, gridId, canEdit=false) {
     <div class="vendor-card">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:7px">
         <div><div class="vendor-name">${v.name}</div><div class="vendor-spec">${v.specialization||'—'}</div></div>
-        <span style="font-size:0.62rem;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;${v.is_active?'background:rgba(5,150,105,0.08);color:#047857;border:1px solid rgba(5,150,105,0.2)':'background:var(--off-white);color:var(--gray-4);border:1px solid var(--border)'}">
+        <span style="font-size:0.62rem;font-family:var(--font-mono);padding:2px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;${v.is_active?'background:var(--black);color:var(--white);border:1px solid var(--black)':'background:var(--off-white);color:var(--gray-4);border:1px solid var(--border)'}">
           ${v.is_active?'Active':'Inactive'}
         </span>
       </div>
       <div style="margin-bottom:6px">${starRating(v.avg_rating,v.rating_count)}</div>
-      ${pt?`<div style="font-size:0.7rem;margin-bottom:8px;padding:3px 7px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:3px;color:#6366f1">💳 ${pt.label}</div>`:''}
+      ${pt?`<div class="vendor-payment-tag" style="margin-bottom:8px"><span class="vendor-icon">💳</span>${pt.label}</div>`:''}
       <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:9px">
-      ${v.contact_person?`<div style="font-size:0.75rem;color:var(--gray-3)">👤 ${v.contact_person}</div>`:''}
-      ${v.email?`<div style="font-size:0.75rem">✉ <a href="mailto:${v.email}" style="color:var(--red);text-decoration:none">${v.email}</a></div>`:''}
-      ${v.phone?`<div style="font-size:0.75rem;color:var(--gray-3)">📞 ${v.phone}</div>`:''}
+      ${v.contact_person?`<div class="vendor-meta"><span class="vendor-icon">👤</span>${v.contact_person}</div>`:''}
+      ${v.email?`<div class="vendor-meta"><span class="vendor-icon">✉</span><a href="mailto:${v.email}" style="color:var(--red);text-decoration:none">${v.email}</a></div>`:''}
+      ${v.phone?`<div class="vendor-meta"><span class="vendor-icon">📞</span>${v.phone}</div>`:''}
 
-      ${(v.gstin||v.GSTIN)?`<div style="font-size:0.75rem;color:var(--gray-3)">🧾 GSTIN: ${v.gstin||v.GSTIN}</div>`:''}
-        ${v.country?`<div style="font-size:0.75rem;color:var(--gray-3)">🌍 ${v.country}</div>`:''}
-        ${v.vendor_type?`<div style="font-size:0.75rem;color:var(--gray-3)">🏷 ${v.vendor_type}</div>`:''}
+      ${(v.gstin||v.GSTIN)?`<div class="vendor-meta"><span class="vendor-icon">🧾</span>GSTIN: ${v.gstin||v.GSTIN}</div>`:''}
+        ${v.country?`<div class="vendor-meta"><span class="vendor-icon">🌍</span>${v.country}</div>`:''}
+        ${v.vendor_type?`<div class="vendor-meta"><span class="vendor-icon">🏷</span>${v.vendor_type}</div>`:''}
     </div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:auto">
         ${canEdit?`
           <button class="btn btn-secondary btn-sm" onclick="editVendor('${v.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="toggleVendorActive('${v.id}',${v.is_active})">${v.is_active?'Deactivate':'Activate'}</button>
-          <button class="btn btn-ghost btn-sm" onclick="openVendorHistory('${v.id}')">📋 History</button>
-          <button class="btn btn-ghost btn-sm" onclick="openVendorPartsModal('${v.id}','${v.name.replace(/'/g,'\\\'')}')" style="color:#6366f1;border-color:rgba(99,102,241,0.3)">🔩 Parts</button>
-        `:`
-          <button class="btn btn-secondary btn-sm" onclick="openVendorEnquiry(${JSON.stringify(v).split('"').join('&quot;')})">📬 Enquire</button>
-          <button class="btn btn-ghost btn-sm" onclick="openVendorHistory('${v.id}')">📋 History</button>
+          <button class="btn btn-ghost btn-sm" onclick="openVendorHistory('${v.id}')">History</button>
+          <button class="btn btn-ghost btn-sm" onclick="openVendorPartsModal('${v.id}','${v.name.replace(/'/g,'\\\'')}')" style="color:#6366f1;border-color:rgba(99,102,241,0.3)">Parts</button>
+        `:
+        `
+          <button class="btn btn-secondary btn-sm" onclick="openVendorEnquiry(${JSON.stringify(v).split('"').join('&quot;')})">Enquire</button>
+          <button class="btn btn-ghost btn-sm" onclick="openVendorHistory('${v.id}')">History</button>
         `}
       </div>
     </div>`;

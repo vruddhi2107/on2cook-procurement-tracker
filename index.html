@@ -5,33 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>ProcureX — Sign In</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-      <link rel="icon" type="image/x-icon" href="on2cook no bg.png">
+    <link rel="icon" type="image/x-icon" href="on2cook no bg.png">
 
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-            --red:        #C8281A;
-            --red-dark:   #A31F14;
-            --red-muted:  rgba(200,40,26,0.07);
-            --black:      #141414;
-            --gray-1:     #1e1e1e;
-            --gray-2:     #2a2a2a;
-            --gray-3:     #606060;
-            --gray-4:     #909090;
-            --gray-5:     #b8b8b8;
-            --gray-6:     #e6e6e6;
+            --red:        #ed1c24;
+            --red-dark:   #c4141b;
+            --red-muted:  rgba(237,28,36,0.06);
+            --black:      #0a0a0c;
+            --gray-1:     #121215;
+            --gray-2:     #1c1c21;
+            --gray-3:     #27272e;
+            --gray-4:     #71717a;
+            --gray-5:     #a1a1aa;
+            --gray-6:     #e4e4e7;
             --white:      #ffffff;
-            --off-white:  #f5f5f5;
-            --border:     #e2e2e2;
+            --off-white:  #f8f9fa;
+            --border:     #e4e4e7;
             --font:       'Outfit', sans-serif;
             --mono:       'JetBrains Mono', monospace;
             --r-sm:       4px;
-            --r:          7px;
-            --r-lg:       10px;
+            --r:          8px;
+            --r-lg:       12px;
             --ease:       cubic-bezier(0.16, 1, 0.3, 1);
         }
 
@@ -46,9 +46,10 @@
             justify-content: center;
             -webkit-font-smoothing: antialiased;
             overflow: hidden;
+            color: var(--white);
         }
 
-        /* ── Background ── */
+        /* ── Background Grid & Clean Accent Lines ── */
         .bg {
             position: fixed;
             inset: 0;
@@ -61,41 +62,30 @@
             position: absolute;
             inset: -80px;
             background-image:
-                linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
-            background-size: 64px 64px;
-            animation: gridMove 36s linear infinite;
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 48px 48px;
+            animation: gridMove 40s linear infinite;
         }
-        @keyframes gridMove { to { transform: translate(64px, 64px); } }
+        @keyframes gridMove { to { transform: translate(48px, 48px); } }
 
-        .blob {
+        /* Sleek subtle light accent spotlight instead of fuzzy pink blob */
+        .bg-spotlight {
             position: absolute;
-            border-radius: 50%;
-            filter: blur(110px);
-            animation: blobDrift ease-in-out infinite alternate;
-        }
-        .b1 {
-            width: 500px; height: 500px;
-            background: radial-gradient(circle, rgba(200,40,26,0.16), transparent 68%);
-            top: -160px; left: -120px;
-            animation-duration: 10s;
-        }
-        .b2 {
-            width: 300px; height: 300px;
-            background: radial-gradient(circle, rgba(200,40,26,0.09), transparent 68%);
-            bottom: -60px; right: 5%;
-            animation-duration: 14s; animation-delay: -5s;
-        }
-        @keyframes blobDrift {
-            from { transform: translate(0,0) scale(1); }
-            to   { transform: translate(30px,-30px) scale(1.1); }
+            top: -200px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 500px;
+            background: radial-gradient(ellipse at center, rgba(237, 28, 36, 0.08) 0%, transparent 70%);
+            pointer-events: none;
         }
 
         .pt {
             position: absolute;
             width: 2px; height: 2px;
             border-radius: 50%;
-            background: rgba(200,40,26,0.55);
+            background: rgba(237, 28, 36, 0.4);
             animation: ptFloat linear infinite;
         }
         @keyframes ptFloat {
@@ -113,14 +103,14 @@
             animation: sceneEnter 0.65s var(--ease) both;
         }
         @keyframes sceneEnter {
-            from { opacity: 0; transform: translateY(24px) scale(0.95); }
+            from { opacity: 0; transform: translateY(24px) scale(0.96); }
             to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         .card {
             width: 420px;
             transform-style: preserve-3d;
-            transition: transform 0.82s var(--ease);
+            transition: transform 0.8s var(--ease);
             position: relative;
         }
         .card.flipped { transform: rotateY(180deg); }
@@ -128,7 +118,7 @@
         .face {
             backface-visibility: hidden;
             -webkit-backface-visibility: hidden;
-            border-radius: 14px;
+            border-radius: 16px;
             overflow: hidden;
         }
         .back-face {
@@ -140,186 +130,121 @@
         /* ────────── FRONT ────────── */
         .front-face {
             background: var(--gray-1);
-            border: 1px solid rgba(255,255,255,0.065);
-            box-shadow: 0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.065);
-            padding: 34px;
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 24px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+            padding: 36px;
             display: flex;
             flex-direction: column;
+            position: relative;
         }
 
-        /* sheen pass */
-        .front-face::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(108deg, transparent 38%, rgba(255,255,255,0.025) 50%, transparent 62%);
-            background-size: 300% 100%;
-            background-position: 200% 0;
-            animation: sheen 6s ease-in-out infinite 1.2s;
-            border-radius: inherit;
-            pointer-events: none;
-        }
-        @keyframes sheen {
-            0%, 55%, 100% { background-position: 200% 0; }
-            28% { background-position: -60% 0; }
-        }
-
-        /* logo row */
         .fl-logo {
-            display: flex; align-items: center; gap: 9px;
+            display: flex; align-items: center; gap: 10px;
         }
         .fl-mark {
-    width: 32px;
-    height: 32px;
-    background: url("on2cook no bg.png") center/cover no-repeat;
-    border-radius: var(--r);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: markPulse 3.5s ease-in-out infinite;
-    flex-shrink: 0;
-}
-        @keyframes markPulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(200,40,26,0.5); }
-            50%       { box-shadow: 0 0 0 7px rgba(200,40,26,0); }
+            width: 34px; height: 34px;
+            background: url("on2cook no bg.png") center/contain no-repeat;
+            border-radius: var(--r);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
         }
         .fl-name {
-            font-weight: 700; font-size: 0.93rem; color: white; letter-spacing: -0.02em;
+            font-weight: 800; font-size: 1.05rem; color: white; letter-spacing: -0.03em;
         }
         .fl-name span { color: var(--red); }
 
-        /* decorative rings (top-right) */
+        /* Rings */
         .fl-rings {
             position: absolute;
-            top: 30px; right: 30px;
-            width: 76px; height: 76px;
+            top: 28px; right: 28px;
+            width: 70px; height: 70px;
             pointer-events: none;
         }
         .fl-ring {
-            position: absolute;
-            border-radius: 50%;
-            border: 1px solid rgba(200,40,26,0.17);
-            animation: ringPulse 4s ease-in-out infinite;
+            position: absolute; border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.06);
         }
-        .fl-ring:nth-child(1) { inset: 0; animation-delay: 0s; }
-        .fl-ring:nth-child(2) { inset: 14px; border-color: rgba(200,40,26,0.11); animation-delay: 0.4s; }
-        .fl-ring:nth-child(3) { inset: 28px; background: rgba(200,40,26,0.05); border-color: rgba(200,40,26,0.22); animation-delay: 0.8s; }
-        @keyframes ringPulse {
-            0%, 100% { transform: scale(1); opacity: 0.9; }
-            50%       { transform: scale(1.07); opacity: 0.45; }
-        }
+        .fl-ring:nth-child(1) { inset: 0; }
+        .fl-ring:nth-child(2) { inset: 12px; border-color: rgba(237,28,36,0.2); }
+        .fl-ring:nth-child(3) { inset: 24px; border-color: rgba(237,28,36,0.4); }
 
-        /* hero */
-        .fl-hero { flex: 1; padding: 44px 0 32px; }
+        /* Hero */
+        .fl-hero { flex: 1; padding: 48px 0 36px; }
         .fl-eyebrow {
             font-family: var(--mono);
-            font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase;
-            color: var(--red); margin-bottom: 13px;
-            display: flex; align-items: center; gap: 7px;
+            font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase;
+            color: var(--red); margin-bottom: 12px; font-weight: 600;
+            display: flex; align-items: center; gap: 8px;
         }
-        .fl-eyebrow::before { content: ''; width: 18px; height: 1px; background: var(--red); }
+        .fl-eyebrow::before { content: ''; width: 20px; height: 2px; background: var(--red); }
         .fl-h1 {
-            font-size: 2.55rem; font-weight: 800; letter-spacing: -0.045em;
-            line-height: 0.97; color: white;
+            font-size: 2.5rem; font-weight: 800; letter-spacing: -0.04em;
+            line-height: 1.02; color: white;
         }
         .fl-h1 .r { color: var(--red); display: block; }
         .fl-desc {
-            margin-top: 13px; font-size: 0.77rem;
-            color: rgba(255,255,255,0.35); line-height: 1.6; max-width: 280px;
+            margin-top: 14px; font-size: 0.82rem;
+            color: var(--gray-5); line-height: 1.5; max-width: 290px;
         }
 
-        /* stats */
-        .fl-stats {
-            display: flex;
-            border-top: 1px solid rgba(255,255,255,0.065);
-            padding-top: 18px;
-            margin-bottom: 20px;
-        }
-        .fl-stat { flex: 1; }
-        .fl-stat + .fl-stat {
-            padding-left: 16px;
-            border-left: 1px solid rgba(255,255,255,0.065);
-        }
-        .fl-sn {
-            font-size: 1.25rem; font-weight: 800; color: white; letter-spacing: -0.04em; line-height: 1;
-        }
-        .fl-sn sup { color: var(--red); font-size: 0.65em; }
-        .fl-sl {
-            font-family: var(--mono); font-size: 0.56rem;
-            color: rgba(255,255,255,0.28); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 3px;
-        }
-
-        /* CTA */
         .fl-btn {
-            width: 100%; padding: 12px;
+            width: 100%; padding: 13px;
             background: var(--red); border: none; border-radius: var(--r);
-            color: white; font-family: var(--font); font-size: 0.83rem; font-weight: 700;
+            color: white; font-family: var(--font); font-size: 0.88rem; font-weight: 700;
             letter-spacing: -0.01em; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 7px;
-            transition: all 0.15s; position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: all 0.18s var(--ease);
         }
-        .fl-btn::before {
-            content: '';
-            position: absolute; inset: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 55%);
-            opacity: 0; transition: opacity 0.15s;
-        }
-        .fl-btn:hover { background: var(--red-dark); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(200,40,26,0.32); }
-        .fl-btn:hover::before { opacity: 1; }
-        .fl-btn:hover .arr { transform: translateX(3px); }
+        .fl-btn:hover { background: var(--red-dark); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(237, 28, 36, 0.35); }
         .fl-btn:active { transform: translateY(0); }
         .arr { transition: transform 0.15s; }
+        .fl-btn:hover .arr { transform: translateX(3px); }
 
         /* ────────── BACK ────────── */
         .back-face {
             background: var(--white);
-            box-shadow: 0 24px 64px rgba(0,0,0,0.45);
+            box-shadow: 0 24px 64px rgba(0,0,0,0.5);
             display: flex;
             flex-direction: column;
-            padding: 32px;
+            padding: 34px;
+            color: var(--black);
         }
 
         .bk-header {
             display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 26px;
+            margin-bottom: 24px;
         }
-        .bk-logo { display: flex; align-items: center; gap: 7px; }
+        .bk-logo { display: flex; align-items: center; gap: 8px; }
         .bk-mark {
-            width: 30px;
-            height: 30px;
-            background: url("on2cook favicon.png") center/cover no-repeat;
-            border-radius: 5px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            font-size: 9px;
-            color: white;
+            width: 28px; height: 28px;
+            background: url("on2cook favicon.png") center/contain no-repeat;
+            border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
         }
-        .bk-name { font-size: 0.83rem; font-weight: 700; color: var(--black); letter-spacing: -0.02em; }
+        .bk-name { font-size: 0.95rem; font-weight: 800; color: var(--black); letter-spacing: -0.02em; }
         .bk-name span { color: var(--red); }
 
         .bk-back {
-            width: 27px; height: 27px;
+            width: 30px; height: 30px;
             background: var(--off-white); border: 1px solid var(--border);
             border-radius: var(--r-sm);
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 0.7rem; color: var(--gray-4);
-            transition: all 0.13s;
+            cursor: pointer; font-size: 0.75rem; color: var(--gray-4);
+            transition: all 0.15s;
         }
-        .bk-back:hover { background: var(--red-muted); color: var(--red); border-color: rgba(200,40,26,0.2); }
+        .bk-back:hover { background: var(--black); color: var(--white); border-color: var(--black); }
 
         .bk-title {
-            font-size: 1.35rem; font-weight: 700; letter-spacing: -0.03em; color: var(--black); margin-bottom: 2px;
+            font-size: 1.4rem; font-weight: 800; letter-spacing: -0.03em; color: var(--black); margin-bottom: 2px;
         }
-        .bk-sub { font-size: 0.74rem; color: var(--gray-4); margin-bottom: 22px; }
+        .bk-sub { font-size: 0.78rem; color: var(--gray-4); margin-bottom: 20px; }
 
         /* error */
         .bk-err {
-            display: none; align-items: center; gap: 7px;
-            background: var(--red-muted); border: 1px solid rgba(200,40,26,0.18);
-            color: var(--red); padding: 8px 10px; border-radius: var(--r-sm);
-            font-size: 0.74rem; font-weight: 500; margin-bottom: 14px;
+            display: none; align-items: center; gap: 8px;
+            background: rgba(237,28,36,0.08); border: 1px solid var(--red);
+            color: var(--red-dark); padding: 9px 12px; border-radius: var(--r-sm);
+            font-size: 0.78rem; font-weight: 600; margin-bottom: 14px;
         }
         .bk-err.on { display: flex; animation: errSlide 0.18s ease; }
         @keyframes errSlide {
@@ -328,86 +253,61 @@
         }
 
         /* fields */
-        .fg { margin-bottom: 13px; }
+        .fg { margin-bottom: 14px; }
         .lbl {
-            display: block; font-size: 0.61rem; font-weight: 600;
-            text-transform: uppercase; letter-spacing: 0.04em; color: var(--gray-3); margin-bottom: 5px;
+            display: block; font-family: var(--mono); font-size: 0.65rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-4); margin-bottom: 6px;
         }
         .iw { position: relative; }
         .ii {
-            position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-            font-size: 0.73rem; color: var(--gray-5); pointer-events: none; transition: color 0.13s;
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            font-size: 0.8rem; color: var(--gray-4); pointer-events: none; transition: color 0.15s;
         }
         .fc {
-            width: 100%; padding: 9px 10px 9px 32px;
+            width: 100%; padding: 10px 12px 10px 36px;
             border: 1px solid var(--border); border-radius: var(--r-sm);
-            font-family: var(--font); font-size: 0.8rem; color: var(--black);
-            background: var(--off-white); outline: none;
-            transition: border-color 0.13s, background 0.13s, box-shadow 0.13s;
+            font-family: var(--font); font-size: 0.85rem; color: var(--black);
+            background: var(--white); outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
             letter-spacing: -0.01em;
         }
-        .fc:focus { border-color: var(--red); background: var(--white); box-shadow: 0 0 0 3px rgba(200,40,26,0.07); }
+        .fc:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(237,28,36,0.12); }
         .fc:focus ~ .ii { color: var(--red); }
 
         .fgt {
             display: block; text-align: right; margin-top: 6px;
-            font-size: 0.69rem; font-weight: 600; color: var(--red); text-decoration: none;
+            font-size: 0.72rem; font-weight: 600; color: var(--red); text-decoration: none;
         }
-        .fgt:hover { opacity: 0.7; }
+        .fgt:hover { text-decoration: underline; }
 
         .sub-btn {
-            width: 100%; margin-top: 8px; padding: 11px;
+            width: 100%; margin-top: 10px; padding: 12px;
             background: var(--red); border: none; border-radius: var(--r-sm);
-            color: white; font-family: var(--font); font-size: 0.83rem; font-weight: 700;
+            color: white; font-family: var(--font); font-size: 0.88rem; font-weight: 700;
             letter-spacing: -0.01em; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 7px;
-            transition: all 0.13s; position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: all 0.15s; position: relative; overflow: hidden;
         }
-        .sub-btn::after {
-            content: '';
-            position: absolute; top: 0; left: -110%; width: 55%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.09), transparent);
-            transition: left 0.45s ease;
-        }
-        .sub-btn:hover { background: var(--red-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(200,40,26,0.28); }
-        .sub-btn:hover::after { left: 160%; }
-        .sub-btn:active { transform: translateY(0); }
-        .sub-btn:disabled { opacity: 0.62; cursor: not-allowed; transform: none; }
+        .sub-btn:hover { background: var(--red-dark); box-shadow: 0 4px 14px rgba(237,28,36,0.3); }
+        .sub-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 
-        /* footer strip */
         .bk-foot {
-            margin-top: auto; padding-top: 18px;
+            margin-top: auto; padding-top: 20px;
             border-top: 1px solid var(--border);
             display: flex; align-items: center; justify-content: space-between;
         }
-        .bk-copy { font-family: var(--mono); font-size: 0.56rem; color: var(--gray-5); }
-        .bk-links { display: flex; gap: 11px; }
-        .bk-links a { font-family: var(--mono); font-size: 0.56rem; color: var(--gray-5); text-decoration: none; }
+        .bk-copy { font-family: var(--mono); font-size: 0.62rem; color: var(--gray-4); }
+        .bk-links { display: flex; gap: 12px; }
+        .bk-links a { font-family: var(--mono); font-size: 0.62rem; color: var(--gray-4); text-decoration: none; }
         .bk-links a:hover { color: var(--red); }
-
-        /* ── Responsive ── */
-        @media (max-width: 480px) {
-            body { align-items: flex-start; }
-            .scene { width: 100vw; }
-            .card { width: 100vw; }
-            .face, .back-face, .front-face { border-radius: 0; }
-            .front-face { min-height: 100svh; padding: 28px 22px; }
-            .back-face  { min-height: 100svh; padding: 28px 22px; }
-            .fl-h1 { font-size: 2.1rem; }
-        }
-
-        @media (min-width: 481px) and (max-width: 720px) {
-            .card { width: 390px; }
-        }
     </style>
 </head>
 <body>
 
-<!-- Background -->
+<!-- Background Grid & Spotlight -->
 <div class="bg">
     <div class="bg-grid"></div>
-    <div class="blob b1"></div>
-    <div class="blob b2"></div>
+    <div class="bg-spotlight"></div>
 </div>
 
 <div class="scene">
@@ -434,21 +334,6 @@
                 </h1>
                 <p class="fl-desc">End-to-end procurement intelligence system</p>
             </div>
-
-            <!-- <div class="fl-stats">
-                <div class="fl-stat">
-                    <div class="fl-sn">98<sup>%</sup></div>
-                    <div class="fl-sl">Uptime SLA</div>
-                </div>
-                <div class="fl-stat">
-                    <div class="fl-sn">2.4<sup>×</sup></div>
-                    <div class="fl-sl">Faster Cycles</div>
-                </div>
-                <div class="fl-stat">
-                    <div class="fl-sn">500<sup>+</sup></div>
-                    <div class="fl-sl">Enterprises</div>
-                </div>
-            </div> -->
 
             <button class="fl-btn" onclick="flip()">
                 Sign In to Dashboard
@@ -516,12 +401,12 @@
 <script src="js/supabase-config.js"></script>
 
 <script>
-    /* particles */
+    /* background particles */
     const bg = document.querySelector('.bg');
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 18; i++) {
         const d = document.createElement('div');
         d.className = 'pt';
-        d.style.cssText = `left:${Math.random()*100}%;width:${1.5+Math.random()*1.5}px;height:${1.5+Math.random()*1.5}px;animation-duration:${11+Math.random()*15}s;animation-delay:-${Math.random()*22}s`;
+        d.style.cssText = `left:${Math.random()*100}%;width:${1.5+Math.random()*1.5}px;height:${1.5+Math.random()*1.5}px;animation-duration:${12+Math.random()*15}s;animation-delay:-${Math.random()*20}s`;
         bg.appendChild(d);
     }
 
@@ -580,4 +465,3 @@
 </script>
 </body>
 </html>
-

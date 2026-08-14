@@ -24,15 +24,15 @@
   </div>
 
   <div class="stats-grid">
-    <div class="stat-card" style="--accent:#f59e0b"><div class="stat-card-value" id="sGrnPending">—</div><div class="stat-card-label">GRN Pending</div><div class="stat-card-icon">📦</div></div>
-    <div class="stat-card" style="--accent:#ef4444"><div class="stat-card-value" id="sRework">—</div><div class="stat-card-label">Rework Out</div><div class="stat-card-icon">🔄</div></div>
-    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sDone">—</div><div class="stat-card-label">Completed</div><div class="stat-card-icon">✅</div></div>
+    <div class="stat-card" style="--accent:#f59e0b"><div class="stat-card-value" id="sGrnPending">—</div><div class="stat-card-label">GRN Pending</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#ef4444"><div class="stat-card-value" id="sRework">—</div><div class="stat-card-label">Rework Out</div><div class="stat-card-icon"></div></div>
+    <div class="stat-card" style="--accent:#22c55e"><div class="stat-card-value" id="sDone">—</div><div class="stat-card-label">Completed</div><div class="stat-card-icon"></div></div>
   </div>
 
   <div class="tabs">
-    <button class="tab-btn active" data-tab="action" onclick="switchTab('action')">🔔 Action Required</button>
-    <button class="tab-btn" data-tab="all" onclick="switchTab('all')">📊 All Cycles — Status</button>
-    <button class="tab-btn" data-tab="myrequests" onclick="switchTab('myrequests')">📋 My PR Submissions</button>
+    <button class="tab-btn active" data-tab="action" onclick="switchTab('action')"> Action Required</button>
+    <button class="tab-btn" data-tab="all" onclick="switchTab('all')"> All Cycles — Status</button>
+    <button class="tab-btn" data-tab="myrequests" onclick="switchTab('myrequests')"> My PR Submissions</button>
   </div>
 
   <div id="tabMain">
@@ -65,7 +65,7 @@
   <div class="modal" style="max-width:900px">
     <div class="modal-header">
       <div class="modal-title" id="modalTitle">Request Detail</div>
-      <button class="modal-close" onclick="closeModal('prModal')">✕</button>
+      <button class="modal-close" onclick="closeModal('prModal')"></button>
     </div>
     <div class="modal-body" id="modalBody"></div>
   </div>
@@ -209,7 +209,7 @@ function renderModal() {
     </tr>`).join('');
 
     actionSection = `<div class="action-section">
-      <div class="action-section-title">📦 Goods Receipt Note (GRN) <span class="action-badge">ACTION REQUIRED</span></div>
+      <div class="action-section-title"> Goods Receipt Note (GRN) <span class="action-badge">ACTION REQUIRED</span></div>
       <p style="font-size:0.8rem;color:var(--gray-3);margin-bottom:10px">Once goods arrive at the warehouse, log them here to raise the GRN and send the request to QC.</p>
 
       <div class="grn-header-grid">
@@ -243,7 +243,7 @@ function renderModal() {
           <textarea class="form-control" id="grnRemarks" rows="2" placeholder="Condition, packaging, any notes..." style="font-size:0.82rem"></textarea></div>
       </div>
 
-      <button class="btn btn-primary" style="margin-top:14px" onclick="submitGRN()">✅ Submit GRN — Send to QC →</button>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="submitGRN()"> Submit GRN — Send to QC →</button>
     </div>`;
   }
 
@@ -253,11 +253,11 @@ function renderModal() {
     const sfParts = pr.parts||[];
     const sfToday = new Date().toISOString().split('T')[0];
     actionSection = `<div class="action-section" style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.25)">
-      <div class="action-section-title" style="color:#b45309">🔄 Rework Dispatch — Fill Details &amp; Send Out <span class="action-badge" style="background:#b45309">ACTION REQUIRED</span></div>
+      <div class="action-section-title" style="color:#b45309"> Rework Dispatch — Fill Details &amp; Send Out <span class="action-badge" style="background:#b45309">ACTION REQUIRED</span></div>
       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">QC has failed these goods. Fill in the rework dispatch details and confirm sending them out. This will raise a JWC and move the request to Rework Pending.</p>
 
       ${sfJwcData.jwc_number ? `<div style="padding:10px 12px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);font-size:0.82rem;margin-bottom:12px">
-        <div style="font-weight:700;color:#dc2626;margin-bottom:4px">📄 JWC Prefilled by QC — JWC ${sfJwcData.jwc_number}</div>
+        <div style="font-weight:700;color:#dc2626;margin-bottom:4px"> JWC Prefilled by QC — JWC ${sfJwcData.jwc_number}</div>
         ${sfJwcData.rework_vendor ? `<div>Suggested Rework Vendor: <strong>${sfJwcData.rework_vendor}</strong></div>` : ''}
         ${sfJwcData.process ? `<div>Process: <strong>${sfJwcData.process}</strong></div>` : ''}
       </div>` : ''}
@@ -289,7 +289,7 @@ function renderModal() {
         </div>
       </div>
 
-      <button class="btn btn-primary" style="background:#b45309;border-color:#b45309" onclick="submitReworkDispatch()">📦 Confirm Goods Dispatched for Rework →</button>
+      <button class="btn btn-primary" style="background:#b45309;border-color:#b45309" onclick="submitReworkDispatch()"> Confirm Goods Dispatched for Rework →</button>
     </div>`;
   }
 
@@ -297,7 +297,7 @@ function renderModal() {
   if (pr.phase==='rework_pending') {
     const jwcData = pr.qc_criteria?.jwc || {};
     actionSection = `<div class="action-section" style="background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius);padding:14px">
-      <div class="action-section-title" style="color:#dc2626">🔄 Rework Out — Awaiting Return <span class="rework-badge">JWC RAISED</span></div>
+      <div class="action-section-title" style="color:#dc2626"> Rework Out — Awaiting Return <span class="rework-badge">JWC RAISED</span></div>
       ${jwcData.jwc_number?`<div style="margin:10px 0;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.82rem">
         <div style="font-weight:600;margin-bottom:4px">JWC Details</div>
         <div>JWC No: <strong>${jwcData.jwc_number}</strong></div>
@@ -307,7 +307,7 @@ function renderModal() {
       </div>`:''}
       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Once reworked goods are returned from vendor, mark them received to send back for QC re-inspection.</p>
       <textarea class="form-control" id="reworkReturnNotes" rows="2" placeholder="Rework return notes / condition..." style="font-size:0.82rem;margin-bottom:10px"></textarea>
-      <button class="btn btn-primary" onclick="markReworkReturned()">📦 Reworked Goods Returned — Send for Re-QC →</button>
+      <button class="btn btn-primary" onclick="markReworkReturned()"> Reworked Goods Returned — Send for Re-QC →</button>
     </div>`;
   }
 
@@ -315,7 +315,7 @@ function renderModal() {
   if (pr.phase==='rework2_pending') {
     const jwcData2 = pr.qc_criteria?.jwc2 || pr.qc_criteria?.jwc || {};
     actionSection = `<div class="action-section" style="background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius);padding:14px">
-      <div class="action-section-title" style="color:#dc2626">🔄 2nd Rework Out — Awaiting Return <span class="rework-badge">2ND REWORK JWC</span></div>
+      <div class="action-section-title" style="color:#dc2626"> 2nd Rework Out — Awaiting Return <span class="rework-badge">2ND REWORK JWC</span></div>
       ${jwcData2.jwc_number?`<div style="margin:10px 0;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.82rem">
         <div style="font-weight:600;margin-bottom:4px">2nd Rework JWC Details</div>
         <div>JWC No: <strong>${jwcData2.jwc_number}</strong></div>
@@ -325,18 +325,18 @@ function renderModal() {
       </div>`:''}
       <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Once reworked goods are returned, mark them received for final QC re-inspection.</p>
       <textarea class="form-control" id="rework2ReturnNotes" rows="2" placeholder="2nd rework return notes / condition..." style="font-size:0.82rem;margin-bottom:10px"></textarea>
-      <button class="btn btn-primary" onclick="markRework2Returned()">📦 2nd Rework Goods Returned — Send for Re-QC →</button>
+      <button class="btn btn-primary" onclick="markRework2Returned()"> 2nd Rework Goods Returned — Send for Re-QC →</button>
     </div>`;
   }
 
   // ── QC PENDING / PASSED / REWORK RETURNED: read-only ──
   if (['qc_pending','qc_passed','accepted','rework_returned','rework2_returned','qc_deviated','deviation_approval'].includes(pr.phase)) {
     const msgs = {
-      qc_passed:        '✅ QC Passed',
-      accepted:         '✅ Closed',
-      qc_pending:       '🔍 QC Inspection in Progress',
-      rework_returned:  '🔄 Reworked Goods Returned — Awaiting QC Re-inspection',
-      rework2_returned: '🔄 2nd Rework Returned — Awaiting Final QC',
+      qc_passed:        ' QC Passed',
+      accepted:         ' Closed',
+      qc_pending:       ' QC Inspection in Progress',
+      rework_returned:  ' Reworked Goods Returned — Awaiting QC Re-inspection',
+      rework2_returned: ' 2nd Rework Returned — Awaiting Final QC',
       qc_deviated:      '↗ QC Deviated — Pending Review',
       deviation_approval:'↗ Deviation Under Review'
     };
@@ -368,7 +368,7 @@ function renderModal() {
     const bg = bgColors[pr.phase] || 'transparent';
     const border = borderColors[pr.phase] ? `border:1px solid ${borderColors[pr.phase]}` : '';
     actionSection = `<div class="action-section" style="background:${bg};${border};border-radius:var(--radius);padding:14px">
-      <div class="action-section-title" style="${titleColor}">${msgs[pr.phase] || '🔍 QC In Progress'}</div>
+      <div class="action-section-title" style="${titleColor}">${msgs[pr.phase] || ' QC In Progress'}</div>
       ${pr.phase === 'rework_returned'
         ? '<p style="font-size:0.82rem;color:var(--gray-3)">Goods have been returned from rework. The QC Inspector will perform re-inspection.</p>'
         : '<p style="font-size:0.82rem;color:var(--gray-3)">GRN submitted. QC Inspector is performing quality check.</p>'
@@ -442,7 +442,7 @@ async function submitGRN() {
   showLoader(false);
   if (error) { showToast('Error: '+error.message,'error'); return; }
   notifyPhaseChange(currentPR.id,'qc_pending',currentUser?.id);
-  await window.postComment(currentPR.id, currentUser?.id, `📦 GRN completed (${grnNumber}) — sent to QC Inspector.`);
+  await window.postComment(currentPR.id, currentUser?.id, ` GRN completed (${grnNumber}) — sent to QC Inspector.`);
   showToast('GRN submitted — QC Inspector notified!','success');
   closeModal('prModal'); await loadRequests();
 }
@@ -485,7 +485,7 @@ async function submitReworkDispatch() {
 
   notifyPhaseChange(currentPR.id,'rework_pending',currentUser?.id);
   await window.postComment(currentPR.id, currentUser?.id,
-    `🔄 Goods dispatched for rework to ${vendor}. Expected return: ${days} days. Vehicle: ${vehicle||'—'}.${notes?' Notes: '+notes:''}`
+    ` Goods dispatched for rework to ${vendor}. Expected return: ${days} days. Vehicle: ${vehicle||'—'}.${notes?' Notes: '+notes:''}`
   );
   showToast('Goods dispatched for rework — QC notified!','success');
   closeModal('prModal'); await loadRequests();
@@ -503,7 +503,7 @@ async function markReworkReturned() {
   showLoader(false);
   if (error) { showToast('Error: '+error.message,'error'); return; }
   notifyPhaseChange(currentPR.id,'rework_returned',currentUser?.id);
-  await window.postComment(currentPR.id, currentUser?.id, `🔄 Reworked goods returned to store — QC Inspector notified for re-inspection. ${notes}`);
+  await window.postComment(currentPR.id, currentUser?.id, ` Reworked goods returned to store — QC Inspector notified for re-inspection. ${notes}`);
   showToast('Rework returned — QC Inspector notified for re-inspection!','success');
   closeModal('prModal'); await loadRequests();
 }
@@ -520,7 +520,7 @@ async function markRework2Returned() {
   showLoader(false);
   if (error) { showToast('Error: '+error.message,'error'); return; }
   notifyPhaseChange(currentPR.id,'rework2_returned',currentUser?.id);
-  await window.postComment(currentPR.id, currentUser?.id, `🔄 2nd rework goods returned to store — QC Inspector notified for final re-inspection. ${notes}`);
+  await window.postComment(currentPR.id, currentUser?.id, ` 2nd rework goods returned to store — QC Inspector notified for final re-inspection. ${notes}`);
   showToast('2nd Rework returned — QC Inspector notified!','success');
   closeModal('prModal'); await loadRequests();
 }
