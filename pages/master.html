@@ -761,6 +761,13 @@ async function viewPR(id) {
     pr.assigned_vendor_id?db.from('vendors').select('name').eq('id',pr.assigned_vendor_id).single():Promise.resolve({data:null}),
     db.from('pr_attachments').select('*').eq('pr_id',id).order('created_at')
   ]);
+  let splitSibling = null;
+  if (pr.split_group_id) {
+    const { data: sib } = await db.from('procurement_requests')
+      .select('id,request_number,phase').eq('split_group_id', pr.split_group_id)
+      .neq('id', pr.id).limit(1).maybeSingle();
+    splitSibling = sib || null;
+  }
   const attachments = attRes.data || [];
   showLoader(false);
   const attachmentsHTML = attachments.length ? `
@@ -789,7 +796,7 @@ async function viewPR(id) {
       <button class="btn btn-primary btn-sm" onclick="saveOverride('${pr.id}')">Save Reassignment</button>
     </div>`;
   document.getElementById('prDetailBody').innerHTML=
-    buildPRDetailHTML(pr,quotations,vd?.data?.name||'','',{clearanceManagerName:allUsers.find(u=>u.id===pr.initial_approver_id)?.name||'',currentUser})+
+    buildPRDetailHTML(pr,quotations,vd?.data?.name||'','',{clearanceManagerName:allUsers.find(u=>u.id===pr.initial_approver_id)?.name||'',currentUser,splitSibling,onOpenSplitSibling:'viewPR'})+
     reassignHTML+
     attachmentsHTML+
     `<div style="margin-top:24px;border-top:1.5px solid var(--border);padding-top:18px">
@@ -920,6 +927,13 @@ async function openDirectorModal(prId, isOverride = false) {
   directorQuotations = quotations || [];
   const existingSelectedQ = directorQuotations.find(q => q.is_selected) || directorQuotations.find(q => q.id === directorCurrentPR.selected_quotation_id);
   directorSelectedQuotationId = existingSelectedQ?.id || null;
+  let directorSplitSibling = null;
+  if (directorCurrentPR.split_group_id) {
+    const { data: sib } = await db.from('procurement_requests')
+      .select('id,request_number,phase').eq('split_group_id', directorCurrentPR.split_group_id)
+      .neq('id', directorCurrentPR.id).limit(1).maybeSingle();
+    directorSplitSibling = sib || null;
+  }
   showLoader(false);
   const directorClearanceManagerName = allUsers.find(u=>u.id===directorCurrentPR.initial_approver_id)?.name||'';
 
@@ -932,7 +946,7 @@ async function openDirectorModal(prId, isOverride = false) {
     const devAtts = directorCurrentPR.qc_criteria?.qc_attachments || [];
     document.getElementById('modalTitle').textContent = `QC Deviation Review — PR-${String(directorCurrentPR.request_number).padStart(4,'0')}`;
     document.getElementById('modalBody').innerHTML = `
-      <div style="margin-bottom:16px">${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {clearanceManagerName:directorClearanceManagerName})}</div>
+      <div style="margin-bottom:16px">${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {clearanceManagerName:directorClearanceManagerName,splitSibling:directorSplitSibling,onOpenSplitSibling:'openDirectorModal'})}</div>
       <div class="action-section" style="border-color:#7c3aed;background:rgba(124,58,237,0.04)">
         <div class="action-section-title" style="color:#7c3aed">↗ QC Deviation — Director Review <span class="action-badge" style="background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35">ACTION REQUIRED</span></div>
         <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:10px">The <strong>QC Inspector (${qcInspector})</strong> has deviated this QC request to you for review.</p>
@@ -967,7 +981,7 @@ async function openDirectorModal(prId, isOverride = false) {
   document.getElementById('modalTitle').textContent = `Director Review — ${prLabel}`;
   document.getElementById('modalBody').innerHTML = `
     <div style="margin-bottom:16px">
-      ${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {clearanceManagerName:directorClearanceManagerName})}
+      ${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {clearanceManagerName:directorClearanceManagerName,splitSibling:directorSplitSibling,onOpenSplitSibling:'openDirectorModal'})}
     </div>
     <div class="action-section" style="border-color:#7c3aed33;background:rgba(124,58,237,0.04)">
       ${headerLabel}

@@ -83,6 +83,7 @@ const PHASES = {
   advance_raised_to_accounts:   { label: 'Advance Raised',           color: '#f59e0b', icon: 'upload' },
   advance_payment_received:     { label: 'Advance Received',         color: '#22c55e', icon: 'creditcard' },
   qc_passed:                    { label: 'QC Passed',                color: '#22c55e', icon: 'check' },
+  closed_full_advance:          { label: 'Closed — Advance Settled', color: '#22c55e', icon: 'check-circle' },
   payment_requested:            { label: 'Payment Requested',        color: '#8b5cf6', icon: 'creditcard' },
   payment_raised_to_accounts:   { label: 'Payment Raised',           color: '#8b5cf6', icon: 'upload' },
   payment_received:             { label: 'Payment Received',         color: '#22c55e', icon: 'check-circle' },
@@ -110,6 +111,7 @@ const CLOSED_PHASES = new Set([
   'payment_received',
   'lp_rejected',
   'vendor_info_received',
+  'closed_full_advance',
 ]);
 
 // ── PIPELINE DEFINITIONS ─────────────────────────────────────
@@ -141,10 +143,11 @@ const PIPELINES = {
       'qc_deviated',
       'deviation_approval',
       'qc_passed',
+      'closed_full_advance',
       'payment_raised_to_accounts',
       'accepted',
     ],
-    terminal: ['accepted', 'rejected', 'declined', 'qc_rejected'],
+    terminal: ['accepted', 'rejected', 'declined', 'qc_rejected', 'closed_full_advance'],
   },
   local_purchase: {
     label: 'Local Purchase',
@@ -212,6 +215,7 @@ const PIPELINE_WF_STEPS = {
     {key:'qc_deviated',label:'Deviated',optional:true},
     {key:'deviation_approval',label:'Deviation Review',optional:true},
     {key:'qc_passed',label:'QC Passed'},
+    {key:'closed_full_advance',label:'Closed (Advance)',optional:true},
     {key:'payment_raised_to_accounts',label:'Pay. Raised'},
     {key:'accepted',label:'Complete'}
   ],
@@ -276,6 +280,7 @@ const PHASE_ORDER = [
   'order_placed',
   'grn_pending',
   'qc_passed',
+  'closed_full_advance',
   'payment_raised_to_accounts',
   'payment_received',
   'accepted',
@@ -326,7 +331,7 @@ function starRating(rating, count) {
 // growing Storage-URL arrays, and are only ever read off a single fetched
 // PR in detail modals, never off list rows. Use select('*') only for
 // single-PR detail queries (.eq('id', id).single()).
-const PR_LIST_COLUMNS = 'id,request_number,request_category,department,order_type,project_name,project_phase,project_manager_name,team_member_name,assigned_pm_id,vendor_suggestion,assigned_vendor_id,selected_quotation_id,sourcing,description,product_link,parts,phase,initial_pm_approval,approval_path,client_approval_notes,pm_final_approval_status,pm_final_approval_notes,rejection_reason,needs_more_vendors,vendor_info_details,is_modification,parent_request_id,modification_note,order_notes,advance_option,qc_result,qc_notes,qc_criteria,phase_timestamps,created_by,created_at,updated_at,urgency,lp_bill_name,deviation_target_id,deviation_approval_status,is_closed,closed_at,item_note,request_for,discipline,initial_approver_id,is_on_hold,hold_reason,hold_started_at,total_hold_seconds';
+const PR_LIST_COLUMNS = 'id,request_number,request_category,department,order_type,project_name,project_phase,project_manager_name,team_member_name,assigned_pm_id,vendor_suggestion,assigned_vendor_id,selected_quotation_id,sourcing,description,product_link,parts,phase,initial_pm_approval,approval_path,client_approval_notes,pm_final_approval_status,pm_final_approval_notes,rejection_reason,needs_more_vendors,vendor_info_details,is_modification,parent_request_id,modification_note,order_notes,advance_option,qc_result,qc_notes,qc_criteria,phase_timestamps,created_by,created_at,updated_at,urgency,lp_bill_name,deviation_target_id,deviation_approval_status,is_closed,closed_at,item_note,request_for,discipline,initial_approver_id,is_on_hold,hold_reason,hold_started_at,total_hold_seconds,split_group_id';
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {

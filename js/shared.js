@@ -930,6 +930,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       <div class="detail-item"><div class="detail-key">Request #</div>
         <div class="detail-value"><span class="pr-number${pr.is_modification?' modified':''}">PR-${String(pr.request_number).padStart(4,'0')}</span>
         ${pr.is_modification?`<span class="mod-badge" style="margin-left:6px">↺ Modified</span>`:''}
+        ${pr.split_group_id?`<span class="mod-badge" style="margin-left:6px;background:#6366f114;color:#6366f1;border-color:#6366f130">⑂ Split Order</span>`:''}
         </div></div>
       <div class="detail-item"><div class="detail-key">Category</div><div class="detail-value">${pr.request_category==='vendor_info'?'Vendor Info Request':'RFQ'}</div></div>
       <div class="detail-item"><div class="detail-key">Project</div><div class="detail-value">${pr.project_name}</div></div>
@@ -965,6 +966,10 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       <strong style="font-family:var(--font-mono);font-size:0.88rem">${calcLeadTimeDays(pr.created_at, pr.closed_at, pr.total_hold_seconds, pr.is_on_hold, pr.hold_started_at)} days${pr.closed_at ? ' (final)' : pr.is_on_hold ? ' (paused)' : ''}</strong>
       <span style="font-size:0.75rem;color:var(--gray-4)">(from ${fmtDate(pr.created_at)}${pr.closed_at ? ' to ' + fmtDate(pr.closed_at) : ' to today'})</span>
     </div>
+    ${extras.splitSibling?`<div style="margin-top:12px;padding:10px 14px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div style="font-size:0.8rem;color:#4338ca"><strong>⑂ Split order</strong> — this request shares its BOM with <strong>PR-${String(extras.splitSibling.request_number).padStart(4,'0')}</strong>, tracked and closed separately.</div>
+      ${extras.onOpenSplitSibling?`<button class="btn btn-ghost btn-sm" onclick="${extras.onOpenSplitSibling}('${extras.splitSibling.id}')">View Linked PR →</button>`:''}
+    </div>`:''}
     ${buildHoldBanner(pr)}
     ${extras.currentUser ? buildHoldControlHTML(pr, extras.currentUser) : ''}
     <div style="margin-top:16px">${renderWorkflowTrack(pr.phase, pr.phase_timestamps, pr.created_at, pr.request_category)}</div>
@@ -1136,12 +1141,19 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
 }
 
 // ── QUOTATION CARD ──────────────────────────────────────────
+// selectedId may be a single id (legacy, single-select pages) or an array of
+// up to 2 ids (split-order pages, e.g. pm.html's multi-accept flow).
 function renderQuotationCard(q, showSelectBtn=false, selectedId=null) {
-  const isSelected = q.id===selectedId||q.is_selected;
+  const selectedIds = Array.isArray(selectedId) ? selectedId : (selectedId ? [selectedId] : []);
+  const isSelected = selectedIds.includes(q.id) || q.is_selected;
+  const otherCount = selectedIds.filter(id=>id!==q.id).length;
   const isImg = q.file_type?.includes('image');
   const isPDF = q.file_type==='application/pdf'||q.file_name?.toLowerCase().includes('.pdf');
   const currency = q.currency||'AED';
   const fi = _regFile(q.file_url, q.file_name||'quotation');
+  // Button label: first pick = "Select as Final", second pick (split order,
+  // when one quote is already chosen) = "Also Accept (Split)".
+  const selectLabel = otherCount>0 ? '✓ Also Accept (Split)' : '✓ Select as Final';
   return `<div class="quotation-card ${isSelected?'selected':''}" id="qcard-${q.id}">
     <div class="quotation-card-header">
       <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
@@ -1151,7 +1163,7 @@ function renderQuotationCard(q, showSelectBtn=false, selectedId=null) {
           <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--gray-4)">${q.vendor_name||'—'} · ${fmtDate(q.created_at)}</div>
         </div>
       </div>
-      ${isSelected?`<span style="background:#22c55e14;color:#16a34a;border:1px solid #22c55e30;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-size:0.62rem;font-weight:600;white-space:nowrap">✓ SELECTED</span>`:''}
+      ${isSelected?`<span style="background:#22c55e14;color:#16a34a;border:1px solid #22c55e30;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-size:0.62rem;font-weight:600;white-space:nowrap">✓ SELECTED${otherCount>0?' (SPLIT)':''}</span>`:''}
     </div>
     <div class="quotation-card-body">
       ${q.amount?`<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:8px">
@@ -1162,8 +1174,8 @@ function renderQuotationCard(q, showSelectBtn=false, selectedId=null) {
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button class="btn btn-secondary btn-sm" onclick="_previewByIdx(${fi})">👁 Preview</button>
         <button class="btn btn-secondary btn-sm" onclick="_downloadByIdx(${fi})">⬇ Download</button>
-        ${showSelectBtn&&!isSelected?`<button class="btn btn-primary btn-sm" onclick="selectQuotation('${q.id}')">✓ Select as Final</button>`:''}
-        ${showSelectBtn&&isSelected?`<button class="btn btn-danger btn-sm" onclick="selectQuotation(null)">Deselect</button>`:''}
+        ${showSelectBtn&&!isSelected?`<button class="btn btn-primary btn-sm" onclick="selectQuotation('${q.id}')">${selectLabel}</button>`:''}
+        ${showSelectBtn&&isSelected?`<button class="btn btn-danger btn-sm" onclick="selectQuotation('${q.id}')">Deselect</button>`:''}
       </div>
     </div>
   </div>`;

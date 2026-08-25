@@ -970,7 +970,7 @@ function renderTable(reqs) {
     const typeLabel=r.request_category==='vendor_info'?'Vendor Info':r.request_category==='local_purchase'?'Local Purchase':'RFQ';
     const typeBg=r.request_category==='local_purchase'?'background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.35);color:#15803d':r.request_category==='vendor_info'?'background:rgba(139,92,246,0.08);border-color:rgba(139,92,246,0.3);color:#6d28d9':'background:var(--off-white);border-color:var(--border)';
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
-      <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
+      <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''}${r.split_group_id?'⑂ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
       <td><div style="font-weight:600;font-size:0.82rem">${r.project_name}</div><div style="font-size:0.72rem;color:var(--gray-4)">${r.project_phase||''}</div>${r.item_note?`<div style="font-size:0.7rem;color:var(--gray-3)"> ${r.item_note}</div>`:''}${activeTab==='onhold'&&r.hold_reason?`<div style="font-size:0.7rem;color:#b45309;margin-top:2px">⏸ ${escHtml(r.hold_reason)}</div>`:''}</td>
       <td><span style="font-size:0.72rem;padding:1px 7px;border-radius:3px;border:1px solid;${typeBg}">${typeLabel}</span></td>
       <td>${getPhaseBadge(r.phase)}${r.is_on_hold?' <span style="background:#f59e0b18;color:#b45309;border:1px solid #f59e0b35;border-radius:3px;font-size:0.6rem;font-family:var(--font-mono);font-weight:700;padding:1px 5px;vertical-align:middle">⏸ HOLD</span>':''}</td>
@@ -1185,6 +1185,13 @@ async function openPR(id) {
     getUserName(currentPR.initial_approver_id)
   ]);
   const existingPO = poRes.data || null;
+  let splitSibling = null;
+  if (currentPR.split_group_id) {
+    const { data: sib } = await db.from('procurement_requests')
+      .select('id,request_number,phase').eq('split_group_id', currentPR.split_group_id)
+      .neq('id', currentPR.id).limit(1).maybeSingle();
+    splitSibling = sib || null;
+  }
   // Normalize engineer's JSONB attachments (stored in procurement_requests.attachments)
   // into the same shape as pr_attachments table rows so they render identically
   const jsonbAttachments = (currentPR.attachments || []).map(a => ({
@@ -1502,14 +1509,38 @@ async function openPR(id) {
 
   // ── QC PASSED ──
   if(currentPR.phase==='qc_passed') {
-    actionSection=`<div class="action-section" style="background:rgba(22,163,74,0.04);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:14px">
-      <div class="action-section-title" style="color:#16a34a"> QC Passed — Raise Full Payment</div>
-      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">QC is complete. Raise the full payment via Smartsheet — attach the screenshot and Payment ID.</p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="openPaymentRequestModal('${id}')"> Raise Full Payment via Smartsheet</button>
-        ${currentPR.assigned_vendor_id?`<button class="btn btn-secondary" onclick="openRateModal('${currentPR.id}','${currentPR.assigned_vendor_id}')">⭐ Rate Vendor</button>`:''}
-      </div>
-    </div>`;
+    // A vendor on 100% advance terms (paid in full before/at ordering — e.g.
+    // Amazon-style portals) has nothing left to pay post-delivery. Skip the
+    // "Raise Full Payment" step entirely and let Procurement close it directly.
+    const vendorObj = vd?.data;
+    const isFullAdvance = vendorObj?.payment_terms === 'full_advance' || currentPR.advance_option === 'full_advance';
+    const advanceConfirmedReceived = advRes?.data?.status === 'payment_received';
+
+    if (isFullAdvance) {
+      actionSection = advanceConfirmedReceived
+        ? `<div class="action-section" style="background:rgba(22,163,74,0.04);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:14px">
+            <div class="action-section-title" style="color:#16a34a"> QC Passed — 100% Advance Already Settled</div>
+            <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">This vendor is on 100% advance terms and the advance payment was already confirmed received (${fmtDate(advRes.data.confirmed_at||advRes.data.created_at)}). There is no post-delivery payment to raise — close this request directly.</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-success" onclick="closeFullAdvancePR('${id}')"> Close Request — Advance Already Paid</button>
+              ${currentPR.assigned_vendor_id?`<button class="btn btn-secondary" onclick="openRateModal('${currentPR.id}','${currentPR.assigned_vendor_id}')">⭐ Rate Vendor</button>`:''}
+            </div>
+          </div>`
+        : `<div class="action-section" style="background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius);padding:14px">
+            <div class="action-section-title" style="color:#b45309"> QC Passed — 100% Advance Vendor, Payment Not Yet Confirmed</div>
+            <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">This vendor is on 100% advance terms, so there's no separate post-delivery payment step — but Accounts hasn't confirmed the advance as received yet. Raise/confirm the advance before closing.</p>
+            <div style="font-size:0.78rem;color:var(--gray-4)">Check the Advance Payment status above, or raise it via Smartsheet if it hasn't been sent yet.</div>
+          </div>`;
+    } else {
+      actionSection=`<div class="action-section" style="background:rgba(22,163,74,0.04);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:14px">
+        <div class="action-section-title" style="color:#16a34a"> QC Passed — Raise Full Payment</div>
+        <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">QC is complete. Raise the full payment via Smartsheet — attach the screenshot and Payment ID.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="openPaymentRequestModal('${id}')"> Raise Full Payment via Smartsheet</button>
+          ${currentPR.assigned_vendor_id?`<button class="btn btn-secondary" onclick="openRateModal('${currentPR.id}','${currentPR.assigned_vendor_id}')">⭐ Rate Vendor</button>`:''}
+        </div>
+      </div>`;
+    }
   }
 
   // ── PAYMENT RAISED TO ACCOUNTS: Procurement Manager marks received ──
@@ -1584,7 +1615,7 @@ async function openPR(id) {
 
   document.getElementById('prModalBody').innerHTML=
     `<div id="prDetailViewSection">`+
-    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',currentPR.project_manager_name||'',{poData:existingPO,advPayRec:advRes.data||null,payRec:payRes.data||null,clearanceManagerName,currentUser})
+    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',currentPR.project_manager_name||'',{poData:existingPO,advPayRec:advRes.data||null,payRec:payRes.data||null,clearanceManagerName,currentUser,splitSibling,onOpenSplitSibling:'openPR'})
     +`</div><div id="prDetailEditSection" style="display:none"></div>`
     +attachmentsSectionHTML
     +actionSection+
@@ -3222,6 +3253,33 @@ async function markAdvanceReceived(prId, advId) {
 }
 
 // ── PROCUREMENT MANAGER: MARK FULL PAYMENT RECEIVED & CLOSE PR ─
+// ── CLOSE PR DIRECTLY WHEN 100% ADVANCE ALREADY SETTLED ──────
+// For vendors on full-advance terms, payment happened before/at ordering,
+// so QC Passed goes straight to closed — no separate "raise/receive payment"
+// step, matching how pay-first portals (e.g. Amazon-style) work.
+async function closeFullAdvancePR(prId) {
+  if (!confirm('Close this request? The 100% advance already covers the full order — there is no further payment to raise.')) return;
+  showLoader(true);
+  const now = new Date().toISOString();
+  const ts = addPhaseTimestamp(currentPR, 'closed_full_advance');
+  const { error } = await db.from('procurement_requests').update({
+    phase: 'closed_full_advance',
+    closed_at: now,
+    is_closed: true,
+    updated_at: now,
+    phase_timestamps: ts
+  }).eq('id', prId);
+  if (!error) {
+    notifyPhaseChange(prId, 'closed_full_advance', currentUser?.id);
+    await window.postComment(prId, currentUser.id,
+      ' Request closed — 100% advance already covers full payment, no post-delivery payment due.');
+  }
+  showLoader(false);
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast(' Closed — advance already settled!', 'success');
+  closeModal('prModal'); await loadRequests();
+}
+
 async function markFullPaymentReceived(prId, payId) {
   const fileEl = document.getElementById('payReceivedFile');
   const note = document.getElementById('payReceivedNote')?.value?.trim() || null;
