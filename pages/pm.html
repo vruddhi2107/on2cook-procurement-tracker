@@ -261,8 +261,7 @@ function addPhaseTimestamp(pr, phaseName) {
 }
 let prQuotations=[];
 let pmSelectedQuotationId=null; // primary quote selected by PM during final approval (back-compat)
-let pmSelectedQuotationIds=[];  // up to 2 selections — a 2nd pick triggers split-order approval
-let pmSplitPartAllocation={};   // part index -> 0 (goes with quote #1) | 1 (goes with quote #2)
+let pmSelectedQuotationIds=[];  // up to 2 selections — a 2nd pick means both quotes are accepted
 
 function handleAttachmentDownload(e, url, fileName) {
   if (!url) return;
@@ -469,10 +468,9 @@ async function openPR(id) {
 
   // ── FINAL APPROVAL ──
   if(currentPR.phase==='pending_pm_final_approval') {
-    // PM selects the final quote(s) during approval — up to 2, for split orders
+    // PM selects the final quote(s) during approval — up to 2, when both are needed
     pmSelectedQuotationId = currentPR.selected_quotation_id || quotations.find(q=>q.is_selected)?.id || null;
     pmSelectedQuotationIds = pmSelectedQuotationId ? [pmSelectedQuotationId] : [];
-    pmSplitPartAllocation = {};
 
     const quotesHTML = quotations.length
       ? `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">${quotations.map(q=>renderQuotationCard(q,true,pmSelectedQuotationIds)).join('')}</div>`
@@ -480,7 +478,7 @@ async function openPR(id) {
 
     actionSection=`<div class="action-section">
       <div class="action-section-title"> Final Approval <span class="action-badge">ACTION REQUIRED</span></div>
-      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Select the final quotation below, then approve or reject. Amounts of <strong>₹5,000 or above</strong> will be automatically escalated to the Director. Selecting a <strong>2nd quotation</strong> splits this into two separately-tracked orders — one per vendor.</p>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Select the final quotation below, then approve or reject. Amounts of <strong>₹5,000 or above</strong> will be automatically escalated to the Director. If <strong>both quotes are needed</strong>, select a 2nd one too — both get accepted on this same request, and Procurement raises a separate PO for each.</p>
       <div class="detail-key" style="margin-bottom:8px">Select Final Quotation(s)</div>
       ${quotesHTML}
       <div id="splitAllocPanel">${renderSplitAllocationHTML()}</div>
@@ -755,9 +753,9 @@ async function rejectLPRequest() {
 }
 
 // ── PROJECT MANAGER QUOTE SELECTION ─────────────────────────
-// Supports selecting up to 2 quotations. A 2nd selection turns this into a
-// split-order approval: both quotes get accepted and the request is divided
-// into two separately-tracked orders (see renderSplitAllocationHTML below).
+// Supports selecting up to 2 quotations. A 2nd selection means "both are
+// needed" — both get accepted on the SAME request (one PO per vendor gets
+// generated later at order-placement; GRN/QC/payment stay combined).
 function selectQuotation(qId) {
   if (qId === null) {
     pmSelectedQuotationIds = [];
@@ -770,16 +768,6 @@ function selectQuotation(qId) {
       pmSelectedQuotationIds.push(qId);
     }
   }
-  if (pmSelectedQuotationIds.length !== 2) {
-    pmSplitPartAllocation = {};
-  } else if (Object.keys(pmSplitPartAllocation).length === 0 && currentPR?.parts?.length) {
-    // Default allocation: split the BOM roughly in half rather than dumping
-    // everything on vendor A — most split orders are 2 vendors covering
-    // genuinely separate parts, so an even starting point needs less
-    // re-clicking than an "all-A" default. The PM can reassign any line.
-    const half = Math.ceil(currentPR.parts.length / 2);
-    currentPR.parts.forEach((_, i) => { pmSplitPartAllocation[i] = i < half ? 0 : 1; });
-  }
   pmSelectedQuotationId = pmSelectedQuotationIds[0] || null; // primary, for back-compat
 
   prQuotations.forEach(q => {
@@ -790,44 +778,29 @@ function selectQuotation(qId) {
   if (panel) panel.innerHTML = renderSplitAllocationHTML();
 }
 
-// When 2 quotations are selected, every part on the BOM must be assigned to
-// whichever vendor is fulfilling it — this becomes each split order's own parts list.
-// Each side's quoted amount (as uploaded) is what's checked against the
-// ₹5,000 director-escalation threshold — not a pro-rated share of the total,
-// since a vendor's quote is for whatever they're actually supplying.
+// When 2 quotations are selected, show both amounts and whether either side
+// trips the ₹5,000 director-escalation threshold (checked on the combined
+// total, since it's one request/one approval decision either way).
 function renderSplitAllocationHTML() {
-  if (pmSelectedQuotationIds.length !== 2 || !currentPR?.parts?.length) return '';
+  if (pmSelectedQuotationIds.length !== 2) return '';
   const qA = prQuotations.find(q => q.id === pmSelectedQuotationIds[0]);
   const qB = prQuotations.find(q => q.id === pmSelectedQuotationIds[1]);
   const nameA = qA?.vendor_name || 'Quote 1';
   const nameB = qB?.vendor_name || 'Quote 2';
-  const rows = currentPR.parts.map((p, i) => {
-    const goesToB = pmSplitPartAllocation[i] === 1;
-    return `<tr>
-      <td style="font-size:0.8rem;padding:4px 6px">${p.name||'—'} <span style="color:var(--gray-4);font-family:var(--font-mono)">×${p.qty||0}</span></td>
-      <td style="text-align:right;white-space:nowrap;padding:4px 6px">
-        <label style="margin-right:14px;font-size:0.76rem;cursor:pointer"><input type="radio" name="splitPart${i}" ${!goesToB?'checked':''} onchange="setSplitPartAllocation(${i},0)"/> ${nameA}</label>
-        <label style="font-size:0.76rem;cursor:pointer"><input type="radio" name="splitPart${i}" ${goesToB?'checked':''} onchange="setSplitPartAllocation(${i},1)"/> ${nameB}</label>
-      </td>
-    </tr>`;
-  }).join('');
   const { inr: inrA } = computeINRAmount(qA);
   const { inr: inrB } = computeINRAmount(qB);
-  const sideBadge = (name, inr) => {
-    const escalates = inr >= PM_APPROVAL_LIMIT;
-    return `<span style="font-size:0.72rem;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-weight:600;${escalates?'background:#7c3aed14;color:#7c3aed;border:1px solid #7c3aed30':'background:#22c55e14;color:#16a34a;border:1px solid #22c55e30'}">${name}: ₹${Math.round(inr).toLocaleString('en-IN')}${escalates?' → Director':''}</span>`;
-  };
+  const combined = inrA + inrB;
+  const escalates = combined >= PM_APPROVAL_LIMIT;
   return `<div style="margin-bottom:14px;padding:12px 14px;background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius)">
-    <div class="detail-key" style="color:#4338ca;margin-bottom:6px">⑂ Split Order — Assign Each Part to a Vendor</div>
-    <p style="font-size:0.75rem;color:var(--gray-3);margin-bottom:8px">Both quotations will be approved. Assign every part below to whichever vendor is fulfilling it — this becomes two separate requests (PO, QC, payment each tracked independently), linked to each other for reference. Each side is checked against the ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')} director-escalation threshold on its own quoted amount.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${sideBadge(nameA,inrA)}${sideBadge(nameB,inrB)}</div>
-    <table style="width:100%;border-collapse:collapse"><tbody>${rows}</tbody></table>
+    <div class="detail-key" style="color:#4338ca;margin-bottom:6px">⑂ Both Quotes Needed</div>
+    <p style="font-size:0.75rem;color:var(--gray-3);margin-bottom:8px">Both quotations will be accepted on this one request. At order placement, Procurement generates a separate PO for each vendor — GRN, QC and payment stay tracked together for the whole request.</p>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px">
+      <div><div style="font-size:0.7rem;color:var(--gray-4)">${nameA}</div><div style="font-weight:700;font-family:var(--font-mono)">₹${Math.round(inrA).toLocaleString('en-IN')}</div></div>
+      <div><div style="font-size:0.7rem;color:var(--gray-4)">${nameB}</div><div style="font-weight:700;font-family:var(--font-mono)">₹${Math.round(inrB).toLocaleString('en-IN')}</div></div>
+      <div><div style="font-size:0.7rem;color:var(--gray-4)">Combined</div><div style="font-weight:700;font-family:var(--font-mono)">₹${Math.round(combined).toLocaleString('en-IN')}</div></div>
+    </div>
+    <span style="font-size:0.72rem;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-weight:600;${escalates?'background:#7c3aed14;color:#7c3aed;border:1px solid #7c3aed30':'background:#22c55e14;color:#16a34a;border:1px solid #22c55e30'}">${escalates?'→ Escalates to Director (combined ≥ ₹'+PM_APPROVAL_LIMIT.toLocaleString('en-IN')+')':'Within PM approval limit'}</span>
   </div>`;
-}
-function setSplitPartAllocation(i, group) {
-  pmSplitPartAllocation[i] = group;
-  const panel = document.getElementById('splitAllocPanel');
-  if (panel) panel.innerHTML = renderSplitAllocationHTML();
 }
 
 // ── APPROVAL THRESHOLD ─────────────────────────────────────
@@ -860,9 +833,9 @@ async function finalDecision(decision) {
     needsMoreVendors=ra==='more_vendors';
   }
 
-  // Two quotations selected on approval = split order (2 vendors, tracked separately)
+  // Two quotations selected on approval = both are needed (2 vendors, 1 request)
   if (decision==='approved' && pmSelectedQuotationIds.length===2) {
-    await finalDecisionSplit(notes);
+    await finalDecisionMultiAccept(notes);
     return;
   }
 
@@ -939,107 +912,47 @@ async function finalDecision(decision) {
   closeModal('prModal'); await loadRequests();
 }
 
-// ── SPLIT-ORDER APPROVAL: 2 quotations accepted, request divides into two
-// separately-tracked requests (own PO / QC / payment lifecycle each),
-// linked via split_group_id for cross-reference in the UI.
-async function finalDecisionSplit(notes) {
+// ── MULTI-ACCEPT APPROVAL: both quotations accepted, one request. Each
+// vendor gets its own PO at order-placement time; GRN/QC/payment stay
+// combined for the whole request (see procurement.html buildApprovedPhaseHTML).
+async function finalDecisionMultiAccept(notes) {
   const [idA, idB] = pmSelectedQuotationIds;
   const quoteA = prQuotations.find(q=>q.id===idA);
   const quoteB = prQuotations.find(q=>q.id===idB);
   if (!quoteA || !quoteB) { showToast('Could not find both selected quotations','error'); return; }
 
-  const parts = currentPR.parts || [];
-  const partsA = parts.filter((_,i)=>pmSplitPartAllocation[i]!==1);
-  const partsB = parts.filter((_,i)=>pmSplitPartAllocation[i]===1);
-  if (!partsB.length) { showToast('Assign at least one part to the second vendor to split the order','error'); return; }
-  if (!partsA.length) { showToast('At least one part must stay with the first vendor','error'); return; }
-
   showLoader(true);
 
-  const { amt:amtA, inr:inrA } = computeINRAmount(quoteA);
-  const { amt:amtB, inr:inrB } = computeINRAmount(quoteB);
-  const phaseA = inrA >= PM_APPROVAL_LIMIT ? 'pending_sandy_approval' : 'approved';
-  const phaseB = inrB >= PM_APPROVAL_LIMIT ? 'pending_sandy_approval' : 'approved';
-  const splitGroupId = (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(36).slice(2)));
+  const { inr: inrA } = computeINRAmount(quoteA);
+  const { inr: inrB } = computeINRAmount(quoteB);
+  const combinedINR = inrA + inrB;
+  const newPhase = combinedINR >= PM_APPROVAL_LIMIT ? 'pending_sandy_approval' : 'approved';
   const now = new Date().toISOString();
 
-  // Quote A + allocated parts stay on the original PR
   await db.from('pr_quotations').update({is_selected:false}).eq('pr_id',currentPR.id);
-  await db.from('pr_quotations').update({is_selected:true}).eq('id',idA);
-  const { error: errA } = await db.from('procurement_requests').update({
-    phase: phaseA,
-    is_closed: CLOSED_PHASES.has(phaseA),
-    pm_final_approval_status: phaseA==='pending_sandy_approval' ? 'pending' : 'approved',
+  await db.from('pr_quotations').update({is_selected:true}).in('id',[idA,idB]);
+
+  const { error } = await db.from('procurement_requests').update({
+    phase: newPhase,
+    is_closed: CLOSED_PHASES.has(newPhase),
+    pm_final_approval_status: newPhase==='pending_sandy_approval' ? 'pending' : 'approved',
     pm_final_approval_notes: notes,
-    selected_quotation_id: idA,
-    assigned_vendor_id: quoteA.vendor_id || currentPR.assigned_vendor_id,
-    parts: partsA,
-    split_group_id: splitGroupId,
+    selected_quotation_id: idA, // primary, for anything reading a single quote
     updated_at: now,
-    phase_timestamps: addPhaseTimestamp(currentPR, phaseA)
+    phase_timestamps: addPhaseTimestamp(currentPR, newPhase)
   }).eq('id', currentPR.id);
 
-  // Quote B + its allocated parts become a new, independently-tracked PR.
-  // pr_quotations rows are scoped to one pr_id, so clone quote B's row
-  // rather than pointing the new PR at the original request's quotation.
-  const { data: cloneQ, error: cloneQErr } = await db.from('pr_quotations').insert({
-    vendor_id: quoteB.vendor_id, vendor_name: quoteB.vendor_name,
-    file_name: quoteB.file_name, file_url: quoteB.file_url, file_type: quoteB.file_type,
-    amount: quoteB.amount, currency: quoteB.currency, lead_time_days: quoteB.lead_time_days,
-    notes: quoteB.notes, is_selected: true, uploaded_by: quoteB.uploaded_by,
-    fx_rate: quoteB.fx_rate, inr_amount: quoteB.inr_amount
-  }).select().single();
-
-  if (errA || cloneQErr || !cloneQ) {
-    showLoader(false);
-    showToast('Error splitting order: '+(errA?.message||cloneQErr?.message||'unknown error'),'error');
-    return;
-  }
-
-  const { data: newPR, error: errB } = await db.from('procurement_requests').insert({
-    request_category: currentPR.request_category,
-    department: currentPR.department,
-    order_type: currentPR.order_type,
-    project_name: currentPR.project_name,
-    project_phase: currentPR.project_phase,
-    project_manager_name: currentPR.project_manager_name,
-    team_member_name: currentPR.team_member_name,
-    assigned_pm_id: currentPR.assigned_pm_id,
-    assigned_vendor_id: quoteB.vendor_id,
-    selected_quotation_id: cloneQ.id,
-    sourcing: currentPR.sourcing,
-    description: currentPR.description,
-    product_link: currentPR.product_link,
-    parts: partsB,
-    phase: phaseB,
-    pm_final_approval_status: phaseB==='pending_sandy_approval' ? 'pending' : 'approved',
-    pm_final_approval_notes: notes,
-    urgency: currentPR.urgency,
-    request_for: currentPR.request_for,
-    discipline: currentPR.discipline,
-    item_note: currentPR.item_note,
-    split_group_id: splitGroupId,
-    is_closed: CLOSED_PHASES.has(phaseB),
-    created_by: currentUser.id,
-    phase_timestamps: addPhaseTimestamp(null, phaseB)
-  }).select().single();
-
-  if (errB || !newPR) {
-    showLoader(false);
-    showToast('Original request updated, but creating the split request failed: '+(errB?.message||'unknown error'),'error');
-    return;
-  }
-  await db.from('pr_quotations').update({pr_id:newPR.id}).eq('id',cloneQ.id);
-
-  notifyPhaseChange(currentPR.id, phaseA, currentUser?.id);
-  notifyPhaseChange(newPR.id, phaseB, currentUser?.id);
-  await postComment(currentPR.id, currentUser.id,
-    ` Project Manager approved as a split order alongside PR-${String(newPR.request_number).padStart(4,'0')} (${quoteB.vendor_name||'2nd vendor'}). ${notes}`);
-  await postComment(newPR.id, currentUser.id,
-    ` Split from PR-${String(currentPR.request_number).padStart(4,'0')} — ${quoteA.vendor_name||'1st vendor'} handles the remaining parts. ${notes}`);
-
   showLoader(false);
-  showToast(' Approved as a split order — 2 requests now tracked separately.','success');
+  if (error) { showToast('Error: '+error.message,'error'); return; }
+
+  notifyPhaseChange(currentPR.id, newPhase, currentUser?.id);
+  await postComment(currentPR.id, currentUser.id,
+    ` Project Manager accepted both quotations — ${quoteA.vendor_name||'Vendor 1'} and ${quoteB.vendor_name||'Vendor 2'}. Procurement will raise a separate PO for each. ${notes}`);
+
+  if (newPhase==='pending_sandy_approval')
+    showToast(`⬆ Combined amount ₹${Math.round(combinedINR).toLocaleString('en-IN')} meets/exceeds ₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')} — escalated to Director.`,'info');
+  else
+    showToast(' Both quotes accepted — Procurement may now place both orders.','success');
   closeModal('prModal'); await loadRequests();
 }
 

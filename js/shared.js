@@ -1152,8 +1152,8 @@ function renderQuotationCard(q, showSelectBtn=false, selectedId=null) {
   const currency = q.currency||'AED';
   const fi = _regFile(q.file_url, q.file_name||'quotation');
   // Button label: first pick = "Select as Final", second pick (split order,
-  // when one quote is already chosen) = "Also Accept (Split)".
-  const selectLabel = otherCount>0 ? '✓ Also Accept (Split)' : '✓ Select as Final';
+  // when one quote is already chosen) = "Also Accept (Both Needed)".
+  const selectLabel = otherCount>0 ? '✓ Also Accept (Both Needed)' : '✓ Select as Final';
   return `<div class="quotation-card ${isSelected?'selected':''}" id="qcard-${q.id}">
     <div class="quotation-card-header">
       <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
@@ -1163,7 +1163,7 @@ function renderQuotationCard(q, showSelectBtn=false, selectedId=null) {
           <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--gray-4)">${q.vendor_name||'—'} · ${fmtDate(q.created_at)}</div>
         </div>
       </div>
-      ${isSelected?`<span style="background:#22c55e14;color:#16a34a;border:1px solid #22c55e30;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-size:0.62rem;font-weight:600;white-space:nowrap">✓ SELECTED${otherCount>0?' (SPLIT)':''}</span>`:''}
+      ${isSelected?`<span style="background:#22c55e14;color:#16a34a;border:1px solid #22c55e30;padding:2px 8px;border-radius:3px;font-family:var(--font-mono);font-size:0.62rem;font-weight:600;white-space:nowrap">✓ SELECTED${otherCount>0?' (BOTH)':''}</span>`:''}
     </div>
     <div class="quotation-card-body">
       ${q.amount?`<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:8px">

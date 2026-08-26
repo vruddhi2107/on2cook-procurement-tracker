@@ -1178,13 +1178,15 @@ async function openPR(id) {
     loadComments(id),
     db.from('pr_quotations').select('*').eq('pr_id',id).order('created_at').then(r=>r.data||[]),
     currentPR.assigned_vendor_id?db.from('vendors').select('*').eq('id',currentPR.assigned_vendor_id).single():Promise.resolve({data:null}),
-    db.from('purchase_orders').select('*').eq('pr_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
+    db.from('purchase_orders').select('*').eq('pr_id',id).order('created_at',{ascending:false}),
     db.from('pr_attachments').select('*').eq('pr_id',id).order('created_at'),
     db.from('advance_payment_requests').select('*').eq('pr_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
     db.from('payment_requests').select('*').eq('pr_id',id).order('request_date',{ascending:false}).limit(1).maybeSingle(),
     getUserName(currentPR.initial_approver_id)
   ]);
-  const existingPO = poRes.data || null;
+  const allPOs = poRes.data || [];
+  const existingPO = allPOs[0] || null; // most recent — used wherever a single PO is expected
+  const acceptedQuotes = quotations.filter(q=>q.is_selected); // 1 normally, 2 when both were accepted
   let splitSibling = null;
   if (currentPR.split_group_id) {
     const { data: sib } = await db.from('procurement_requests')
@@ -1400,7 +1402,7 @@ async function openPR(id) {
     const vendorObj = vd?.data;
     const pt = PAYMENT_TERMS_OPTIONS.find(p=>p.value===vendorObj?.payment_terms);
     // Also fetch advRec for advance_requested
-    actionSection = buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO);
+    actionSection = buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO, acceptedQuotes, allPOs);
   }
 
   // ── ADVANCE RAISED TO ACCOUNTS: Procurement Manager marks received ──
@@ -2258,14 +2260,14 @@ async function submitAdvanceViaSmartsheet() {
 async function placeOrder() {
   if (!currentPR) return;
 
-  const { data: poCheck } = await db.from('purchase_orders')
-    .select('id,po_number')
-    .eq('pr_id', currentPR.id)
-    .limit(1)
-    .maybeSingle();
+  const [{ data: allPOsCheck }, { data: acceptedQuotesCheck }] = await Promise.all([
+    db.from('purchase_orders').select('id,po_number,quotation_id').eq('pr_id', currentPR.id),
+    db.from('pr_quotations').select('id').eq('pr_id', currentPR.id).eq('is_selected', true)
+  ]);
 
-  if (!poCheck) {
-    showToast('Please generate and save the Purchase Order (Step 1) before confirming the order.', 'error');
+  const neededCount = acceptedQuotesCheck?.length || 1;
+  if (!allPOsCheck || allPOsCheck.length < neededCount) {
+    showToast(`Please generate ${neededCount > 1 ? 'both Purchase Orders' : 'the Purchase Order'} (Step 1) before confirming the order.`, 'error');
     return;
   }
 
@@ -2284,10 +2286,11 @@ async function placeOrder() {
   notifyPhaseChange(currentPR.id,'order_placed',currentUser?.id);
 
   if (!error) {
+    const poNumbers = allPOsCheck.map(p=>p.po_number).join(', ');
     await window.postComment(
       currentPR.id,
       currentUser.id,
-      ` Order placed with vendor. PO: ${poCheck.po_number}.` + (notes ? ` Notes: ${notes}` : '')
+      ` Order placed with vendor${allPOsCheck.length>1?'s':''}. PO${allPOsCheck.length>1?'s':''}: ${poNumbers}.` + (notes ? ` Notes: ${notes}` : '')
     );
   }
 
@@ -2346,16 +2349,25 @@ function numToWords(n) {
 }
 
 // ── PO MODAL — styled paper layout ───────────────────────────
-async function openPOModal(prId) {
+let poTargetQuotationId = null; // when a PR has 2 accepted quotes, tracks which one this PO modal instance is for
+
+async function openPOModal(prId, quotationId=null) {
   const pr = currentPR;
+  poTargetQuotationId = quotationId;
   const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',prId);
-  const selectedQ=quotations?.find(q=>q.is_selected||q.id===pr.selected_quotation_id)||quotations?.[0];
-  const{data:vendor}=pr.assigned_vendor_id?await db.from('vendors').select('*').eq('id',pr.assigned_vendor_id).single():{data:null};
+  const acceptedQuotes = quotations?.filter(q=>q.is_selected) || [];
+  const selectedQ = quotationId
+    ? quotations?.find(q=>q.id===quotationId)
+    : (quotations?.find(q=>q.is_selected||q.id===pr.selected_quotation_id)||quotations?.[0]);
+  const vendorId = selectedQ?.vendor_id || pr.assigned_vendor_id;
+  const{data:vendor}=vendorId?await db.from('vendors').select('*').eq('id',vendorId).single():{data:null};
 
   const now=new Date();
   const fy=now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;
   const fyShort=`${String(fy).slice(2)}-${String(fy+1).slice(2)}`;
-  const poNumber=`O2C/PO/${fyShort}/${String(pr.request_number).padStart(4,'0')}`;
+  // When both quotes were accepted, suffix the PO number per vendor so the two don't collide
+  const poSuffix = acceptedQuotes.length===2 ? `-${acceptedQuotes.findIndex(q=>q.id===selectedQ?.id)+1 || 1}` : '';
+  const poNumber=`O2C/PO/${fyShort}/${String(pr.request_number).padStart(4,'0')}${poSuffix}`;
   const todayStr=now.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/');
   const deliveryDate=selectedQ?.lead_time_days
     ? new Date(Date.now()+selectedQ.lead_time_days*86400000).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/')
@@ -2812,15 +2824,18 @@ async function confirmGeneratePO() {
   const netPayable = Math.round(taxableValue + Math.round(taxableValue*cgstPct/100*100)/100 + Math.round(taxableValue*sgstPct/100*100)/100 + other);
 
   const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',currentPR.id);
-  const selectedQ=quotations?.find(q=>q.is_selected)||quotations?.[0];
+  const selectedQ = poTargetQuotationId
+    ? quotations?.find(q=>q.id===poTargetQuotationId)
+    : (quotations?.find(q=>q.is_selected)||quotations?.[0]);
 
   // Step 1: Save to purchase_orders
   const{error:poErr}=await db.from('purchase_orders').insert({
     pr_id:currentPR.id, po_number:poNumber, po_date:new Date().toISOString(),
-    vendor_id:currentPR.assigned_vendor_id, quotation_id:selectedQ?.id||null,
+    vendor_id:selectedQ?.vendor_id||currentPR.assigned_vendor_id, quotation_id:selectedQ?.id||null,
     total_amount:netPayable, currency:selectedQ?.currency||'INR', generated_by:currentUser.id
   });
   if(poErr){showLoader(false);showToast('Error saving PO: '+poErr.message,'error');return;}
+  poTargetQuotationId = null;
 
   // Step 2: Generate PDF from the styled preview box
   let pdfUrl = null;
@@ -3487,22 +3502,41 @@ function _freezePOInputs(container) {
       if (terms) { terms.style.border = terms._origBorder || ''; terms.style.boxShadow = terms._origShadow || ''; }
     }
 
-function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO) {
+function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO, acceptedQuotes, allPOs) {
   const currency = selectedQ?.currency || 'AED';
-  const hasPO = !!existingPO;
+  acceptedQuotes = acceptedQuotes || (selectedQ ? [selectedQ] : []);
+  allPOs = allPOs || (existingPO ? [existingPO] : []);
+  const isDual = acceptedQuotes.length === 2;
 
-  return `<div class="action-section">
-    <div class="action-section-title"> Place Order <span class="action-badge">ACTION REQUIRED</span></div>
-    <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Generate the PO, confirm the order, then optionally raise an advance via Smartsheet.</p>
-
-    ${selectedQ ? `<div style="margin-bottom:14px;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm)">
-      <div class="detail-key" style="margin-bottom:4px">Selected Quote</div>
-      <div style="font-weight:600">${selectedQ.vendor_name || vendorObj?.name || '—'} — ${currency} ${Number(selectedQ.amount || 0).toLocaleString()}</div>
-      ${pt ? `<div style="font-size:0.72rem;color:#6366f1;margin-top:3px"> Payment Terms: ${pt.label}</div>` : ''}
-    </div>` : ''}
-
-    <!-- STEP 1: PO -->
-    <div style="border:1px solid ${hasPO ? 'rgba(22,163,74,0.3)' : 'var(--border)'};border-radius:var(--radius);padding:14px;margin-bottom:14px;background:${hasPO ? 'rgba(22,163,74,0.04)' : 'white'}">
+  let step1HTML, hasPO;
+  if (isDual) {
+    // Both quotes were accepted at PM approval — one PO per vendor, both feeding
+    // the same request. GRN/QC/payment below stay combined for the whole PR.
+    const poForQuote = q => allPOs.find(po => po.quotation_id === q.id);
+    hasPO = acceptedQuotes.every(q => !!poForQuote(q));
+    const rows = acceptedQuotes.map((q, i) => {
+      const po = poForQuote(q);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:8px 0;${i===0?'border-bottom:1px solid var(--border);margin-bottom:6px':''}">
+        <div>
+          <div style="font-size:0.8rem;font-weight:700">${q.vendor_name||'Vendor '+(i+1)}</div>
+          <div style="font-size:0.72rem;color:var(--gray-4)">${q.currency||'AED'} ${Number(q.amount||0).toLocaleString()}</div>
+        </div>
+        ${po
+          ? `<span style="font-family:var(--font-mono);font-size:0.78rem;font-weight:700;color:#16a34a">&#x2705; ${po.po_number}</span>`
+          : `<button class="btn btn-secondary btn-sm" onclick="openPOModal('${id}','${q.id}')">&#x1F4C4; Generate PO</button>`
+        }
+      </div>`;
+    }).join('');
+    step1HTML = `<div style="border:1px solid ${hasPO?'rgba(22,163,74,0.3)':'var(--border)'};border-radius:var(--radius);padding:14px;margin-bottom:14px;background:${hasPO?'rgba(22,163,74,0.04)':'white'}">
+      <div style="font-size:0.82rem;font-weight:700;color:${hasPO?'#16a34a':'#111'};margin-bottom:8px">
+        ${hasPO ? '&#x2705; Step 1 — Both POs Generated' : '&#x1F4CB; Step 1 — Generate 2 Purchase Orders (both accepted)'}
+      </div>
+      <p style="font-size:0.75rem;color:var(--gray-3);margin-bottom:6px">Both quotations were accepted for this request — generate a separate PO for each vendor. GRN, QC and payment stay tracked together for the whole request.</p>
+      ${rows}
+    </div>`;
+  } else {
+    hasPO = !!existingPO;
+    step1HTML = `<div style="border:1px solid ${hasPO ? 'rgba(22,163,74,0.3)' : 'var(--border)'};border-radius:var(--radius);padding:14px;margin-bottom:14px;background:${hasPO ? 'rgba(22,163,74,0.04)' : 'white'}">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:${hasPO ? '0' : '10px'}">
         <div style="font-size:0.82rem;font-weight:700;color:${hasPO ? '#16a34a' : '#111'}">
           ${hasPO ? '&#x2705; Step 1 — PO Generated' : '&#x1F4CB; Step 1 — Generate Purchase Order (Required)'}
@@ -3514,12 +3548,26 @@ function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existin
         : `<p style="font-size:0.78rem;color:var(--gray-3);margin-bottom:10px">Generate and save the PO before confirming the order.</p>
            <button class="btn btn-secondary" onclick="openPOModal('${id}')">&#x1F4C4; Preview &amp; Generate PO</button>`
       }
-    </div>
+    </div>`;
+  }
+
+  return `<div class="action-section">
+    <div class="action-section-title"> Place Order <span class="action-badge">ACTION REQUIRED</span></div>
+    <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">Generate the PO${isDual?'s':''}, confirm the order, then optionally raise an advance via Smartsheet.</p>
+
+    ${isDual ? '' : (selectedQ ? `<div style="margin-bottom:14px;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <div class="detail-key" style="margin-bottom:4px">Selected Quote</div>
+      <div style="font-weight:600">${selectedQ.vendor_name || vendorObj?.name || '—'} — ${currency} ${Number(selectedQ.amount || 0).toLocaleString()}</div>
+      ${pt ? `<div style="font-size:0.72rem;color:#6366f1;margin-top:3px"> Payment Terms: ${pt.label}</div>` : ''}
+    </div>` : '')}
+
+    <!-- STEP 1: PO -->
+    ${step1HTML}
 
     <!-- STEP 2: Place Order -->
     <div id="poPlaceOrderSection" style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:white;margin-bottom:14px;${!hasPO ? 'opacity:0.45;pointer-events:none' : ''}">
       <div style="font-size:0.82rem;font-weight:700;margin-bottom:10px;color:${hasPO ? '#111' : 'var(--gray-4)'}">
-        &#x1F6D2; Step 2 — Confirm Order Placed ${!hasPO ? '<span style="font-size:0.72rem;font-weight:400">(generate PO first)</span>' : ''}
+        &#x1F6D2; Step 2 — Confirm Order Placed ${!hasPO ? `<span style="font-size:0.72rem;font-weight:400">(generate PO${isDual?'s':''} first)</span>` : ''}
       </div>
       <div class="form-group" style="margin-bottom:12px">
         <label class="form-label">Order Notes</label>
