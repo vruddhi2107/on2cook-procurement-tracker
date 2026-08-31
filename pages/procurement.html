@@ -1149,6 +1149,8 @@ async function saveVendor(){
   const paymentTerms=document.getElementById('vPaymentTerms').value;
   if(!paymentTerms){showToast('Please select payment terms','error');return;}
   const id=document.getElementById('vId').value;
+  const existingVendor = id ? allVendors.find(v=>v.id===id) : null;
+  const paymentTermsChanged = !!(existingVendor && existingVendor.payment_terms !== paymentTerms);
   const vals={name,contact_person:document.getElementById('vContact').value.trim()||null,email:document.getElementById('vEmail').value.trim()||null,phone:document.getElementById('vPhone').value.trim()||null,specialization:document.getElementById('vSpec').value.trim()||null,address:document.getElementById('vAddress').value.trim()||null,notes:document.getElementById('vNotes').value.trim()||null,GSTIN: document.getElementById('vGstin').value.trim() || null,
   country: document.getElementById('vCountry').value.trim() || null,
   vendor_type: document.getElementById('vVendorType').value.trim() || null,payment_terms:paymentTerms,custom_payment_terms:paymentTerms==='custom'?document.getElementById('vCustomPaymentTerms').value.trim():null,added_by:currentUser.id};
@@ -1158,6 +1160,52 @@ async function saveVendor(){
   if(error){showToast('Error: '+error.message,'error');return;}
   showToast(id?'Vendor updated.':'Vendor added!','success');
   closeModal('vendorModal');await refreshVendors();
+  if(paymentTermsChanged) await offerPaymentTermsResync(id, name, paymentTerms);
+}
+
+// ── MID-ORDER PAYMENT-TERMS RE-SYNC ───────────────────────────
+// Orders normally FREEZE payment terms as a snapshot on purchase_orders
+// (vendor_payment_terms / is_full_advance) the moment their PO is raised —
+// see migration_2026-08-27_routing_and_advance.sql — specifically so that
+// editing a vendor here never SILENTLY changes what an already-placed
+// order owes. If Procurement explicitly wants a new vendor agreement (e.g.
+// switching to 100% advance) to also apply to orders already in flight
+// with that vendor, this offers to re-stamp those specific POs — nothing
+// changes unless confirmed here. Once re-stamped as full-advance, the
+// existing QC-Passed screen already skips "Raise Full Payment" and shows
+// "Close Request — Advance Already Paid" instead (see the qc_passed
+// block above) — no further change needed there.
+async function offerPaymentTermsResync(vendorId, vendorName, newPaymentTerms) {
+  const { data: vendorPRs, error: prErr } = await db.from('procurement_requests')
+    .select('id, request_number, phase').eq('assigned_vendor_id', vendorId);
+  if (prErr || !vendorPRs || !vendorPRs.length) return;
+  const openPRs = vendorPRs.filter(r => !CLOSED_PHASES.has(r.phase));
+  if (!openPRs.length) return;
+  const { data: pos, error: poErr } = await db.from('purchase_orders')
+    .select('id, pr_id').in('pr_id', openPRs.map(r => r.id));
+  if (poErr || !pos || !pos.length) return;
+
+  const affectedPRs = openPRs.filter(r => pos.some(p => p.pr_id === r.id));
+  const prLabels = affectedPRs.map(r => `PR-${String(r.request_number).padStart(4, '0')}`).join(', ');
+  const isFullAdvance = newPaymentTerms === 'full_advance';
+  const confirmMsg = `${vendorName}'s payment terms changed. ${pos.length} in-flight order${pos.length > 1 ? 's' : ''} with this vendor (${prLabels}) were placed under the OLD terms and won't be affected automatically.\n\nApply the new terms to ${pos.length > 1 ? 'those orders' : 'that order'} too? This changes what's still owed post-QC (e.g. skips the full-payment step if now 100% advance).\n\nCancel to leave them on their originally agreed terms.`;
+  if (!confirm(confirmMsg)) return;
+
+  showLoader(true);
+  const { error } = await db.from('purchase_orders').update({
+    vendor_payment_terms: newPaymentTerms,
+    is_full_advance: isFullAdvance,
+    terms_last_synced_at: new Date().toISOString(),
+    terms_synced_by: currentUser?.id || null
+  }).in('id', pos.map(p => p.id));
+  showLoader(false);
+  if (error) { showToast('Failed to update in-flight orders: ' + error.message, 'error'); return; }
+  for (const pr of affectedPRs) {
+    await window.postComment(pr.id, currentUser?.id,
+      ` Vendor payment terms updated to "${newPaymentTerms}" mid-order by Procurement — synced onto this order's PO.`);
+  }
+  showToast(`Payment terms updated on ${pos.length} in-flight order${pos.length > 1 ? 's' : ''}.`, 'success');
+  await loadRequests();
 }
 
 async function toggleVendorActive(id,current){
@@ -1514,8 +1562,20 @@ async function openPR(id) {
     // A vendor on 100% advance terms (paid in full before/at ordering — e.g.
     // Amazon-style portals) has nothing left to pay post-delivery. Skip the
     // "Raise Full Payment" step entirely and let Procurement close it directly.
+    //
+    // IMPORTANT: this must read the payment-terms SNAPSHOT taken when the PO
+    // was generated (purchase_orders.is_full_advance / vendor_payment_terms),
+    // NOT the vendor's live payment_terms. The vendor record can be edited
+    // any time after this PR's PO was raised (e.g. for a future order), and
+    // that must never retroactively change what an already-placed order owes.
+    // `currentPR.advance_option` (set at submission, before a vendor/PO even
+    // exists) is kept only as a legacy fallback for PRs raised before this
+    // snapshot existed.
     const vendorObj = vd?.data;
-    const isFullAdvance = vendorObj?.payment_terms === 'full_advance' || currentPR.advance_option === 'full_advance';
+    const hasSnapshot = existingPO && existingPO.is_full_advance !== null && existingPO.is_full_advance !== undefined;
+    const isFullAdvance = hasSnapshot
+      ? existingPO.is_full_advance
+      : (vendorObj?.payment_terms === 'full_advance' || currentPR.advance_option === 'full_advance');
     const advanceConfirmedReceived = advRes?.data?.status === 'payment_received';
 
     if (isFullAdvance) {
@@ -2828,11 +2888,24 @@ async function confirmGeneratePO() {
     ? quotations?.find(q=>q.id===poTargetQuotationId)
     : (quotations?.find(q=>q.is_selected)||quotations?.[0]);
 
+  // ── SNAPSHOT vendor payment terms AT THE MOMENT THE PO IS RAISED ──
+  // This is deliberately a snapshot, not a live lookup. If the vendor's
+  // payment_terms field is edited later (e.g. for a future, unrelated
+  // order), this PO — and every downstream QC/closing check that reads
+  // it — must keep behaving exactly as it did the day it was generated.
+  // See buildQcPassedActionSection(): it reads THIS snapshot, never
+  // vendors.payment_terms live.
+  const poVendorId = selectedQ?.vendor_id||currentPR.assigned_vendor_id;
+  const poVendorObj = allVendors.find(v=>v.id===poVendorId);
+  const poVendorPaymentTerms = poVendorObj?.payment_terms || null;
+  const poIsFullAdvance = poVendorPaymentTerms==='full_advance';
+
   // Step 1: Save to purchase_orders
   const{error:poErr}=await db.from('purchase_orders').insert({
     pr_id:currentPR.id, po_number:poNumber, po_date:new Date().toISOString(),
-    vendor_id:selectedQ?.vendor_id||currentPR.assigned_vendor_id, quotation_id:selectedQ?.id||null,
-    total_amount:netPayable, currency:selectedQ?.currency||'INR', generated_by:currentUser.id
+    vendor_id:poVendorId, quotation_id:selectedQ?.id||null,
+    total_amount:netPayable, currency:selectedQ?.currency||'INR', generated_by:currentUser.id,
+    vendor_payment_terms:poVendorPaymentTerms, is_full_advance:poIsFullAdvance
   });
   if(poErr){showLoader(false);showToast('Error saving PO: '+poErr.message,'error');return;}
   poTargetQuotationId = null;

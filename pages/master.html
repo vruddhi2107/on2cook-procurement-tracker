@@ -112,14 +112,55 @@
       </div>
     </div>
 
+    <div class="card" style="margin-bottom:18px;border:1.5px solid rgba(220,38,38,0.2);background:rgba(220,38,38,0.02)">
+      <div class="card-header">
+        <span class="section-title" style="color:#dc2626"> Fallback Approvers <span style="font-weight:400;color:var(--gray-4)">(safety net)</span></span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Used ONLY when nothing below resolves an approver. Set these once and requests never sit in the "Awaiting Approver Assignment" queue above as routine — that queue becomes a true exception, not normal traffic.</span>
+      </div>
+      <table class="data-table">
+        <thead><tr><th style="width:160px">Approval Role</th><th>Default Approver</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Clearance</strong></td>
+            <td><select class="form-control" id="fb-clearance" style="max-width:280px"></select></td>
+            <td><button class="btn btn-primary btn-sm" onclick="saveFallbackApprovers()">Save Both</button></td>
+          </tr>
+          <tr>
+            <td><strong>Quote Approval</strong></td>
+            <td><select class="form-control" id="fb-quote" style="max-width:280px"></select></td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-bottom:18px;border:1.5px solid rgba(124,58,237,0.25);background:rgba(124,58,237,0.02)">
+      <div class="card-header">
+        <span class="section-title" style="color:#7c3aed"> Quote Amount Escalation</span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Decides which PHASE a request moves to once its quote amount is known — below the threshold stays with the Project Manager, at/above it escalates to the Director. This is the default that applies whenever nothing else below (Routing Groups, Department Routing, a project's own PM) is what decides who the Quote Approver is — a request without any of those configured simply routes by its own amount.</span>
+      </div>
+      <div style="padding:14px 16px;display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end">
+        <div class="form-group" style="margin:0">
+          <label class="form-label" style="font-size:0.78rem">Threshold (₹, INR)</label>
+          <input class="form-control" type="number" min="0" step="1" id="qar-threshold" style="max-width:180px" placeholder="5000"/>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label" style="font-size:0.78rem">Director</label>
+          <select class="form-control" id="qar-director" style="max-width:280px"></select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveQuoteAmountRouting()">Save</button>
+      </div>
+      <div style="padding:0 16px 14px;font-size:0.75rem;color:var(--gray-4)">Note: access to the Director approval queue is still role-based (any user with role Director or Master can act on escalated requests) — the Director picked here is used for the name shown to Project Managers, not as an extra permission check.</div>
+    </div>
+
     <div class="card" style="margin-bottom:18px">
       <div class="card-header">
         <span class="section-title">Default Department Routing</span>
-        <span style="font-size:0.8rem;color:var(--gray-3)">Who clears requirement approval for each category, by default — pick any user, any role</span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Who handles each category by default — Clearance and Quote Approval are separate people, set independently</span>
       </div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>Request For</th><th>Discipline</th><th>Department Manager</th><th></th></tr></thead>
+          <thead><tr><th>Request For</th><th>Discipline</th><th>Clearance Manager</th><th></th><th>Quote Approver</th><th></th></tr></thead>
           <tbody id="deptRoutingBody"></tbody>
         </table>
       </div>
@@ -127,8 +168,8 @@
 
     <div class="card" style="margin-bottom:18px">
       <div class="card-header">
-        <span class="section-title">Antunes Project Override <span style="font-weight:400;color:var(--gray-4)">(legacy)</span></span>
-        <span style="font-size:0.8rem;color:var(--gray-3)">Applies instead of the default above, only for projects flagged "Antunes" in Projects</span>
+        <span class="section-title">Antunes Project Override <span style="font-weight:400;color:var(--gray-4)">(legacy, Clearance only)</span></span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Applies instead of the Clearance default above, only for projects flagged "Antunes" in Projects. This table predates Quote Approval routing and never applied to it — use Project Routing Groups below for a project that needs both roles overridden.</span>
       </div>
       <div class="table-wrap">
         <table class="data-table">
@@ -141,17 +182,18 @@
     <div class="card" style="border:1.5px solid rgba(99,102,241,0.25);background:rgba(99,102,241,0.02)">
       <div class="card-header">
         <span class="section-title" style="color:#6366f1"> Project Routing Groups</span>
-        <span style="font-size:0.8rem;color:var(--gray-3)">Pick any name (e.g. "CM Yuva") and one manager — that person gets requirement-clearance authority across BOTH NPD &amp; Production and BOTH Elec &amp; Mechanical for every project tagged with this group</span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Pick any name (e.g. "CM Yuva") and TWO managers — one for Clearance, one for Quote Approval. Each gets authority across BOTH NPD &amp; Production and BOTH Elec &amp; Mechanical for every project tagged with this group.</span>
       </div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>Group</th><th>Manager</th><th>Projects Tagged</th><th></th></tr></thead>
-          <tbody id="routingGroupsBody"><tr><td colspan="4" style="text-align:center;padding:20px;color:var(--gray-4)">Loading...</td></tr></tbody>
+          <thead><tr><th>Group</th><th>Clearance Manager</th><th>Quote Approver</th><th>Projects Tagged</th><th></th></tr></thead>
+          <tbody id="routingGroupsBody"><tr><td colspan="5" style="text-align:center;padding:20px;color:var(--gray-4)">Loading...</td></tr></tbody>
         </table>
       </div>
       <div style="padding:14px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input class="form-control" id="newRoutingGroupName" placeholder="New group name, e.g. CM Yuva" style="max-width:220px"/>
-        <select class="form-control" id="newRoutingGroupManager" style="max-width:280px"></select>
+        <select class="form-control" id="newRoutingGroupManager" style="max-width:260px"></select>
+        <select class="form-control" id="newRoutingGroupQuoteManager" style="max-width:260px"></select>
         <button class="btn btn-primary btn-sm" onclick="createRoutingGroup()">+ Create Group</button>
       </div>
       <div style="padding:0 16px 14px;font-size:0.72rem;color:var(--gray-4)">Then go to Projects and set that project's "Routing Group" field to this same name.</div>
@@ -304,18 +346,36 @@
           <input type="checkbox" id="uManualRouting" style="width:auto"/>
           <label class="form-label" for="uManualRouting" style="margin:0">Send this user's own requests to Master for manual approver assignment each time (managers, or any exception you want reviewed by hand)</label>
         </div>
-        <div class="form-group full" style="margin-top:8px">
-          <label class="form-label">Always forward this user's NPD requests to (optional — overrides department/Antunes routing)</label>
+        <div class="form-group full" style="margin-top:12px;padding-top:8px;border-top:1px solid var(--border)">
+          <label class="form-label" style="font-weight:700">Clearance overrides</label>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Always forward this user's NPD requests to, for Clearance (optional — overrides department/Antunes/group routing)</label>
           <select class="form-control" id="uOverrideApproverNPD">
             <option value="">— No fixed override —</option>
           </select>
         </div>
         <div class="form-group full" style="margin-top:8px">
-          <label class="form-label">Always forward this user's Production requests to (optional — overrides department/Antunes routing)</label>
+          <label class="form-label">Always forward this user's Production requests to, for Clearance (optional)</label>
           <select class="form-control" id="uOverrideApproverProduction">
             <option value="">— No fixed override —</option>
           </select>
-          <div style="font-size:0.72rem;color:var(--gray-4);margin-top:4px">If set, this user's requests of that type skip the department/Antunes routing entirely and go straight to the person picked here — no queue, no manual step each time. NPD and Production can be routed to different people.</div>
+        </div>
+        <div class="form-group full" style="margin-top:12px;padding-top:8px;border-top:1px solid var(--border)">
+          <label class="form-label" style="font-weight:700">Quote Approval overrides</label>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Always forward this user's NPD requests to, for Quote Approval (optional)</label>
+          <select class="form-control" id="uOverrideApproverNPDQuote">
+            <option value="">— No fixed override —</option>
+          </select>
+        </div>
+        <div class="form-group full" style="margin-top:8px">
+          <label class="form-label">Always forward this user's Production requests to, for Quote Approval (optional)</label>
+          <select class="form-control" id="uOverrideApproverProductionQuote">
+            <option value="">— No fixed override —</option>
+          </select>
+          <div style="font-size:0.72rem;color:var(--gray-4);margin-top:4px">If set, this user's requests of that type/role skip the routing tables entirely and go straight to the person picked here — no queue, no manual step each time. Clearance and Quote Approval, and NPD vs. Production, can all be routed to different people.</div>
         </div>
       </div>
     </div>
@@ -414,6 +474,7 @@ async function loadVendors() {
 
 let deptRouting=[], antunesRouting=[], routingOverrides=[], routingProjects=[];
 const ROUTING_COMBOS=[['npd','elec'],['npd','mechanical'],['production','elec'],['production','mechanical']];
+const APPROVAL_TYPES=['clearance','quote'];
 
 async function loadRoutingConfig() {
   const[dr,ar,ro,rp]=await Promise.all([
@@ -428,15 +489,20 @@ async function loadRoutingConfig() {
   if(rp.error) console.error('loadRoutingConfig projects failed:',rp.error);
   deptRouting=dr.data||[];
   antunesRouting=ar.data||[];
-  routingOverrides=ro.data||[];
+  // approval_type is a new column — rows written before the migration have
+  // it null in the DB but default to 'clearance' via the column default, so
+  // this is a client-side belt-and-suspenders normalize only.
+  routingOverrides=(ro.data||[]).map(r=>({...r, approval_type:r.approval_type||'clearance'}));
   routingProjects=rp.data||[];
 }
 
-// Collapses the 4 per-combo routing_overrides rows for a group into one
-// "group -> manager" entry for display. Rows within a group are always
-// written together (see saveRoutingGroup), so any one row's manager_id
-// represents the whole group; if they've ever drifted apart (e.g. edited
-// directly in the DB) this shows the most common manager_id and flags it.
+// Collapses the (up to) 8 per-combo routing_overrides rows for a group
+// (4 combos x 2 approval types) into one "group -> {clearance, quote}"
+// entry for display. Rows for the SAME approval_type within a group are
+// always written together (see saveRoutingGroup), so any one row per type
+// represents the whole group for that type; if they've ever drifted apart
+// (e.g. edited directly in the DB) this shows the most common manager_id
+// per type and flags it.
 function summarizeRoutingGroups() {
   const byGroup = new Map();
   routingOverrides.forEach(r => {
@@ -448,12 +514,20 @@ function summarizeRoutingGroups() {
     if (p.routing_group && !byGroup.has(p.routing_group)) byGroup.set(p.routing_group, []);
   });
   return [...byGroup.entries()].map(([name, rows]) => {
-    const managerIds = [...new Set(rows.map(r=>r.manager_id))];
+    const byType = {};
+    let inconsistent = false;
+    APPROVAL_TYPES.forEach(t=>{
+      const typeRows = rows.filter(r=>r.approval_type===t);
+      const managerIds = [...new Set(typeRows.map(r=>r.manager_id))];
+      if (managerIds.length > 1) inconsistent = true;
+      byType[t] = managerIds.length === 1 ? managerIds[0] : null;
+    });
     const projectCount = routingProjects.filter(p=>p.routing_group===name).length;
     return {
       name,
-      managerId: managerIds.length === 1 ? managerIds[0] : null,
-      inconsistent: managerIds.length > 1,
+      clearanceManagerId: byType.clearance,
+      quoteManagerId: byType.quote,
+      inconsistent,
       configuredCombos: rows.length,
       projectCount
     };
@@ -470,12 +544,15 @@ function userPickerOptions(selectedId, excludeId) {
 
 function renderRoutingTab() {
   document.getElementById('deptRoutingBody').innerHTML=ROUTING_COMBOS.map(([rf,disc])=>{
-    const row=deptRouting.find(r=>r.request_for===rf&&r.discipline===disc);
+    const clearRow=deptRouting.find(r=>r.request_for===rf&&r.discipline===disc&&(r.approval_type||'clearance')==='clearance');
+    const quoteRow=deptRouting.find(r=>r.request_for===rf&&r.discipline===disc&&r.approval_type==='quote');
     return `<tr>
       <td>${rf==='npd'?'NPD':'Production'}</td>
       <td>${disc==='elec'?'Elec':'Mechanical'}</td>
-      <td><select class="form-control" id="dr-${rf}-${disc}" style="max-width:280px">${userPickerOptions(row?.manager_id)}</select></td>
-      <td><button class="btn btn-primary btn-sm" onclick="saveDeptRouting('${rf}','${disc}')">Save</button></td>
+      <td><select class="form-control" id="dr-clearance-${rf}-${disc}" style="max-width:240px">${userPickerOptions(clearRow?.manager_id)}</select></td>
+      <td><button class="btn btn-primary btn-sm" onclick="saveDeptRouting('${rf}','${disc}','clearance')">Save</button></td>
+      <td><select class="form-control" id="dr-quote-${rf}-${disc}" style="max-width:240px">${userPickerOptions(quoteRow?.manager_id)}</select></td>
+      <td><button class="btn btn-primary btn-sm" onclick="saveDeptRouting('${rf}','${disc}','quote')">Save</button></td>
     </tr>`;
   }).join('');
 
@@ -491,17 +568,74 @@ function renderRoutingTab() {
 
   renderRoutingGroups();
   document.getElementById('newRoutingGroupManager').innerHTML = userPickerOptions(null);
+  document.getElementById('newRoutingGroupQuoteManager').innerHTML = userPickerOptions(null);
+  renderFallbackApprovers();
+  renderQuoteAmountRouting();
   renderReassignQueue();
+}
+
+// ── QUOTE AMOUNT ESCALATION (admin_configs 'quote_amount_routing') ──
+// Replaces the old hardcoded ENGINEER_APPROVAL_LIMIT (engineer.html) /
+// PM_APPROVAL_LIMIT (pm.html) constants, which duplicated the same 5000
+// figure in two files with no single source of truth. Read live via
+// _loadQuoteAmountRouting() in shared.js.
+function renderQuoteAmountRouting() {
+  _loadQuoteAmountRouting().then(cfg=>{
+    document.getElementById('qar-threshold').value = cfg.threshold_inr;
+    const directorOptions = ['<option value="">— None set —</option>']
+      .concat([...allUsers].filter(u=>u.role==='director'||u.role==='master').sort((a,b)=>a.name.localeCompare(b.name))
+        .map(u=>`<option value="${u.id}" ${u.id===cfg.director_id?'selected':''}>${u.name} (${u.role})</option>`));
+    document.getElementById('qar-director').innerHTML = directorOptions.join('');
+  });
+}
+async function saveQuoteAmountRouting() {
+  const thresholdRaw = document.getElementById('qar-threshold').value;
+  const threshold_inr = thresholdRaw==='' ? 5000 : Math.max(0, parseFloat(thresholdRaw) || 0);
+  const director_id = document.getElementById('qar-director').value || null;
+  showLoader(true);
+  const{error}=await db.from('admin_configs').upsert({
+    config_type:'quote_amount_routing', config_data:{threshold_inr,director_id}, updated_at:new Date().toISOString(), updated_by:currentUser.id
+  },{onConflict:'config_type'});
+  showLoader(false);
+  if(error){ showToast('Failed to save quote amount escalation: '+error.message,'error'); return; }
+  if(typeof _invalidateQuoteAmountRoutingCache==='function') _invalidateQuoteAmountRoutingCache();
+  showToast('Quote amount escalation saved.','success');
+}
+
+// ── FALLBACK APPROVERS (universal safety net, admin_configs) ──
+async function loadFallbackApprovers() {
+  const{data,error}=await db.from('admin_configs').select('config_data').eq('config_type','default_fallback_approvers').maybeSingle();
+  if(error){ console.error('loadFallbackApprovers failed:',error); return {}; }
+  return (data&&data.config_data)||{};
+}
+function renderFallbackApprovers() {
+  loadFallbackApprovers().then(fb=>{
+    document.getElementById('fb-clearance').innerHTML=userPickerOptions(fb.clearance||null);
+    document.getElementById('fb-quote').innerHTML=userPickerOptions(fb.quote||null);
+  });
+}
+async function saveFallbackApprovers() {
+  const clearance=document.getElementById('fb-clearance').value||null;
+  const quote=document.getElementById('fb-quote').value||null;
+  showLoader(true);
+  const{error}=await db.from('admin_configs').upsert({
+    config_type:'default_fallback_approvers', config_data:{clearance,quote}, updated_at:new Date().toISOString(), updated_by:currentUser.id
+  },{onConflict:'config_type'});
+  showLoader(false);
+  if(error){ showToast('Failed to save fallback approvers: '+error.message,'error'); return; }
+  if(typeof _invalidateFallbackApproversCache==='function') _invalidateFallbackApproversCache();
+  showToast('Fallback approvers saved — these now back up every routing rule below','success');
 }
 
 // ── PROJECT ROUTING GROUPS (generic, per-project override) ───
 function renderRoutingGroups() {
   const body=document.getElementById('routingGroupsBody');
   const groups=summarizeRoutingGroups();
-  if(!groups.length){ body.innerHTML='<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--gray-4)">No routing groups yet — create one below</td></tr>'; return; }
+  if(!groups.length){ body.innerHTML='<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--gray-4)">No routing groups yet — create one below</td></tr>'; return; }
   body.innerHTML=groups.map((g,i)=>`<tr>
-    <td><strong>${escHtml(g.name)}</strong>${g.inconsistent?' <span style="color:var(--red);font-size:0.68rem" title="The 4 combos for this group don\'t all point to the same manager — re-save to fix"> mixed</span>':''}</td>
-    <td><select class="form-control" id="rg-manager-${i}" style="max-width:260px">${userPickerOptions(g.managerId)}</select></td>
+    <td><strong>${escHtml(g.name)}</strong>${g.inconsistent?' <span style="color:var(--red);font-size:0.68rem" title="This group\'s combos don\'t all point to the same manager for one role — re-save to fix"> mixed</span>':''}</td>
+    <td><select class="form-control" id="rg-manager-${i}" style="max-width:220px">${userPickerOptions(g.clearanceManagerId)}</select></td>
+    <td><select class="form-control" id="rg-quote-manager-${i}" style="max-width:220px">${userPickerOptions(g.quoteManagerId)}</select></td>
     <td style="font-family:var(--font-mono);font-size:0.8rem">${g.projectCount}</td>
     <td style="white-space:nowrap">
       <button class="btn btn-primary btn-sm" onclick="saveRoutingGroup('${g.name.replace(/'/g,"\\'")}', ${i})">Save</button>
@@ -510,36 +644,45 @@ function renderRoutingGroups() {
   </tr>`).join('');
 }
 
-// Writes (or clears) the SAME manager across all 4 request_for x discipline
-// combos for this routing_group in one go — this is what gives the assigned
-// manager authority over both disciplines and both NPD/Production, instead
-// of having to configure 4 separate rows by hand like the legacy tables.
+// Writes (or clears) the SAME clearance manager and the SAME quote approver
+// across all 4 request_for x discipline combos for this routing_group in
+// one go (8 rows total: 4 combos x 2 approval types) — this is what gives
+// each assigned manager authority over both disciplines and both
+// NPD/Production, for their respective role, instead of having to configure
+// rows by hand like the legacy tables.
 async function saveRoutingGroup(name, rowIndex) {
-  const sel=document.getElementById(`rg-manager-${rowIndex}`);
-  const managerId=sel ? sel.value : '';
+  const clearSel=document.getElementById(`rg-manager-${rowIndex}`);
+  const quoteSel=document.getElementById(`rg-quote-manager-${rowIndex}`);
+  const clearanceId=clearSel?clearSel.value:'';
+  const quoteId=quoteSel?quoteSel.value:'';
   showLoader(true);
   // Delete-then-insert rather than upsert, since routing_overrides has no
-  // guaranteed unique constraint on (routing_group,request_for,discipline).
+  // guaranteed unique constraint on (routing_group,request_for,discipline,approval_type).
   const{error:delErr}=await db.from('routing_overrides').delete().eq('routing_group',name);
   let error=delErr;
-  if(!error && managerId){
-    const rows=ROUTING_COMBOS.map(([rf,disc])=>({routing_group:name,request_for:rf,discipline:disc,manager_id:managerId}));
-    ({error}=await db.from('routing_overrides').insert(rows));
+  if(!error){
+    const rows=[];
+    if(clearanceId) ROUTING_COMBOS.forEach(([rf,disc])=>rows.push({routing_group:name,request_for:rf,discipline:disc,approval_type:'clearance',manager_id:clearanceId}));
+    if(quoteId) ROUTING_COMBOS.forEach(([rf,disc])=>rows.push({routing_group:name,request_for:rf,discipline:disc,approval_type:'quote',manager_id:quoteId}));
+    if(rows.length) ({error}=await db.from('routing_overrides').insert(rows));
   }
   showLoader(false);
   if(error){ console.error('saveRoutingGroup failed:',error); showToast('Failed to save group: '+error.message,'error'); return; }
-  showToast(managerId?`"${name}" now routes to that manager for both disciplines`:`"${name}" cleared — falls back to default routing`,'success');
+  showToast(`"${name}" routing saved`,'success');
   await loadRoutingConfig(); renderRoutingTab();
 }
 
 async function createRoutingGroup() {
   const name=document.getElementById('newRoutingGroupName').value.trim();
-  const managerId=document.getElementById('newRoutingGroupManager').value;
+  const clearanceId=document.getElementById('newRoutingGroupManager').value;
+  const quoteId=document.getElementById('newRoutingGroupQuoteManager').value;
   if(!name){ showToast('Group name required','error'); return; }
-  if(!managerId){ showToast('Pick a manager for this group','error'); return; }
+  if(!clearanceId&&!quoteId){ showToast('Pick at least a Clearance or a Quote Approval manager for this group','error'); return; }
   if(summarizeRoutingGroups().some(g=>g.name.toLowerCase()===name.toLowerCase())){ showToast('A group with that name already exists — edit it in the table above','error'); return; }
   showLoader(true);
-  const rows=ROUTING_COMBOS.map(([rf,disc])=>({routing_group:name,request_for:rf,discipline:disc,manager_id:managerId}));
+  const rows=[];
+  if(clearanceId) ROUTING_COMBOS.forEach(([rf,disc])=>rows.push({routing_group:name,request_for:rf,discipline:disc,approval_type:'clearance',manager_id:clearanceId}));
+  if(quoteId) ROUTING_COMBOS.forEach(([rf,disc])=>rows.push({routing_group:name,request_for:rf,discipline:disc,approval_type:'quote',manager_id:quoteId}));
   const{error}=await db.from('routing_overrides').insert(rows);
   showLoader(false);
   if(error){ console.error('createRoutingGroup failed:',error); showToast('Failed to create group: '+error.message,'error'); return; }
@@ -559,16 +702,17 @@ async function deleteRoutingGroup(name) {
   await loadRoutingConfig(); renderRoutingTab();
 }
 
-async function saveDeptRouting(requestFor,discipline) {
-  const managerId=document.getElementById(`dr-${requestFor}-${discipline}`).value;
+async function saveDeptRouting(requestFor,discipline,approvalType) {
+  approvalType = approvalType==='quote'?'quote':'clearance';
+  const managerId=document.getElementById(`dr-${approvalType}-${requestFor}-${discipline}`).value;
   let error;
   if(!managerId){
-    ({error}=await db.from('department_routing').delete().eq('request_for',requestFor).eq('discipline',discipline));
+    ({error}=await db.from('department_routing').delete().eq('request_for',requestFor).eq('discipline',discipline).eq('approval_type',approvalType));
   } else {
-    ({error}=await db.from('department_routing').upsert({request_for:requestFor,discipline,manager_id:managerId},{onConflict:'request_for,discipline'}));
+    ({error}=await db.from('department_routing').upsert({request_for:requestFor,discipline,approval_type:approvalType,manager_id:managerId},{onConflict:'request_for,discipline,approval_type'}));
   }
   if(error){ console.error('saveDeptRouting failed:',error); showToast('Failed to save routing: '+error.message,'error'); return; }
-  showToast('Routing updated','success');
+  showToast((approvalType==='quote'?'Quote Approval':'Clearance')+' routing updated','success');
   await loadRoutingConfig(); renderRoutingTab();
 }
 
@@ -865,7 +1009,13 @@ async function deletePR() {
   await loadRequests();
 }
 
-// ── DIRECTOR (SANDY) APPROVAL FUNCTIONS ────────────────────
+// ── DIRECTOR APPROVAL FUNCTIONS ─────────────────────────────
+// Legacy display-only constant — kept so old bookmarked references don't
+// break, but not read anywhere. The actual director shown to PMs is now
+// whoever is set in Master → Approval Routing → Quote Amount Escalation
+// (admin_configs 'quote_amount_routing', see renderQuoteAmountRouting()
+// below). Access to this Director tab itself stays role-gated
+// (role='director' or 'master') regardless of that setting.
 const DIRECTOR_EMAIL = 'sandy@on2cook.com';
 
 // Phases the Director can override from any state
@@ -1316,6 +1466,8 @@ function openAddUser() {
   document.getElementById('uManualRouting').checked=false;
   document.getElementById('uOverrideApproverNPD').innerHTML=userPickerOptions(null);
   document.getElementById('uOverrideApproverProduction').innerHTML=userPickerOptions(null);
+  document.getElementById('uOverrideApproverNPDQuote').innerHTML=userPickerOptions(null);
+  document.getElementById('uOverrideApproverProductionQuote').innerHTML=userPickerOptions(null);
   onUserRoleChange();
   openModal('userModal');
 }
@@ -1337,6 +1489,8 @@ function editUser(id) {
   // value for both, only where the specific NPD/Production field isn't set.
   document.getElementById('uOverrideApproverNPD').innerHTML=userPickerOptions(u.override_approver_npd_id||u.override_approver_id, u.id);
   document.getElementById('uOverrideApproverProduction').innerHTML=userPickerOptions(u.override_approver_production_id||u.override_approver_id, u.id);
+  document.getElementById('uOverrideApproverNPDQuote').innerHTML=userPickerOptions(u.override_approver_npd_quote_id, u.id);
+  document.getElementById('uOverrideApproverProductionQuote').innerHTML=userPickerOptions(u.override_approver_production_quote_id, u.id);
   onUserRoleChange();
   openModal('userModal');
 }
@@ -1351,12 +1505,14 @@ async function saveUser() {
   const manual_routing=document.getElementById('uManualRouting').checked;
   const override_approver_npd_id=document.getElementById('uOverrideApproverNPD').value||null;
   const override_approver_production_id=document.getElementById('uOverrideApproverProduction').value||null;
+  const override_approver_npd_quote_id=document.getElementById('uOverrideApproverNPDQuote').value||null;
+  const override_approver_production_quote_id=document.getElementById('uOverrideApproverProductionQuote').value||null;
   if(!name||!email||!role){showToast('Please fill all required fields','error');return;}
   showLoader(true);
   let error;
   // override_approver_id (legacy single field) is cleared going forward —
-  // the two split fields above are now the source of truth.
-  const payload={name,email,password,role,department,pm_type,manual_routing,override_approver_id:null,override_approver_npd_id,override_approver_production_id};
+  // the split fields above are now the source of truth.
+  const payload={name,email,password,role,department,pm_type,manual_routing,override_approver_id:null,override_approver_npd_id,override_approver_production_id,override_approver_npd_quote_id,override_approver_production_quote_id};
   if(editingUserId){({error}=await db.from('users').update(payload).eq('id',editingUserId));}
   else{({error}=await db.from('users').insert(payload));}
   showLoader(false);

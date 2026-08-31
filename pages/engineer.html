@@ -879,14 +879,14 @@ async function submitPR() {
   }
 
   // ── Resolve WHO grants initial requirement clearance. This is independent
-  //    of assigned_pm_id (the project's linked PM), which still owns final
-  //    quote approval below and is untouched by this routing step. ──
+  //    of assigned_pm_id (the Quote Approver), which is resolved separately
+  //    right below and is untouched by this routing step. ──
   let initialApproverId=null, needsReassignment=false;
   const willNeedClearance=!isEditMode&&!isVI&&!isLP&&selectedPMApproval==='needs_approval';
   if(willNeedClearance){
     showLoader(true);
     try {
-      ({approverId:initialApproverId, needsReassignment}=await resolveApproverForSubmission(currentUser,projectId,requestFor,discipline));
+      ({approverId:initialApproverId, needsReassignment}=await resolveApproverForSubmission(currentUser,projectId,requestFor,discipline,'clearance'));
     } catch(e) {
       showLoader(false);
       console.error('Approver resolution failed:',e);
@@ -894,6 +894,22 @@ async function submitPR() {
       return;
     }
     showLoader(false);
+  }
+
+  // ── Resolve WHO owns final Quote Approval, from Master Admin's routing
+  //    config (Master → Approval Routing → Quote Approval, per routing group
+  //    / department, or a per-user fixed Quote override). The dropdown pick
+  //    above is now only the FALLBACK — used only if nothing is configured —
+  //    so this never has to be picked by hand once Master sets it up. ──
+  let quotePmId=pmId, quotePmName=pmUser?.name||'';
+  if(!isLP){
+    try {
+      const{approverId:routedQuoteId}=await resolveApproverForSubmission(currentUser,projectId,requestFor,discipline,'quote');
+      if(routedQuoteId){
+        quotePmId=routedQuoteId;
+        quotePmName=await getUserName(routedQuoteId)||quotePmName;
+      }
+    } catch(e){ console.warn('Quote approver routing failed, using manually-selected PM:',e.message); }
   }
 
   const basePhase=isLP?'lp_submitted':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':(needsReassignment?'pending_master_reassignment':'pending_initial_pm_approval');
@@ -904,9 +920,9 @@ async function submitPR() {
     discipline:(!isVI&&!isLP)?discipline:null,
     project_name:projectName,
     project_phase:projectPhase,
-    assigned_pm_id:isLP?lpFinalPmId:pmId,
+    assigned_pm_id:isLP?lpFinalPmId:quotePmId,
     initial_approver_id:isLP?lpFinalPmId:((willNeedClearance&&!needsReassignment)?initialApproverId:null),
-    project_manager_name:isLP?lpFinalPmName:(pmUser?.name||''),
+    project_manager_name:isLP?lpFinalPmName:quotePmName,
     team_member_name:currentUser.name,
     department:dept,
     urgency,
@@ -998,7 +1014,8 @@ async function openPR(id) {
   }
 
   if(currentPR.phase==='quotations_shared') {
-    actionSection=buildQuoteReview(quotations);
+    const quoteRoutingCfg = await _loadQuoteAmountRouting();
+    actionSection=buildQuoteReview(quotations, quoteRoutingCfg.threshold_inr);
     footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('prModal')">Cancel</button>`;
   }
 
@@ -1125,14 +1142,16 @@ async function resolveVendorInfo(action) {
   showToast('Done!','success');closeModal('prModal');await loadRequests();
 }
 
-function buildQuoteReview(quotations) {
+function buildQuoteReview(quotations, thresholdInr) {
+  thresholdInr = (typeof thresholdInr === 'number' && thresholdInr >= 0) ? thresholdInr : ENGINEER_APPROVAL_LIMIT;
+  const thresholdDisplay = `₹${thresholdInr.toLocaleString('en-IN')}`;
   if(!quotations.length) return `<div class="action-section"><div class="action-section-title"> Review Quotations <span class="action-badge">ACTION REQUIRED</span></div><p style="color:var(--gray-4);font-size:0.82rem">No quotations yet.</p></div>`;
   return `<div class="action-section">
     <div class="action-section-title"> Validate Quotations <span class="action-badge">ACTION REQUIRED</span></div>
     <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:14px">Review the ${quotations.length} quotation${quotations.length>1?'s':''} below and check if they meet the requirement. You cannot select a quotation — that will be done by the approver. Click <strong>Validate & Forward</strong> if the quotes are suitable, or use the issue options below if they are not.</p>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">${quotations.map(q=>renderQuotationCard(q,false,null)).join('')}</div>
     <div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:0.8rem;color:#4338ca">
-      <strong>ℹ Routing rule:</strong> Quotes below ₹5,000 go to the <strong>Project Manager</strong>. Quotes of ₹5,000 or above go to the <strong>Director</strong> for approval.
+      <strong>ℹ Routing rule (default — no other routing configured for this request):</strong> Quotes below ${thresholdDisplay} go to the <strong>Project Manager</strong>. Quotes of ${thresholdDisplay} or above go to the <strong>Director</strong> for approval. Set in Master → Approval Routing → Quote Amount Escalation.
     </div>
 
     <!--  VALIDATE -->
@@ -1189,7 +1208,13 @@ function onEngineerIssueChange() {
 }
 
 // ── ENGINEER QUOTE VERIFICATION ─────────────────────────────
-const ENGINEER_APPROVAL_LIMIT = 5000; // INR threshold
+// Threshold now lives in Master Admin → Approval Routing → Quote Amount
+// Escalation (admin_configs 'quote_amount_routing'). 5000 is only the
+// fallback used if that config row is missing. See _loadQuoteAmountRouting
+// in shared.js — kept as a plain number here (not the async default) so
+// any code that reads this synchronously before the page's first await
+// still gets a sane value.
+let ENGINEER_APPROVAL_LIMIT = 5000; // INR threshold (refreshed from admin_configs below)
 
 // ── Close the request ────────────────────────────────────────
 async function submitEngineerClose() {
@@ -1246,6 +1271,10 @@ async function submitEngineerVerification() {
   const selectedQ = prQuotations.find(q=>q.is_selected) || prQuotations[0];
   if(!selectedQ && !prQuotations.length){showToast('No quotations found','error');return;}
 
+  // Pull the live, Master-configured threshold (falls back to 5000 if unset)
+  const quoteRouting = await _loadQuoteAmountRouting();
+  ENGINEER_APPROVAL_LIMIT = quoteRouting.threshold_inr;
+
   const amount = parseFloat(selectedQ.amount || 0);
   // Compute INR equivalent for threshold check.
   // Prefer the stored inr_amount column (set by procurement when uploading).
@@ -1276,7 +1305,7 @@ async function submitEngineerVerification() {
   }).eq('id',currentPR.id);
 
   if(!error){
-    const routedTo = needsDirector ? 'Director (amount ≥ ₹5,000)' : 'Project Manager';
+    const routedTo = needsDirector ? `Director (amount ≥ ₹${ENGINEER_APPROVAL_LIMIT.toLocaleString('en-IN')})` : 'Project Manager';
     await postComment(currentPR.id, currentUser.id,
       ` Engineer validated quotations (${prQuotations.length} quote${prQuotations.length!==1?'s':''}). Forwarded to ${routedTo} for approval.`);
     notifyPhaseChange(currentPR.id, newPhase, currentUser?.id);

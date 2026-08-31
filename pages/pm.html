@@ -421,6 +421,8 @@ async function openPR(id) {
   document.getElementById('prModalTitle').textContent=`PR-${String(currentPR.request_number).padStart(4,'0')} — ${currentPR.project_name}`;
   document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${currentPR.users?.name||''}`;
   showLoader(true);
+  const quoteRoutingCfg = await _loadQuoteAmountRouting();
+  PM_APPROVAL_LIMIT = quoteRoutingCfg.threshold_inr;
   const[comments,quotations,vd,poRes,advRes,payRes,clearanceManagerName]=await Promise.all([
     loadComments(id),
     db.from('pr_quotations').select('*').eq('pr_id',id).order('created_at').then(r=>r.data||[]),
@@ -498,9 +500,11 @@ async function openPR(id) {
   if(currentPR.phase==='pending_sandy_approval') {
     const selQ=quotations.find(q=>q.is_selected)||quotations.find(q=>q.id===currentPR.selected_quotation_id);
     const amt=selQ?.amount?`₹${parseFloat(selQ.amount).toLocaleString('en-IN')}`:'—';
+    const configuredDirectorName = allPMs.find(p=>p.id===quoteRoutingCfg.director_id)?.name || null;
+    const directorLabel = configuredDirectorName ? `the Director (${configuredDirectorName})` : 'the Director';
     actionSection=`<div class=\"action-section\" style=\"border-color:#7c3aed33;background:rgba(124,58,237,0.04)\">
       <div class=\"action-section-title\" style=\"color:#7c3aed\"> Awaiting Director Approval <span class=\"action-badge\" style=\"background:#7c3aed18;color:#7c3aed;border-color:#7c3aed35\">ESCALATED</span></div>
-      <p style=\"font-size:0.82rem;color:var(--gray-3);margin-bottom:12px\">This request has been escalated to the Director (sandy@on2cook.com) because the selected quotation amount <strong>${amt}</strong> exceeds the Project Manager approval limit of <strong>₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}</strong>.</p>
+      <p style=\"font-size:0.82rem;color:var(--gray-3);margin-bottom:12px\">This request has been escalated to ${directorLabel} because the selected quotation amount <strong>${amt}</strong> exceeds the Project Manager approval limit of <strong>₹${PM_APPROVAL_LIMIT.toLocaleString('en-IN')}</strong>.</p>
       <div style=\"background:rgba(124,58,237,0.07);border:1px solid rgba(124,58,237,0.18);border-radius:var(--radius-sm);padding:9px 12px;font-size:0.78rem;color:#6d28d9\">
         The Director has been notified by email. No further action required from you.
       </div>
@@ -804,9 +808,13 @@ function renderSplitAllocationHTML() {
 }
 
 // ── APPROVAL THRESHOLD ─────────────────────────────────────
-// PM can approve quotes strictly below ₹5,000.
-// ₹5,000 and above is escalated to the Director (sandy@on2cook.com).
-const PM_APPROVAL_LIMIT = 5000;
+// PM can approve quotes strictly below this amount; at/above it, the
+// request escalates to the Director. Now Master-configurable in
+// Master → Approval Routing → Quote Amount Escalation (admin_configs
+// 'quote_amount_routing'); 5000 below is only the fallback used until
+// openPR() refreshes it from that config. See _loadQuoteAmountRouting in
+// shared.js.
+let PM_APPROVAL_LIMIT = 5000;
 
 // Shared INR-equivalent calc used for the ₹5,000 director-escalation threshold.
 function computeINRAmount(q) {
@@ -1234,7 +1242,7 @@ async function submitPR() {
   if(willNeedClearance){
     showLoader(true);
     try {
-      ({approverId:initialApproverId, needsReassignment}=await resolveApproverForSubmission(currentUser,projectId,requestFor,discipline));
+      ({approverId:initialApproverId, needsReassignment}=await resolveApproverForSubmission(currentUser,projectId,requestFor,discipline,'clearance'));
     } catch(e) {
       showLoader(false);
       console.error('Approver resolution failed:',e);
@@ -1242,6 +1250,20 @@ async function submitPR() {
       return;
     }
     showLoader(false);
+  }
+
+  // ── Resolve WHO owns final Quote Approval from Master Admin's routing
+  //    config, same as Engineer submissions. Falls back to the manually
+  //    picked PM only if nothing is configured. ──
+  let quotePmId=pmId, quotePmName=allPMs.find(p=>p.id===pmId)?.name||currentUser.name;
+  if(!isLP){
+    try {
+      const{approverId:routedQuoteId}=await resolveApproverForSubmission(currentUser,projectId,requestFor,discipline,'quote');
+      if(routedQuoteId){
+        quotePmId=routedQuoteId;
+        quotePmName=await getUserName(routedQuoteId)||quotePmName;
+      }
+    } catch(e){ console.warn('Quote approver routing failed, using manually-selected PM:',e.message); }
   }
   const basePhase=isLP?'lp_submitted':isVI?'procurement_active':(needsReassignment?'pending_master_reassignment':'pending_initial_pm_approval');
 
@@ -1251,9 +1273,9 @@ async function submitPR() {
     discipline:(!isVI&&!isLP)?discipline:null,
     project_name:projectName,
     project_phase:projectPhase,
-    assigned_pm_id:isLP?lpFinalPmId:pmId,
+    assigned_pm_id:isLP?lpFinalPmId:quotePmId,
     initial_approver_id:isLP?lpFinalPmId:((willNeedClearance&&!needsReassignment)?initialApproverId:null),
-    project_manager_name:isLP?lpFinalPmName:(allPMs.find(p=>p.id===pmId)?.name||currentUser.name),
+    project_manager_name:isLP?lpFinalPmName:quotePmName,
     team_member_name:currentUser.name,
     department:dept,
     urgency,

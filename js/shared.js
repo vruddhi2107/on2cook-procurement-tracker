@@ -104,64 +104,167 @@ window.dbFetch = dbFetch;
 const _fileRegistry = [];
 
 // ══════════════════════════════════════════════════════════════
-// INITIAL-CLEARANCE APPROVAL ROUTING
-// Resolves who must grant "requirement clearance" (pending_initial_pm_approval)
-// for a new RFQ, based on request_for (npd/production) x discipline
-// (elec/mechanical) — 4 standing combos — with per-project overrides.
-// This is INDEPENDENT of assigned_pm_id, which still drives final quote
-// approval and stays tied to the project's linked Project Manager.
+// APPROVAL ROUTING — CLEARANCE  vs.  QUOTE APPROVAL
 //
-// Priority order:
-//  1. GENERIC "Routing Group" override — any project can be tagged with a
-//     named routing_group (e.g. "CM Yuva") from the Projects page. Master
-//     assigns ONE manager per group (Master → Approval Routing → Project
-//     Routing Groups), and that write fans out to all 4 request_for x
-//     discipline combos, so that one person gets authority across both
-//     NPD/Production and both Elec/Mechanical for every project tagged with
-//     that group. This is the fully generic, admin-configurable version of
-//     what used to be the Antunes-only special case below.
-//  2. LEGACY Antunes override — kept working as-is for existing configured
-//     data: only applies if the project is flagged is_antunes AND a routing
-//     row exists for this exact request_for/discipline combo.
-//  3. Default department routing (one of the 4 standing combos).
+// Every request has TWO separate approver roles, resolved completely
+// independently of each other, both fully configurable from Master Admin
+// (Master → Approval Routing) — nothing here should ever require a
+// per-request manual pick as normal operation:
+//
+//   'clearance' — grants initial requirement clearance
+//                 (pending_initial_pm_approval). Lands in
+//                 procurement_requests.initial_approver_id.
+//   'quote'     — owns final quote approval. Lands in
+//                 procurement_requests.assigned_pm_id.
+//
+// Both roles share the exact same 3-tier admin-configured chain, resolved
+// by resolveRoutedApprover(projectId, requestFor, discipline, approvalType):
+//
+//   1. Routing Group override (routing_overrides) — a project tagged with a
+//      named group (Projects page) gets a manager PER APPROVAL TYPE for
+//      that group (Master → Approval Routing → Project Routing Groups now
+//      has a Clearance column AND a Quote Approval column).
+//   2. Legacy Antunes override (antunes_routing) — clearance only (this
+//      table predates the clearance/quote split and was never used for
+//      quote approval), applies only when the project is flagged is_antunes.
+//   3. Default Department Routing (department_routing) — per request_for x
+//      discipline x approval_type. This is the generic fallback matrix.
+//   4. Quote approval ONLY: the project's own default_pm_id (Projects page)
+//      — kept as a last-resort default since that's the pre-existing
+//      behavior for NPD projects.
+//   5. Master's universal Fallback Approver (admin_configs, config_type
+//      'default_fallback_approvers') — one clearance default + one quote
+//      default, configured ONCE (Master → Approval Routing → Fallback
+//      Approvers). This is what makes the manual-reassignment queue a true
+//      last resort instead of a routine landing spot: as long as Master
+//      sets these two, resolution never comes back empty.
+//
+// On top of that chain, a per-user FIXED override (set on the user's own
+// record) always wins outright for that user, split by request_for AND by
+// approval_type — see resolveApproverForSubmission below.
 // ══════════════════════════════════════════════════════════════
-async function resolveInitialApprover(projectId, requestFor, discipline) {
-  if (!discipline || !requestFor) return null;
+
+// Cached for the page's lifetime; Master's admin UI calls
+// _invalidateFallbackApproversCache() after saving so the next resolution
+// on that same page picks up the change immediately.
+let _fallbackApproversCache = null;
+async function _loadFallbackApprovers() {
+  if (_fallbackApproversCache) return _fallbackApproversCache;
   try {
+    const { data, error } = await db.from('admin_configs').select('config_data').eq('config_type', 'default_fallback_approvers').maybeSingle();
+    if (error) throw error;
+    _fallbackApproversCache = (data && data.config_data) || {};
+  } catch (e) {
+    console.warn('_loadFallbackApprovers failed:', e.message);
+    _fallbackApproversCache = {};
+  }
+  return _fallbackApproversCache;
+}
+window._loadFallbackApprovers = _loadFallbackApprovers;
+function _invalidateFallbackApproversCache() { _fallbackApproversCache = null; }
+window._invalidateFallbackApproversCache = _invalidateFallbackApproversCache;
+
+// ══════════════════════════════════════════════════════════════
+// QUOTE AMOUNT ESCALATION — Master-configurable ₹ threshold that decides
+// whether a request's quote goes to the Project Manager or is escalated to
+// the Director, replacing the old hardcoded ENGINEER_APPROVAL_LIMIT /
+// PM_APPROVAL_LIMIT constants (both were 5000, duplicated in two files).
+//
+// Stored in admin_configs, config_type 'quote_amount_routing':
+//   { threshold_inr: 5000, director_id: <uuid|null> }
+//
+// NOTE: this is a separate mechanism from resolveRoutedApprover() above.
+// It doesn't decide WHO the Quote Approver (assigned_pm_id) is — that's
+// still resolved by the routing chain at submission time, before any
+// quotation (and therefore any amount) exists. This threshold instead
+// decides which PHASE a request moves to once a quote amount is actually
+// known (quotations_shared / PM final approval): pending_pm_final_approval
+// vs pending_sandy_approval. Director access to that phase is still
+// role-gated (role='director' or 'master') — director_id here is used for
+// display/notification purposes, not as an access check.
+//
+// DEFAULT BEHAVIOR: when nothing above (routing groups, department
+// routing, project default PM) is configured for Quote Approval, routing
+// falls through to this amount-based rule automatically — i.e. "goes as
+// per the request": under the threshold to the Project Manager, at/above
+// it to the Director. See resolveRoutedApprover()'s doc comment for the
+// Quote Approver chain itself.
+// ══════════════════════════════════════════════════════════════
+let _quoteAmountRoutingCache = null;
+async function _loadQuoteAmountRouting() {
+  if (_quoteAmountRoutingCache) return _quoteAmountRoutingCache;
+  try {
+    const { data, error } = await db.from('admin_configs').select('config_data').eq('config_type', 'quote_amount_routing').maybeSingle();
+    if (error) throw error;
+    const cfg = (data && data.config_data) || {};
+    _quoteAmountRoutingCache = {
+      threshold_inr: (typeof cfg.threshold_inr === 'number' && cfg.threshold_inr >= 0) ? cfg.threshold_inr : 5000,
+      director_id: cfg.director_id || null
+    };
+  } catch (e) {
+    console.warn('_loadQuoteAmountRouting failed:', e.message);
+    _quoteAmountRoutingCache = { threshold_inr: 5000, director_id: null };
+  }
+  return _quoteAmountRoutingCache;
+}
+window._loadQuoteAmountRouting = _loadQuoteAmountRouting;
+function _invalidateQuoteAmountRoutingCache() { _quoteAmountRoutingCache = null; }
+window._invalidateQuoteAmountRoutingCache = _invalidateQuoteAmountRoutingCache;
+
+async function resolveRoutedApprover(projectId, requestFor, discipline, approvalType) {
+  if (!discipline || !requestFor) return null;
+  approvalType = approvalType === 'quote' ? 'quote' : 'clearance';
+  try {
+    let proj = null;
     if (projectId) {
-      const { data: proj } = await db.from('projects').select('is_antunes, routing_group').eq('id', projectId).maybeSingle();
+      const { data } = await db.from('projects').select('is_antunes, routing_group, default_pm_id').eq('id', projectId).maybeSingle();
+      proj = data || null;
       // 1. Generic routing-group override (any project, any admin-named group)
       if (proj && proj.routing_group) {
         const { data: gRow } = await db.from('routing_overrides')
           .select('manager_id').eq('routing_group', proj.routing_group)
-          .eq('request_for', requestFor).eq('discipline', discipline).maybeSingle();
+          .eq('request_for', requestFor).eq('discipline', discipline).eq('approval_type', approvalType).maybeSingle();
         if (gRow && gRow.manager_id) return gRow.manager_id;
       }
-      // 2. Legacy Antunes override — only applies if the project is flagged is_antunes
-      //    AND a routing row exists for this exact request_for/discipline combo.
-      if (proj && proj.is_antunes) {
+      // 2. Legacy Antunes override — clearance only, project flagged is_antunes.
+      if (approvalType === 'clearance' && proj && proj.is_antunes) {
         const { data: aRow } = await db.from('antunes_routing')
           .select('manager_id').eq('request_for', requestFor).eq('discipline', discipline).maybeSingle();
         if (aRow && aRow.manager_id) return aRow.manager_id;
       }
     }
-    // 3. Default department routing (one of the 4 standing combos)
+    // 3. Default Department Routing, for this approval type
     const { data: dRow } = await db.from('department_routing')
-      .select('manager_id').eq('request_for', requestFor).eq('discipline', discipline).maybeSingle();
-    return dRow ? dRow.manager_id : null;
+      .select('manager_id').eq('request_for', requestFor).eq('discipline', discipline).eq('approval_type', approvalType).maybeSingle();
+    if (dRow && dRow.manager_id) return dRow.manager_id;
+    // 4. Quote approval only: the project's own linked PM, as a last resort
+    //    before the universal fallback.
+    if (approvalType === 'quote' && proj && proj.default_pm_id) return proj.default_pm_id;
+    // 5. Master's universal Fallback Approver — the safety net.
+    const fallback = await _loadFallbackApprovers();
+    const fbId = approvalType === 'quote' ? fallback.quote : fallback.clearance;
+    if (fbId) return fbId;
+    return null;
   } catch (e) {
-    console.warn('resolveInitialApprover failed:', e.message);
+    console.warn('resolveRoutedApprover failed:', e.message);
     return null;
   }
 }
-window.resolveInitialApprover = resolveInitialApprover;
+window.resolveRoutedApprover = resolveRoutedApprover;
+// Back-compat alias for any code (or cached browser tab) still calling the
+// old clearance-only name directly.
+window.resolveInitialApprover = function(projectId, requestFor, discipline) {
+  return resolveRoutedApprover(projectId, requestFor, discipline, 'clearance');
+};
 
 // True if this request cannot go straight to the auto-resolved approver and
-// instead needs a human at Master Admin to pick and forward it:
-//  - no routing configured at all for this combo (resolvedApproverId is null)
-//  - the requester IS the resolved approver (can't clear your own request)
+// instead needs a human at Master Admin to pick and forward it. With the
+// Fallback Approver (step 5 above) configured, resolvedApproverId should
+// essentially never come back null in normal operation — this is now a
+// true last-resort check, covering:
+//  - genuinely nothing configured anywhere, including the fallback (null)
+//  - the requester IS the resolved approver (can't approve your own request)
 //  - the requester has been flagged by Master as always needing manual routing
-//    (covers managers/PMs, or any "exceptional" user Master wants routed by hand)
 function needsManualReassignment(requesterUser, resolvedApproverId) {
   if (!resolvedApproverId) return true;
   if (requesterUser?.manual_routing) return true;
@@ -170,52 +273,65 @@ function needsManualReassignment(requesterUser, resolvedApproverId) {
 }
 window.needsManualReassignment = needsManualReassignment;
 
-// Single entry point used at submission time. Priority order:
-//  1. Fixed per-user override — "everything user A submits goes straight to
-//     user B", set on the user record by Master. Bypasses discipline
-//     routing AND the manual-reassignment queue entirely (it's a standing,
-//     pre-decided answer, irrespective of role/department/category).
-//  2. Antunes / department discipline routing (resolveInitialApprover).
-//  3. If that's empty, is the requester themselves, or the requester is
-//     flagged manual_routing — send to Master's reassignment queue.
+// Single entry point used at submission time, for EITHER role. Priority:
+//  1. Fixed per-user override for this exact (request_for, approvalType) —
+//     "everything user A submits as NPD Quote goes straight to user B" —
+//     set on the user record by Master. Bypasses the routing chain AND the
+//     manual-reassignment queue entirely.
+//  2. resolveRoutedApprover() — the full admin-configured chain above.
+//  3. Self-approval collision (resolved === requester): retry once against
+//     Master's universal Fallback Approver before giving up, since that's
+//     exactly what the fallback exists for.
+//  4. If still empty, or the requester is flagged manual_routing — send to
+//     Master's reassignment queue (should be rare once configured).
 //
 // IMPORTANT: `requesterUser` is normally the cached Session object, which is
-// only ever refreshed on login. manual_routing / override_approver_id are
+// only ever refreshed on login. manual_routing / the override fields are
 // exactly the kind of setting Master can change mid-session without the
-// requester logging out — so we re-fetch those two fields live from the
-// users table here rather than trusting whatever's cached, to avoid acting
-// on a stale override/flag.
-async function resolveApproverForSubmission(requesterUser, projectId, requestFor, discipline) {
-  console.log('%c[ROUTING] resolveApproverForSubmission called — build v3 (npd/production split override)', 'color:#7c3aed;font-weight:bold', { requesterId: requesterUser?.id, requesterName: requesterUser?.name, projectId, requestFor, discipline });
+// requester logging out — so we re-fetch them live from the users table
+// here rather than trusting whatever's cached, to avoid acting on a stale
+// override/flag.
+async function resolveApproverForSubmission(requesterUser, projectId, requestFor, discipline, approvalType) {
+  approvalType = approvalType === 'quote' ? 'quote' : 'clearance';
 
   let liveUser = requesterUser;
   try {
     const { data, error } = await db.from('users')
-      .select('id, manual_routing, override_approver_id, override_approver_npd_id, override_approver_production_id')
+      .select('id, manual_routing, override_approver_id, override_approver_npd_id, override_approver_production_id, override_approver_npd_quote_id, override_approver_production_quote_id')
       .eq('id', requesterUser.id).maybeSingle();
     if (error) throw error;
     if (data) liveUser = { ...requesterUser, ...data };
-    console.log('%c[ROUTING] live user flags fetched:', 'color:#7c3aed', data);
   } catch (e) {
     console.warn('[ROUTING] Could not refresh live routing flags for user, falling back to cached session:', e.message);
   }
 
-  // Fixed override, split by request_for: an NPD-specific target and a
-  // Production-specific target. Falls back to the legacy single
-  // override_approver_id (pre-split) only if neither specific field is set,
-  // so existing configurations keep working until re-set explicitly.
-  const overrideId = requestFor === 'production'
-    ? (liveUser?.override_approver_production_id || (!liveUser?.override_approver_npd_id ? liveUser?.override_approver_id : null))
-    : (liveUser?.override_approver_npd_id || (!liveUser?.override_approver_production_id ? liveUser?.override_approver_id : null));
+  // Fixed override, split by request_for AND by approval type. Clearance
+  // falls back to the legacy single override_approver_id (pre-split) only
+  // if neither NPD/Production clearance field is set, so existing
+  // configurations keep working untouched. Quote overrides are new fields
+  // with no legacy fallback.
+  let overrideId;
+  if (approvalType === 'quote') {
+    overrideId = requestFor === 'production' ? liveUser?.override_approver_production_quote_id : liveUser?.override_approver_npd_quote_id;
+  } else {
+    overrideId = requestFor === 'production'
+      ? (liveUser?.override_approver_production_id || (!liveUser?.override_approver_npd_id ? liveUser?.override_approver_id : null))
+      : (liveUser?.override_approver_npd_id || (!liveUser?.override_approver_production_id ? liveUser?.override_approver_id : null));
+  }
 
   if (overrideId && overrideId !== liveUser.id) {
-    console.log('%c[ROUTING] DECISION: fixed override applies ('+requestFor+') -> '+overrideId, 'color:#059669;font-weight:bold');
     return { approverId: overrideId, needsReassignment: false };
   }
-  console.log('%c[ROUTING] DECISION: no override in effect for '+requestFor+', falling back to department/Antunes routing', 'color:#b45309;font-weight:bold');
-  const resolved = await resolveInitialApprover(projectId, requestFor, discipline);
+
+  let resolved = await resolveRoutedApprover(projectId, requestFor, discipline, approvalType);
+  if (resolved && resolved === liveUser.id) {
+    // Self-approval collision — try the universal fallback once before
+    // giving up, instead of dumping straight into the manual queue.
+    const fallback = await _loadFallbackApprovers();
+    const fbId = approvalType === 'quote' ? fallback.quote : fallback.clearance;
+    resolved = (fbId && fbId !== liveUser.id) ? fbId : null;
+  }
   const needsReassignment = needsManualReassignment(liveUser, resolved);
-  console.log('%c[ROUTING] department/Antunes result:', 'color:#7c3aed', { resolved, needsReassignment });
   return { approverId: resolved, needsReassignment };
 }
 window.resolveApproverForSubmission = resolveApproverForSubmission;
