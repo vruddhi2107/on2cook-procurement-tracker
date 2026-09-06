@@ -632,7 +632,7 @@
 <div class="modal-overlay" id="payReqModal">
   <div class="modal" style="max-width:680px">
     <div class="modal-header">
-      <div><div class="modal-title"> Create Payment Request</div><div class="modal-title-sub" id="payReqSub"></div></div>
+      <div><div class="modal-title" id="payReqTitle"> Create Payment Request</div><div class="modal-title-sub" id="payReqSub"></div></div>
       <button class="modal-close" onclick="closeModal('payReqModal')"></button>
     </div>
     <div class="modal-body" id="payReqBody" style="max-height:78vh;overflow-y:auto"></div>
@@ -1559,47 +1559,37 @@ async function openPR(id) {
 
   // ── QC PASSED ──
   if(currentPR.phase==='qc_passed') {
-    // A vendor on 100% advance terms (paid in full before/at ordering — e.g.
-    // Amazon-style portals) has nothing left to pay post-delivery. Skip the
-    // "Raise Full Payment" step entirely and let Procurement close it directly.
-    //
-    // IMPORTANT: this must read the payment-terms SNAPSHOT taken when the PO
-    // was generated (purchase_orders.is_full_advance / vendor_payment_terms),
-    // NOT the vendor's live payment_terms. The vendor record can be edited
-    // any time after this PR's PO was raised (e.g. for a future order), and
-    // that must never retroactively change what an already-placed order owes.
-    // `currentPR.advance_option` (set at submission, before a vendor/PO even
-    // exists) is kept only as a legacy fallback for PRs raised before this
-    // snapshot existed.
-    const vendorObj = vd?.data;
-    const hasSnapshot = existingPO && existingPO.is_full_advance !== null && existingPO.is_full_advance !== undefined;
-    const isFullAdvance = hasSnapshot
-      ? existingPO.is_full_advance
-      : (vendorObj?.payment_terms === 'full_advance' || currentPR.advance_option === 'full_advance');
-    const advanceConfirmedReceived = advRes?.data?.status === 'payment_received';
+    // Payment resolution at QC-passed is a fully manual, human-declared call —
+    // no automated detection of "fully paid" from PO/vendor payment-term
+    // snapshots or amount sums. Whoever closes this out picks the option that
+    // matches reality:
+    //  - An advance was raised for this PR at some point (any status) →
+    //    show "Payment Already Made" (close directly, nothing more owed) and
+    //    "Pay Remaining Amount" (raise whatever balance is actually still due,
+    //    however many advance rounds it took to get there) side by side.
+    //  - No advance was ever raised for this PR → show "Pay Full" only.
+    const hasAdvance = !!advRes?.data;
+    const rateBtn = currentPR.assigned_vendor_id
+      ? `<button class="btn btn-secondary" onclick="openRateModal('${currentPR.id}','${currentPR.assigned_vendor_id}')">⭐ Rate Vendor</button>`
+      : '';
 
-    if (isFullAdvance) {
-      actionSection = advanceConfirmedReceived
-        ? `<div class="action-section" style="background:rgba(22,163,74,0.04);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:14px">
-            <div class="action-section-title" style="color:#16a34a"> QC Passed — 100% Advance Already Settled</div>
-            <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">This vendor is on 100% advance terms and the advance payment was already confirmed received (${fmtDate(advRes.data.confirmed_at||advRes.data.created_at)}). There is no post-delivery payment to raise — close this request directly.</p>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <button class="btn btn-success" onclick="closeFullAdvancePR('${id}')"> Close Request — Advance Already Paid</button>
-              ${currentPR.assigned_vendor_id?`<button class="btn btn-secondary" onclick="openRateModal('${currentPR.id}','${currentPR.assigned_vendor_id}')">⭐ Rate Vendor</button>`:''}
-            </div>
-          </div>`
-        : `<div class="action-section" style="background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius);padding:14px">
-            <div class="action-section-title" style="color:#b45309"> QC Passed — 100% Advance Vendor, Payment Not Yet Confirmed</div>
-            <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">This vendor is on 100% advance terms, so there's no separate post-delivery payment step — but Accounts hasn't confirmed the advance as received yet. Raise/confirm the advance before closing.</p>
-            <div style="font-size:0.78rem;color:var(--gray-4)">Check the Advance Payment status above, or raise it via Smartsheet if it hasn't been sent yet.</div>
-          </div>`;
+    if (hasAdvance) {
+      actionSection = `<div class="action-section" style="background:rgba(22,163,74,0.04);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:14px">
+          <div class="action-section-title" style="color:#16a34a"> QC Passed — Resolve Payment</div>
+          <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:10px">An advance was raised for this PR (last one: ${advRes.data.currency||'AED'} ${Number(advRes.data.amount||0).toLocaleString()} — ${advRes.data.status.replace(/_/g,' ')}${advRes.data.confirmed_at?', confirmed '+fmtDate(advRes.data.confirmed_at):''}). Pick whichever matches what's actually happened with this vendor:</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-success" onclick="closeFullAdvancePR('${id}')"> Payment Already Made (100% Advance)</button>
+            <button class="btn btn-primary" onclick="openPaymentRequestModal('${id}','remaining')"> Pay Remaining Amount</button>
+            ${rateBtn}
+          </div>
+        </div>`;
     } else {
-      actionSection=`<div class="action-section" style="background:rgba(22,163,74,0.04);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:14px">
-        <div class="action-section-title" style="color:#16a34a"> QC Passed — Raise Full Payment</div>
-        <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">QC is complete. Raise the full payment via Smartsheet — attach the screenshot and Payment ID.</p>
+      actionSection = `<div class="action-section" style="background:rgba(22,163,74,0.04);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:14px">
+        <div class="action-section-title" style="color:#16a34a"> QC Passed — Raise Payment</div>
+        <p style="font-size:0.82rem;color:var(--gray-3);margin-bottom:12px">No advance was raised for this PR. Raise the full payment via Smartsheet — attach the screenshot and Payment ID.</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="openPaymentRequestModal('${id}')"> Raise Full Payment via Smartsheet</button>
-          ${currentPR.assigned_vendor_id?`<button class="btn btn-secondary" onclick="openRateModal('${currentPR.id}','${currentPR.assigned_vendor_id}')">⭐ Rate Vendor</button>`:''}
+          <button class="btn btn-primary" onclick="openPaymentRequestModal('${id}','full')"> Pay Full</button>
+          ${rateBtn}
         </div>
       </div>`;
     }
@@ -3067,7 +3057,9 @@ async function reRequestAdvance() {
 }
 
 // ── PAYMENT REQUEST ───────────────────────────────────────────
-async function openPaymentRequestModal(prId) {
+async function openPaymentRequestModal(prId, mode) {
+  mode = mode === 'remaining' ? 'remaining' : 'full';
+  window._payReqMode = mode;
   paymentRequestFiles = [];
   const pr=currentPR;
   const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',prId);
@@ -3076,11 +3068,12 @@ async function openPaymentRequestModal(prId) {
   const pt=PAYMENT_TERMS_OPTIONS.find(p=>p.value===vendor?.payment_terms);
   const now=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 
+  document.getElementById('payReqTitle').textContent = mode==='remaining' ? ' Raise Remaining Payment' : ' Create Payment Request';
   document.getElementById('payReqSub').textContent=`PR-${String(pr.request_number).padStart(4,'0')} — ${pr.project_name}`;
   document.getElementById('payReqBody').innerHTML=`
     <div style="background:rgba(22,163,74,0.05);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px">
-      <div style="font-size:0.8rem;font-weight:600;color:#16a34a;margin-bottom:2px"> Auto-filled from QC Passed request</div>
-      <div style="font-size:0.74rem;color:var(--gray-3)">Review and complete before submitting to accounts</div>
+      <div style="font-size:0.8rem;font-weight:600;color:#16a34a;margin-bottom:2px"> ${mode==='remaining' ? 'Remaining payment — advance already covers part of this order' : 'Auto-filled from QC Passed request'}</div>
+      <div style="font-size:0.74rem;color:var(--gray-3)">${mode==='remaining' ? 'Enter only the balance still due to the vendor, not the full order value.' : 'Review and complete before submitting to accounts'}</div>
     </div>
     <div class="payment-req-form">
       <div class="form-grid">
@@ -3121,12 +3114,12 @@ async function openPaymentRequestModal(prId) {
       </div>`:''}
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label">Invoice Amount *</label>
+          <label class="form-label">${mode==='remaining' ? 'Remaining Amount Due *' : 'Invoice Amount *'}</label>
           <div class="currency-amount-wrap">
             <select class="form-control currency-select" id="prInvCurrency">
               ${CURRENCIES.map(c=>`<option value="${c}" ${c===(selectedQ?.currency||'AED')?'selected':''}>${c}</option>`).join('')}
             </select>
-            <input class="form-control currency-input" id="prInvAmount" type="number" value="${selectedQ?.amount||''}" placeholder="0.00"/>
+            <input class="form-control currency-input" id="prInvAmount" type="number" value="${mode==='remaining' ? '' : (selectedQ?.amount||'')}" placeholder="${mode==='remaining' ? 'Enter balance still due' : '0.00'}"/>
           </div>
         </div>
         <div class="form-group">
@@ -3212,7 +3205,7 @@ async function submitPaymentRequest() {
     }).eq('id', currentPR.id);
     notifyPhaseChange(currentPR.id, 'payment_raised_to_accounts', currentUser?.id);
     await window.postComment(currentPR.id, currentUser.id,
-      ` Full payment of ${invCur} ${invAmt.toLocaleString()} raised to accounts via Smartsheet. Payment ID: ${ssPayId}`);
+      ` ${window._payReqMode==='remaining' ? 'Remaining payment' : 'Full payment'} of ${invCur} ${invAmt.toLocaleString()} raised to accounts via Smartsheet. Payment ID: ${ssPayId}`);
     if (paymentRequestFiles.length) {
       for (const f of paymentRequestFiles) {
         await db.from('pr_attachments').insert({
@@ -3236,6 +3229,7 @@ async function submitPaymentRequest() {
   showLoader(false);
   if(error){showToast('Error: '+error.message,'error');return;}
   showToast('Payment raised to accounts via Smartsheet!','success');
+  window._payReqMode = null;
   closeModal('payReqModal');closeModal('prModal');await loadRequests();
 }
 
@@ -3340,13 +3334,14 @@ async function markAdvanceReceived(prId, advId) {
   closeModal('prModal'); await loadRequests();
 }
 
-// ── PROCUREMENT MANAGER: MARK FULL PAYMENT RECEIVED & CLOSE PR ─
-// ── CLOSE PR DIRECTLY WHEN 100% ADVANCE ALREADY SETTLED ──────
-// For vendors on full-advance terms, payment happened before/at ordering,
-// so QC Passed goes straight to closed — no separate "raise/receive payment"
-// step, matching how pay-first portals (e.g. Amazon-style) work.
+// ── PROCUREMENT MANAGER: CLOSE PR — PAYMENT ALREADY MADE VIA ADVANCE ──
+// Manual, human-declared call at QC-passed: whoever is closing this out is
+// confirming that the advance(s) already raised for this PR cover the full
+// order value, so there's nothing left to raise post-delivery. No automated
+// check against vendor terms or PO snapshots — the person clicking this is
+// trusted to know the real payment status.
 async function closeFullAdvancePR(prId) {
-  if (!confirm('Close this request? The 100% advance already covers the full order — there is no further payment to raise.')) return;
+  if (!confirm('Close this request? This confirms the advance payment(s) already made cover the full order — no further payment will be raised.')) return;
   showLoader(true);
   const now = new Date().toISOString();
   const ts = addPhaseTimestamp(currentPR, 'closed_full_advance');
@@ -3360,11 +3355,11 @@ async function closeFullAdvancePR(prId) {
   if (!error) {
     notifyPhaseChange(prId, 'closed_full_advance', currentUser?.id);
     await window.postComment(prId, currentUser.id,
-      ' Request closed — 100% advance already covers full payment, no post-delivery payment due.');
+      ' Request closed — advance payment(s) already made cover the full order, no post-delivery payment due.');
   }
   showLoader(false);
   if (error) { showToast('Error: ' + error.message, 'error'); return; }
-  showToast(' Closed — advance already settled!', 'success');
+  showToast(' Closed — payment already settled!', 'success');
   closeModal('prModal'); await loadRequests();
 }
 
