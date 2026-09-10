@@ -182,20 +182,22 @@
     <div class="card" style="border:1.5px solid rgba(99,102,241,0.25);background:rgba(99,102,241,0.02)">
       <div class="card-header">
         <span class="section-title" style="color:#6366f1"> Project Routing Groups</span>
-        <span style="font-size:0.8rem;color:var(--gray-3)">Pick any name (e.g. "CM Yuva") and TWO managers — one for Clearance, one for Quote Approval. Each gets authority across BOTH NPD &amp; Production and BOTH Elec &amp; Mechanical for every project tagged with this group.</span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Pick any name (e.g. "CM Yuva") and up to THREE managers — Clearance, Quote Approval, and (optionally) Director Approval. Each gets authority across BOTH NPD &amp; Production and BOTH Elec &amp; Mechanical for every project tagged with this group. Director Approval can be left blank — that keeps the default, open Director/Master queue — or set to any single person (any role) who should exclusively receive Director-level escalations for this group's projects instead.</span>
       </div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>Group</th><th>Clearance Manager</th><th>Quote Approver</th><th>Projects Tagged</th><th></th></tr></thead>
-          <tbody id="routingGroupsBody"><tr><td colspan="5" style="text-align:center;padding:20px;color:var(--gray-4)">Loading...</td></tr></tbody>
+          <thead><tr><th>Group</th><th>Clearance Manager</th><th>Quote Approver</th><th>Director Approver</th><th>Projects Tagged</th><th></th></tr></thead>
+          <tbody id="routingGroupsBody"><tr><td colspan="6" style="text-align:center;padding:20px;color:var(--gray-4)">Loading...</td></tr></tbody>
         </table>
       </div>
       <div style="padding:14px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input class="form-control" id="newRoutingGroupName" placeholder="New group name, e.g. CM Yuva" style="max-width:220px"/>
-        <select class="form-control" id="newRoutingGroupManager" style="max-width:260px"></select>
-        <select class="form-control" id="newRoutingGroupQuoteManager" style="max-width:260px"></select>
+        <select class="form-control" id="newRoutingGroupManager" style="max-width:220px"></select>
+        <select class="form-control" id="newRoutingGroupQuoteManager" style="max-width:220px"></select>
+        <select class="form-control" id="newRoutingGroupDirectorManager" style="max-width:220px"></select>
         <button class="btn btn-primary btn-sm" onclick="createRoutingGroup()">+ Create Group</button>
       </div>
+      <div style="padding:0 16px 6px;font-size:0.72rem;color:var(--gray-4)">Director Approver dropdown: "— Default Director queue —" leaves Director Approval open to any director/master, as today.</div>
       <div style="padding:0 16px 14px;font-size:0.72rem;color:var(--gray-4)">Then go to Projects and set that project's "Routing Group" field to this same name.</div>
     </div>
   </div>
@@ -474,7 +476,7 @@ async function loadVendors() {
 
 let deptRouting=[], antunesRouting=[], routingOverrides=[], routingProjects=[];
 const ROUTING_COMBOS=[['npd','elec'],['npd','mechanical'],['production','elec'],['production','mechanical']];
-const APPROVAL_TYPES=['clearance','quote'];
+const APPROVAL_TYPES=['clearance','quote','director'];
 
 async function loadRoutingConfig() {
   const[dr,ar,ro,rp]=await Promise.all([
@@ -527,6 +529,7 @@ function summarizeRoutingGroups() {
       name,
       clearanceManagerId: byType.clearance,
       quoteManagerId: byType.quote,
+      directorManagerId: byType.director,
       inconsistent,
       configuredCombos: rows.length,
       projectCount
@@ -534,13 +537,14 @@ function summarizeRoutingGroups() {
   }).sort((a,b)=>a.name.localeCompare(b.name));
 }
 
-function userPickerOptions(selectedId, excludeId) {
-  const opts=['<option value="">— Unassigned —</option>'];
+function userPickerOptions(selectedId, excludeId, blankLabel) {
+  const opts=[`<option value="">${blankLabel||'— Unassigned —'}</option>`];
   [...allUsers].filter(u=>u.id!==excludeId).sort((a,b)=>a.name.localeCompare(b.name)).forEach(u=>{
     opts.push(`<option value="${u.id}" ${u.id===selectedId?'selected':''}>${u.name} (${u.role})</option>`);
   });
   return opts.join('');
 }
+const DIRECTOR_APPROVER_BLANK_LABEL = '— Default Director queue —';
 
 function renderRoutingTab() {
   document.getElementById('deptRoutingBody').innerHTML=ROUTING_COMBOS.map(([rf,disc])=>{
@@ -569,6 +573,7 @@ function renderRoutingTab() {
   renderRoutingGroups();
   document.getElementById('newRoutingGroupManager').innerHTML = userPickerOptions(null);
   document.getElementById('newRoutingGroupQuoteManager').innerHTML = userPickerOptions(null);
+  document.getElementById('newRoutingGroupDirectorManager').innerHTML = userPickerOptions(null, null, DIRECTOR_APPROVER_BLANK_LABEL);
   renderFallbackApprovers();
   renderQuoteAmountRouting();
   renderReassignQueue();
@@ -631,11 +636,12 @@ async function saveFallbackApprovers() {
 function renderRoutingGroups() {
   const body=document.getElementById('routingGroupsBody');
   const groups=summarizeRoutingGroups();
-  if(!groups.length){ body.innerHTML='<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--gray-4)">No routing groups yet — create one below</td></tr>'; return; }
+  if(!groups.length){ body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--gray-4)">No routing groups yet — create one below</td></tr>'; return; }
   body.innerHTML=groups.map((g,i)=>`<tr>
     <td><strong>${escHtml(g.name)}</strong>${g.inconsistent?' <span style="color:var(--red);font-size:0.68rem" title="This group\'s combos don\'t all point to the same manager for one role — re-save to fix"> mixed</span>':''}</td>
-    <td><select class="form-control" id="rg-manager-${i}" style="max-width:220px">${userPickerOptions(g.clearanceManagerId)}</select></td>
-    <td><select class="form-control" id="rg-quote-manager-${i}" style="max-width:220px">${userPickerOptions(g.quoteManagerId)}</select></td>
+    <td><select class="form-control" id="rg-manager-${i}" style="max-width:200px">${userPickerOptions(g.clearanceManagerId)}</select></td>
+    <td><select class="form-control" id="rg-quote-manager-${i}" style="max-width:200px">${userPickerOptions(g.quoteManagerId)}</select></td>
+    <td><select class="form-control" id="rg-director-manager-${i}" style="max-width:200px">${userPickerOptions(g.directorManagerId, null, DIRECTOR_APPROVER_BLANK_LABEL)}</select></td>
     <td style="font-family:var(--font-mono);font-size:0.8rem">${g.projectCount}</td>
     <td style="white-space:nowrap">
       <button class="btn btn-primary btn-sm" onclick="saveRoutingGroup('${g.name.replace(/'/g,"\\'")}', ${i})">Save</button>
@@ -653,8 +659,10 @@ function renderRoutingGroups() {
 async function saveRoutingGroup(name, rowIndex) {
   const clearSel=document.getElementById(`rg-manager-${rowIndex}`);
   const quoteSel=document.getElementById(`rg-quote-manager-${rowIndex}`);
+  const directorSel=document.getElementById(`rg-director-manager-${rowIndex}`);
   const clearanceId=clearSel?clearSel.value:'';
   const quoteId=quoteSel?quoteSel.value:'';
+  const directorId=directorSel?directorSel.value:'';
   showLoader(true);
   // Delete-then-insert rather than upsert, since routing_overrides has no
   // guaranteed unique constraint on (routing_group,request_for,discipline,approval_type).
@@ -664,6 +672,7 @@ async function saveRoutingGroup(name, rowIndex) {
     const rows=[];
     if(clearanceId) ROUTING_COMBOS.forEach(([rf,disc])=>rows.push({routing_group:name,request_for:rf,discipline:disc,approval_type:'clearance',manager_id:clearanceId}));
     if(quoteId) ROUTING_COMBOS.forEach(([rf,disc])=>rows.push({routing_group:name,request_for:rf,discipline:disc,approval_type:'quote',manager_id:quoteId}));
+    if(directorId) ROUTING_COMBOS.forEach(([rf,disc])=>rows.push({routing_group:name,request_for:rf,discipline:disc,approval_type:'director',manager_id:directorId}));
     if(rows.length) ({error}=await db.from('routing_overrides').insert(rows));
   }
   showLoader(false);
@@ -676,13 +685,15 @@ async function createRoutingGroup() {
   const name=document.getElementById('newRoutingGroupName').value.trim();
   const clearanceId=document.getElementById('newRoutingGroupManager').value;
   const quoteId=document.getElementById('newRoutingGroupQuoteManager').value;
+  const directorId=document.getElementById('newRoutingGroupDirectorManager').value;
   if(!name){ showToast('Group name required','error'); return; }
-  if(!clearanceId&&!quoteId){ showToast('Pick at least a Clearance or a Quote Approval manager for this group','error'); return; }
+  if(!clearanceId&&!quoteId&&!directorId){ showToast('Pick at least one manager (Clearance, Quote Approval, or Director Approval) for this group','error'); return; }
   if(summarizeRoutingGroups().some(g=>g.name.toLowerCase()===name.toLowerCase())){ showToast('A group with that name already exists — edit it in the table above','error'); return; }
   showLoader(true);
   const rows=[];
   if(clearanceId) ROUTING_COMBOS.forEach(([rf,disc])=>rows.push({routing_group:name,request_for:rf,discipline:disc,approval_type:'clearance',manager_id:clearanceId}));
   if(quoteId) ROUTING_COMBOS.forEach(([rf,disc])=>rows.push({routing_group:name,request_for:rf,discipline:disc,approval_type:'quote',manager_id:quoteId}));
+  if(directorId) ROUTING_COMBOS.forEach(([rf,disc])=>rows.push({routing_group:name,request_for:rf,discipline:disc,approval_type:'director',manager_id:directorId}));
   const{error}=await db.from('routing_overrides').insert(rows);
   showLoader(false);
   if(error){ console.error('createRoutingGroup failed:',error); showToast('Failed to create group: '+error.message,'error'); return; }
@@ -1025,7 +1036,16 @@ const DIRECTOR_OVERRIDABLE_PHASES = [
 ];
 
 async function renderDirectorApprovals() {
-  const pending = allRequests.filter(r => ['pending_sandy_approval','deviation_approval'].includes(r.phase));
+  // A request delegated (via a project's Routing Group) to one specific
+  // Director Approver belongs ONLY in that person's queue — a 'director'
+  // role viewer who isn't the delegate shouldn't see it here at all. Master
+  // keeps full visibility regardless (admin oversight), same as every other
+  // tab on this page.
+  const isDelegatedAwayFromMe = r => r.phase === 'pending_sandy_approval'
+    && r.director_approver_id && r.director_approver_id !== currentUser.id;
+  const visibleToMe = r => currentUser.role === 'master' || !isDelegatedAwayFromMe(r);
+
+  const pending = allRequests.filter(r => ['pending_sandy_approval','deviation_approval'].includes(r.phase) && visibleToMe(r));
   const overridable = allRequests.filter(r => DIRECTOR_OVERRIDABLE_PHASES.includes(r.phase) && r.phase !== 'pending_sandy_approval');
   const tbody = document.getElementById('directorBody');
 
@@ -1043,8 +1063,13 @@ async function renderDirectorApprovals() {
     const q = qMap[r.id];
     const amt = q?.amount ? `₹${parseFloat(q.amount).toLocaleString('en-IN')}` : '—';
     const vendor = q?.vendor_name || '—';
+    // Master-only visibility note: who this particular request is routed to,
+    // so an admin can see delegation at a glance without opening each one.
+    const routedToNote = (currentUser.role === 'master' && r.phase === 'pending_sandy_approval' && r.director_approver_id)
+      ? `<div style="font-size:0.68rem;color:#7c3aed;margin-top:2px">→ ${escHtml(allUsers.find(u=>u.id===r.director_approver_id)?.name || 'Unknown user')}${r.director_approver_id===currentUser.id?' (you)':''}</div>`
+      : '';
     return `<tr>
-      <td><strong>PR-${String(r.request_number).padStart(4,'0')}</strong></td>
+      <td><strong>PR-${String(r.request_number).padStart(4,'0')}</strong>${routedToNote}</td>
       <td>${r.project_name}</td>
       <td>${getPhaseBadge(r.phase)}</td>
       <td style="font-size:0.82rem">${vendor}</td>

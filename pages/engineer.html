@@ -912,6 +912,19 @@ async function submitPR() {
     } catch(e){ console.warn('Quote approver routing failed, using manually-selected PM:',e.message); }
   }
 
+  // ── Resolve WHO receives Director Approval if this request ever
+  //    escalates by amount (pending_sandy_approval). Resolved now — before
+  //    any quote/amount exists, same timing as Quote Approval above — from
+  //    the project's Routing Group (Master → Approval Routing → Project
+  //    Routing Groups → Director Approval column). null = no override =
+  //    default, open Director/Master queue (unchanged behavior). Only
+  //    relevant for RFQ requests — LP and VI never reach pending_sandy_approval. ──
+  let directorApproverId=null;
+  if(!isVI&&!isLP){
+    try { directorApproverId=await resolveDirectorApprover(projectId,requestFor,discipline); }
+    catch(e){ console.warn('Director approver routing failed — will use default Director queue:',e.message); }
+  }
+
   const basePhase=isLP?'lp_submitted':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':(needsReassignment?'pending_master_reassignment':'pending_initial_pm_approval');
 
   const vals={
@@ -922,6 +935,7 @@ async function submitPR() {
     project_phase:projectPhase,
     assigned_pm_id:isLP?lpFinalPmId:quotePmId,
     initial_approver_id:isLP?lpFinalPmId:((willNeedClearance&&!needsReassignment)?initialApproverId:null),
+    director_approver_id:directorApproverId,
     project_manager_name:isLP?lpFinalPmName:quotePmName,
     team_member_name:currentUser.name,
     department:dept,

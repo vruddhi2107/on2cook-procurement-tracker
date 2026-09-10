@@ -809,7 +809,7 @@ async function init() {
   showLoader(true);
   await Promise.all([loadRequests(), loadVendors(), applyAdminConfigOverrides()]);
   refreshFieldCatalog(allRequests);
-  renderDynamicFilterBar('dynamicFilterBar','procurement_manager','filterTable',{includeSearch:false,includeClear:false});
+  renderDynamicFilterBar('dynamicFilterBar','procurement_manager','filterTable',{includeSearch:false,includeClear:false, forceSingleFields:['action','is_on_hold']});
   filterTable();
   showLoader(false);
   // Notification bell (shared helper)

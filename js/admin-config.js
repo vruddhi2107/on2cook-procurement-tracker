@@ -189,7 +189,7 @@ function applyNavVisibility() {
 // ── FIELD VALUE / OPTION HELPERS (used by filters, columns, export) ──
 function fieldOptionsFor(field) {
   switch (field) {
-    case 'phase': return Object.entries(PHASES).map(([k, v]) => ({ value: k, label: `${v.icon} ${v.label}` }));
+    case 'phase': return Object.entries(PHASES).map(([k, v]) => ({ value: k, label: v.label, icon: v.icon }));
     case 'department': return Object.entries(DEPARTMENTS).map(([k, v]) => ({ value: k, label: v }));
     case 'request_category': return [{ value: 'RFQ', label: 'RFQ' }, { value: 'local_purchase', label: 'Local Purchase' }, { value: 'vendor_info', label: 'Vendor Info' }];
     case 'urgency': return [{ value: 'normal', label: 'Normal' }, { value: 'urgent', label: 'Urgent (24h)' }, { value: 'critical', label: 'Critical (48h)' }];
@@ -298,13 +298,15 @@ function renderDynamicFilterBar(containerId, role, onChange, opts) {
   opts = opts || {};
   const includeSearch = opts.includeSearch !== false;
   const includeClear = opts.includeClear !== false;
+  const forceSingleFields = Array.isArray(opts.forceSingleFields) ? opts.forceSingleFields : [];
   const bar = document.getElementById(containerId); if (!bar) return;
   const defs = filtersForRole(role);
   let html = includeSearch ? `<input type="text" id="${containerId}_search" placeholder="Search by project, PR #, team member, item note..." oninput="${onChange}()"/>` : '';
   defs.forEach(f => {
     const opts = fieldOptionsFor(f.field);
     const domId = containerId + '_' + f.id;
-    if (f.type === 'multi') {
+    const isMulti = (f.type === 'multi') && !forceSingleFields.includes(f.field);
+    if (isMulti) {
       html += `<div class="ms-filter" data-field="${f.field}">
         <button type="button" class="form-control ms-filter-btn" onclick="toggleMsFilter(event,'${domId}')">${escHtml(f.label)} <span class="ms-filter-count" id="${domId}_count"></span></button>
         <div class="ms-filter-panel" id="${domId}_panel" style="display:none">

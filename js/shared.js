@@ -123,12 +123,15 @@ const _fileRegistry = [];
 //   1. Routing Group override (routing_overrides) — a project tagged with a
 //      named group (Projects page) gets a manager PER APPROVAL TYPE for
 //      that group (Master → Approval Routing → Project Routing Groups now
-//      has a Clearance column AND a Quote Approval column).
+//      has a Clearance column, a Quote Approval column, AND a Director
+//      Approval column).
 //   2. Legacy Antunes override (antunes_routing) — clearance only (this
 //      table predates the clearance/quote split and was never used for
 //      quote approval), applies only when the project is flagged is_antunes.
 //   3. Default Department Routing (department_routing) — per request_for x
 //      discipline x approval_type. This is the generic fallback matrix.
+//      (Not used for 'director' — there is no department-level Director
+//      matrix, only the per-project Routing Group override in step 1.)
 //   4. Quote approval ONLY: the project's own default_pm_id (Projects page)
 //      — kept as a last-resort default since that's the pre-existing
 //      behavior for NPD projects.
@@ -142,6 +145,22 @@ const _fileRegistry = [];
 // On top of that chain, a per-user FIXED override (set on the user's own
 // record) always wins outright for that user, split by request_for AND by
 // approval_type — see resolveApproverForSubmission below.
+//
+// ── DIRECTOR APPROVAL DELEGATION (approvalType 'director') ──
+// A third, simpler routing type. Director Approval (the ₹-threshold
+// escalation, phase pending_sandy_approval) is open to ANY director/master
+// by default — nothing to configure. A project's Routing Group can instead
+// name ONE specific person (any role — Master → Approval Routing → Project
+// Routing Groups → Director Approval column) to receive it exclusively for
+// that group's projects. Unlike clearance/quote, this has no legacy table,
+// no per-user fixed override, and no universal fallback — an unset director
+// override simply means "leave it in the default, open Director queue",
+// which is a valid steady state, not a gap that needs a safety net.
+// Resolved once at submission time (resolveRoutedApprover(...,'director'))
+// and stored on procurement_requests.director_approver_id, the same moment
+// the Quote Approver is resolved — long before any quote amount (and
+// therefore any escalation) exists. See pm.html/engineer.html submission
+// and pending_sandy_approval handling, and master.html's Director tab.
 // ══════════════════════════════════════════════════════════════
 
 // Cached for the page's lifetime; Master's admin UI calls
@@ -213,7 +232,7 @@ window._invalidateQuoteAmountRoutingCache = _invalidateQuoteAmountRoutingCache;
 
 async function resolveRoutedApprover(projectId, requestFor, discipline, approvalType) {
   if (!discipline || !requestFor) return null;
-  approvalType = approvalType === 'quote' ? 'quote' : 'clearance';
+  approvalType = (approvalType === 'quote' || approvalType === 'director') ? approvalType : 'clearance';
   try {
     let proj = null;
     if (projectId) {
@@ -233,6 +252,10 @@ async function resolveRoutedApprover(projectId, requestFor, discipline, approval
         if (aRow && aRow.manager_id) return aRow.manager_id;
       }
     }
+    // 'director' has no department matrix, no project default, and no
+    // universal fallback — nothing found above just means "use the default
+    // open Director queue", so stop here instead of falling through.
+    if (approvalType === 'director') return null;
     // 3. Default Department Routing, for this approval type
     const { data: dRow } = await db.from('department_routing')
       .select('manager_id').eq('request_for', requestFor).eq('discipline', discipline).eq('approval_type', approvalType).maybeSingle();
@@ -255,6 +278,11 @@ window.resolveRoutedApprover = resolveRoutedApprover;
 // old clearance-only name directly.
 window.resolveInitialApprover = function(projectId, requestFor, discipline) {
   return resolveRoutedApprover(projectId, requestFor, discipline, 'clearance');
+};
+// Convenience wrapper for the Director Approval delegation (see doc block
+// above) — null means "no override, use the default open Director queue".
+window.resolveDirectorApprover = function(projectId, requestFor, discipline) {
+  return resolveRoutedApprover(projectId, requestFor, discipline, 'director');
 };
 
 // True if this request cannot go straight to the auto-resolved approver and
