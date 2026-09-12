@@ -1546,117 +1546,57 @@ footer { background: var(--black); color: var(--gray-4); padding: 18px 22px; dis
 .cp-page { max-width: 400px; margin: 52px auto; padding: 0 18px; }
 .cp-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-sm); }
 /* ── DYNAMIC FILTER BAR (multi-select dropdowns) ── */
+.ms-filter-container{position:relative;display:inline-block}
 .ms-filter{position:relative}
-.ms-filter-btn{cursor:pointer;text-align:left;white-space:nowrap;padding:8px 10px;border:1px solid var(--border);background:var(--white);border-radius:6px;display:inline-flex;align-items:center;gap:8px;font-size:0.85rem;min-width:140px}
-.ms-filter-count{color:var(--red);font-weight:700}
-.ms-filter-panel{position:absolute;top:calc(100% + 4px);left:0;z-index:20;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,0.1);padding:4px;min-width:160px;max-width:280px;max-height:320px;overflow-y:auto}
-.ms-filter-opt{display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:0.9rem;cursor:pointer;border-radius:6px}
+.ms-filter-btn{
+  display:inline-flex;align-items:center;justify-content:space-between;gap:8px;
+  min-width:120px;padding:7px 12px;
+  border:1.5px solid var(--border-strong,var(--border));border-radius:var(--radius-sm,6px);
+  background:var(--white);font-size:0.83rem;cursor:pointer;white-space:nowrap;
+}
+.ms-filter-count{color:var(--red);font-weight:700;font-size:0.75rem}
+
+.filter-bar select{
+  min-width:120px;padding:7px 12px;
+  border:1.5px solid var(--border-strong,var(--border));border-radius:var(--radius-sm,6px);
+  font-size:0.83rem;cursor:pointer;outline:none;
+}
+
+/* Dropdown panel: wide enough for real full names on one line, wraps on
+   word boundaries only (never mid-word) if it still runs long. */
+.ms-filter-panel{
+  position:absolute;top:calc(100% + 4px);left:0;z-index:1000;
+  background:var(--white);border:1px solid var(--border);border-radius:6px;
+  box-shadow:0 6px 18px rgba(0,0,0,0.15);
+  width:max-content;min-width:200px;max-width:320px;
+  max-height:320px;overflow-y:auto;overflow-x:hidden;
+  padding:4px 0;
+}
+.ms-filter-opt{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:6px 12px;font-size:0.85rem;color:var(--text,#2d3748);
+  cursor:pointer;user-select:none;
+  white-space:normal;word-break:normal;overflow-wrap:break-word;line-height:1.3;
+}
 .ms-filter-opt:hover{background:var(--off-white)}
 
-/* Force sensible checkbox sizing and alignment inside the multi-select panel */
-.ms-filter-panel input[type="checkbox"]{
-  width:16px;
-  height:16px;
-  margin:0;
-  flex:0 0 auto;
-  cursor:pointer;
-  accent-color:var(--red);
+/* Custom checkbox — sized explicitly and appearance-reset so it renders
+   the same everywhere instead of an oversized native control on mobile. */
+.ms-filter-panel input[type="checkbox"],
+.ms-filter-opt input[type="checkbox"]{
+  -webkit-appearance:none;appearance:none;
+  width:16px;height:16px;min-width:16px;min-height:16px;
+  margin:2px 0 0 0;flex:0 0 16px;
+  border:1.5px solid var(--border-strong,#94a3b8);border-radius:4px;
+  background:#fff;cursor:pointer;position:relative;
 }
-
-/* Style single-select dropdowns in filter bar consistently */
-.filter-bar select {
-  min-width: 120px;
-  padding: 7px 12px;
-  border: 1.5px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  font-size: 0.83rem;
-  cursor: pointer;
-  outline: none;
+.ms-filter-panel input[type="checkbox"]:checked,
+.ms-filter-opt input[type="checkbox"]:checked{
+  background:var(--red);border-color:var(--red);
 }
-
-/* Enhance multi-select button appearance */
-.ms-filter-btn {
-  min-width: 120px;
-  padding: 7px 12px;
-  border: 1.5px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  font-size: 0.83rem;
-  cursor: pointer;
-}
-
-/* Improve multi-select panel styling */
-/* Container positioning wrapper (if needed to anchor absolute placement) */
-.ms-filter-container {
-  position: relative;
-  display: inline-block;
-}
-
-/* Filter Trigger Button */
-.ms-filter-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.ms-filter-count {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--red, #e53e3e);
-}
-
-/* Dropdown Panel */
-.ms-filter-panel {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 1000;
-  margin-top: 4px;
-  background: var(--white, #ffffff);
-  border: 1px solid var(--border, #e2e8f0);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  
-  /* Fits the width to content automatically up to a reasonable max-width */
-width: max-content;;
-  min-width: 180px;
-  max-width: 280px;
-  
-  /* Vertical scrolling without horizontal overflow */
-  max-height: 220px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 4px 0;
-}
-
-/* Individual Option Item */
-.ms-filter-opt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  font-size: 0.85rem;
-  color: var(--text, #2d3748);
-  cursor: pointer;
-  user-select: none;
-  
-  /* Allow labels to break cleanly if they exceed max-width */
-  white-space: normal;
-  word-break: break-word;
-}
-
-.ms-filter-opt:hover {
-  background: var(--off-white, #f7fafc);
-}
-
-/* Checkbox styling */
-.ms-filter-opt input[type="checkbox"] {
-  accent-color: var(--red, #e53e3e);
-  margin: 0;
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0; /* Prevents checkbox from distorting on text wrap */
-  cursor: pointer;
+.ms-filter-panel input[type="checkbox"]:checked::after,
+.ms-filter-opt input[type="checkbox"]:checked::after{
+  content:'';position:absolute;left:4px;top:1px;
+  width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;
+  transform:rotate(45deg);
 }

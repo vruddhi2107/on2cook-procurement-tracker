@@ -868,6 +868,7 @@ async function submitPR() {
   //    this LP request — and the Clearance Manager must be the same person
   //    (there's no separate clearance step for LP). ──
   let lpFinalPmId=pmId, lpFinalPmName=pmUser?.name||'';
+  let lpNeedsReassignment=false;
   if(isLP){
     try {
       const overrideId=await resolveLPFixedOverride(currentUser,requestFor);
@@ -876,6 +877,24 @@ async function submitPR() {
         lpFinalPmName=await getUserName(overrideId)||lpFinalPmName;
       }
     } catch(e){ console.warn('LP override check failed:',e.message); }
+    // Self-approval guard: a requester (often a Project Manager acting on
+    // their own project) can end up as their own LP approver here, either
+    // by being the manually-picked/default PM or via a misconfigured
+    // override. Mirror the clearance/quote flow — retry the universal
+    // fallback approver once, and if that's also unset/self, don't submit
+    // as self-approved; send it to Master's manual reassignment queue.
+    if(lpFinalPmId===currentUser.id){
+      try {
+        const fallback=await window._loadFallbackApprovers();
+        const fbId=fallback?.quote;
+        if(fbId && fbId!==currentUser.id){
+          lpFinalPmId=fbId;
+          lpFinalPmName=await getUserName(fbId)||lpFinalPmName;
+        } else {
+          lpNeedsReassignment=true;
+        }
+      } catch(e){ console.warn('LP fallback approver check failed:',e.message); lpNeedsReassignment=true; }
+    }
   }
 
   // ── Resolve WHO grants initial requirement clearance. This is independent
@@ -925,7 +944,7 @@ async function submitPR() {
     catch(e){ console.warn('Director approver routing failed — will use default Director queue:',e.message); }
   }
 
-  const basePhase=isLP?'lp_submitted':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':(needsReassignment?'pending_master_reassignment':'pending_initial_pm_approval');
+  const basePhase=(isLP&&lpNeedsReassignment)?'pending_master_reassignment':isLP?'lp_submitted':isVI?'procurement_active':(isEditMode||selectedPMApproval==='already_approved')?'procurement_active':(needsReassignment?'pending_master_reassignment':'pending_initial_pm_approval');
 
   const vals={
     request_category:cat,
@@ -933,8 +952,8 @@ async function submitPR() {
     discipline:(!isVI&&!isLP)?discipline:null,
     project_name:projectName,
     project_phase:projectPhase,
-    assigned_pm_id:isLP?lpFinalPmId:quotePmId,
-    initial_approver_id:isLP?lpFinalPmId:((willNeedClearance&&!needsReassignment)?initialApproverId:null),
+    assigned_pm_id:(isLP&&lpNeedsReassignment)?null:isLP?lpFinalPmId:quotePmId,
+    initial_approver_id:(isLP&&lpNeedsReassignment)?null:isLP?lpFinalPmId:((willNeedClearance&&!needsReassignment)?initialApproverId:null),
     director_approver_id:directorApproverId,
     project_manager_name:isLP?lpFinalPmName:quotePmName,
     team_member_name:currentUser.name,

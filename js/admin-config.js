@@ -332,7 +332,8 @@ function toggleMsFilter(e, domId) {
 document.addEventListener('click', e => {
   document.querySelectorAll('.ms-filter').forEach(el => { if (!el.contains(e.target)) { const p = el.querySelector('.ms-filter-panel'); if (p) p.style.display = 'none'; } });
 });
-function applyDynamicFilters(reqs, containerId, role, searchFields) {
+function applyDynamicFilters(reqs, containerId, role, searchFields, forceSingleFields) {
+  forceSingleFields = Array.isArray(forceSingleFields) ? forceSingleFields : [];
   const s = (document.getElementById(containerId + '_search')?.value || '').toLowerCase();
   if (s) {
     reqs = reqs.filter(r => (searchFields || ['project_name']).some(sf => String(fieldValueGetter(r, sf) || '').toLowerCase().includes(s))
@@ -341,7 +342,11 @@ function applyDynamicFilters(reqs, containerId, role, searchFields) {
   const defs = filtersForRole(role);
   defs.forEach(f => {
     const domId = containerId + '_' + f.id;
-    if (f.type === 'multi') {
+    // Must mirror renderDynamicFilterBar's isMulti check exactly — a field
+    // forced to single-select there is rendered as a plain <select>, not a
+    // checkbox panel, so it has to be read (and filtered) as one here too.
+    const isMulti = (f.type === 'multi') && !forceSingleFields.includes(f.field);
+    if (isMulti) {
       const p = document.getElementById(domId + '_panel');
       const vals = p ? [...p.querySelectorAll('input:checked')].map(i => i.value) : [];
       const cnt = document.getElementById(domId + '_count'); if (cnt) cnt.textContent = vals.length ? `(${vals.length})` : '';

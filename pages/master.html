@@ -758,16 +758,24 @@ function renderReassignQueue() {
 async function assignApprover(prId) {
   const managerId=document.getElementById(`reassign-${prId}`).value;
   if(!managerId){ showToast('Pick a person to assign this to','error'); return; }
-  showLoader(true);
   const pr=allRequests.find(r=>r.id===prId);
-  const ts={...(pr?.phase_timestamps||{}), pending_initial_pm_approval:new Date().toISOString()};
-  const{error}=await db.from('procurement_requests').update({
-    initial_approver_id:managerId, phase:'pending_initial_pm_approval', phase_timestamps:ts
-  }).eq('id',prId);
+  if(managerId===pr?.created_by){ showToast('Cannot assign the requester as their own approver','error'); return; }
+  showLoader(true);
+  const isLP=pr?.request_category==='local_purchase';
+  const targetPhase=isLP?'lp_submitted':'pending_initial_pm_approval';
+  const ts={...(pr?.phase_timestamps||{}), [targetPhase]:new Date().toISOString()};
+  // Local Purchase has a single approval step — assigned_pm_id acts as both
+  // Clearance Manager and Quote Approver (see shared.js), so both fields
+  // must point at the same person, and the phase must return to the LP
+  // pipeline (lp_submitted), not the RFQ clearance phase.
+  const updates=isLP
+    ? { assigned_pm_id:managerId, initial_approver_id:managerId, phase:targetPhase, phase_timestamps:ts }
+    : { initial_approver_id:managerId, phase:targetPhase, phase_timestamps:ts };
+  const{error}=await db.from('procurement_requests').update(updates).eq('id',prId);
   showLoader(false);
   if(error){ showToast('Failed: '+error.message,'error'); return; }
-  await postComment(prId,currentUser.id,` Master Admin assigned this request to a clearance approver`);
-  notifyPhaseChange(prId,'pending_initial_pm_approval',currentUser.id);
+  await postComment(prId,currentUser.id,` Master Admin assigned this request to a${isLP?'n LP':' clearance'} approver`);
+  notifyPhaseChange(prId,targetPhase,currentUser.id);
   showToast('Assigned and forwarded','success');
   await loadRequests();
   renderReassignQueue();

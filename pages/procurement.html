@@ -955,7 +955,7 @@ function filterTable(){
   if(urg) reqs=reqs.filter(r=>(r.urgency||'normal')===urg);
   if(vid) reqs=reqs.filter(r=>r.assigned_vendor_id===vid);
   if(activeTab==='onhold') reqs=[...reqs].sort((a,b)=>new Date(a.hold_started_at||a.updated_at)-new Date(b.hold_started_at||b.updated_at));
-  reqs=applyDynamicFilters(reqs,'dynamicFilterBar','procurement_manager',['project_name']);
+  reqs=applyDynamicFilters(reqs,'dynamicFilterBar','procurement_manager',['project_name'],['action','is_on_hold']);
   renderTable(reqs);
 }
 

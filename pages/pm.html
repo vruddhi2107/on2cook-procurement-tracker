@@ -598,8 +598,16 @@ async function openPR(id) {
   }
 
   // ── LOCAL PURCHASE: lp_submitted / lp_pending_pm_approval — PM or Master can approve/reject ──
-  var canActOnLP = (currentPR.phase==='lp_submitted'||currentPR.phase==='lp_pending_pm_approval') && currentPR.request_category==='local_purchase';
-  var isMasterActingOnLP = canActOnLP && currentUser.role === 'master';
+  // SECURITY: must also confirm currentUser IS the assigned approver
+  // (assigned_pm_id) — or Master acting as an explicit override. Without
+  // this check, ANY user who can open this request (including the
+  // requester themselves, since pm.html's "My Requests"/"✓ Approvals"
+  // view includes requests they created) would see and could click the
+  // Approve button regardless of who it was actually routed to. This is
+  // what let requests get approved without the required approval.
+  var isLPPhase = (currentPR.phase==='lp_submitted'||currentPR.phase==='lp_pending_pm_approval') && currentPR.request_category==='local_purchase';
+  var isMasterActingOnLP = isLPPhase && currentUser.role === 'master';
+  var canActOnLP = isLPPhase && (currentPR.assigned_pm_id===currentUser.id || isMasterActingOnLP);
   if(canActOnLP) {
     var lpLabel = isMasterActingOnLP
       ? ' Master Admin — LP Approval Override'
@@ -763,7 +771,15 @@ async function rejectDeviation() {
 }
 
 // ── LOCAL PURCHASE APPROVAL by Project Manager ────────────────
+// SECURITY: re-check ownership here too, not just in the UI gating that
+// decides whether to show the button — see canActOnLP above for why.
+function _canActOnCurrentLP() {
+  return currentPR && currentPR.request_category==='local_purchase'
+    && (currentPR.phase==='lp_submitted'||currentPR.phase==='lp_pending_pm_approval')
+    && (currentPR.assigned_pm_id===currentUser.id || currentUser.role==='master');
+}
 async function approveLPRequest() {
+  if(!_canActOnCurrentLP()){showToast('You are not the assigned approver for this request.','error');return;}
   const notes=document.getElementById('lpApprovalNotes')?.value.trim()||'Approved';
   showLoader(true);
   const{error}=await db.from('procurement_requests').update({
@@ -780,6 +796,7 @@ async function approveLPRequest() {
 }
 
 async function rejectLPRequest() {
+  if(!_canActOnCurrentLP()){showToast('You are not the assigned approver for this request.','error');return;}
   const notes=document.getElementById('lpApprovalNotes')?.value.trim();
   const isMaster = currentUser?.role === 'master';
   if(!notes && !isMaster){showToast('Please add rejection notes','error');return;}
@@ -1324,6 +1341,7 @@ async function submitPR() {
   //    this LP request — and the Clearance Manager must be the same person
   //    (there's no separate clearance step for LP). ──
   let lpFinalPmId=pmId, lpFinalPmName=allPMs.find(p=>p.id===pmId)?.name||currentUser.name;
+  let lpNeedsReassignment=false;
   if(isLP){
     try {
       const overrideId=await resolveLPFixedOverride(currentUser,requestFor);
@@ -1332,6 +1350,21 @@ async function submitPR() {
         lpFinalPmName=await getUserName(overrideId)||lpFinalPmName;
       }
     } catch(e){ console.warn('LP override check failed:',e.message); }
+    // Self-approval guard — see engineer.html's identical LP submission path
+    // for the full explanation. This one matters even more here: the PM
+    // field above defaults to the submitter themselves for NPD requests.
+    if(lpFinalPmId===currentUser.id){
+      try {
+        const fallback=await window._loadFallbackApprovers();
+        const fbId=fallback?.quote;
+        if(fbId && fbId!==currentUser.id){
+          lpFinalPmId=fbId;
+          lpFinalPmName=await getUserName(fbId)||lpFinalPmName;
+        } else {
+          lpNeedsReassignment=true;
+        }
+      } catch(e){ console.warn('LP fallback approver check failed:',e.message); lpNeedsReassignment=true; }
+    }
   }
 
   // ── A Project Manager's OWN request still needs requirement clearance —
@@ -1382,7 +1415,7 @@ async function submitPR() {
     catch(e){ console.warn('Director approver routing failed — will use default Director queue:',e.message); }
   }
 
-  const basePhase=isLP?'lp_submitted':isVI?'procurement_active':(needsReassignment?'pending_master_reassignment':'pending_initial_pm_approval');
+  const basePhase=(isLP&&lpNeedsReassignment)?'pending_master_reassignment':isLP?'lp_submitted':isVI?'procurement_active':(needsReassignment?'pending_master_reassignment':'pending_initial_pm_approval');
 
   const vals={
     request_category:cat,
@@ -1390,8 +1423,8 @@ async function submitPR() {
     discipline:(!isVI&&!isLP)?discipline:null,
     project_name:projectName,
     project_phase:projectPhase,
-    assigned_pm_id:isLP?lpFinalPmId:quotePmId,
-    initial_approver_id:isLP?lpFinalPmId:((willNeedClearance&&!needsReassignment)?initialApproverId:null),
+    assigned_pm_id:(isLP&&lpNeedsReassignment)?null:isLP?lpFinalPmId:quotePmId,
+    initial_approver_id:(isLP&&lpNeedsReassignment)?null:isLP?lpFinalPmId:((willNeedClearance&&!needsReassignment)?initialApproverId:null),
     director_approver_id:directorApproverId,
     project_manager_name:isLP?lpFinalPmName:quotePmName,
     team_member_name:currentUser.name,
