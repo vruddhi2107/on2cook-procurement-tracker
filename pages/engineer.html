@@ -442,7 +442,12 @@ async function loadRequests() {
 }
 
 async function loadPMs() {
-  allPMs = await dbFetch(() => db.from('users').select('id,name,pm_type').eq('role','project_manager').order('name'), 'PM list');
+  // Includes master/director (not just project_manager) so that a project whose
+  // default_pm_id (set in Projects) points at a Master Admin or Director still
+  // has a matching <option> here — otherwise pmSelect.value=project.default_pm_id
+  // silently fails (no such option), fPMSelect ends up empty, and submitPR()
+  // blocks with "Please select a Project Manager" even though a PM IS assigned.
+  allPMs = await dbFetch(() => db.from('users').select('id,name,role,pm_type').in('role',['project_manager','master','director']).order('name'), 'PM list');
   refreshPMOptions();
 }
 
@@ -457,7 +462,8 @@ function refreshPMOptions() {
     sel.innerHTML='<option value="">No Production PMs configured — set in Master Admin</option>';
     return;
   }
-  sel.innerHTML='<option value="">'+(reqFor==='production'?'Select Production PM':'Select Project Manager')+'</option>'+filtered.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  const roleLabel={master:'Master Admin',director:'Director'};
+  sel.innerHTML='<option value="">'+(reqFor==='production'?'Select Production PM':'Select Project Manager')+'</option>'+filtered.map(p=>`<option value="${p.id}">${p.name}${p.role!=='project_manager'?' ('+(roleLabel[p.role]||p.role)+')':''}</option>`).join('');
   if(filtered.some(p=>p.id===prevVal)) sel.value=prevVal;
 }
 

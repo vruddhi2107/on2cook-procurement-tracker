@@ -450,8 +450,11 @@
             <input class="form-control" type="number" id="cpoSGST" value="9" min="0" max="28" oninput="cpoRecalc()"/>
           </div>
           <div class="form-group" style="margin-bottom:0;min-width:110px">
-            <label class="form-label">P&amp;F Charge (₹)</label>
+            <label class="form-label">P&amp;F / Freight (₹)</label>
             <input class="form-control" type="number" id="cpoPnF" value="0" min="0" oninput="cpoRecalc()"/>
+            <label style="display:flex;align-items:center;gap:5px;margin-top:4px;font-size:0.72rem;color:var(--gray-3);font-weight:500;cursor:pointer" title="Uncheck when the vendor bills freight separately at a flat rate (not part of the taxable invoice value) — GST will then be calculated on the basic amount only, and freight added after tax so the PO total matches the vendor's invoice">
+              <input type="checkbox" id="cpoPnFTaxable" checked onchange="cpoRecalc()" style="margin:0;width:auto"/> GST applies on this charge
+            </label>
           </div>
           <div class="form-group" style="margin-bottom:0;min-width:110px">
             <label class="form-label">Discount (%)</label>
@@ -2480,12 +2483,15 @@ async function openPOModal(prId, quotationId=null) {
       <span> Review and edit fields directly in the PO below. Adjust tax rates here:</span>
       <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
         <label style="font-size:0.74rem;white-space:nowrap">P&amp;F (₹)</label>
-        <input id="pnfInput" type="number" value="0" min="0" class="po-tax-input" style="width:80px" onchange="recalcPO()" title="P&F is added to the discounted amount before GST is applied"/>
+        <input id="pnfInput" type="number" value="0" min="0" class="po-tax-input" style="width:80px" onchange="recalcPO()"/>
+        <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;white-space:nowrap;cursor:pointer" title="Uncheck when the vendor bills this freight/P&F separately at a flat rate, not part of the taxable invoice — GST will then apply on the Basic amount only, and this charge is added after tax so the PO total matches the vendor's invoice">
+          <input type="checkbox" id="pnfTaxable" checked onchange="recalcPO()" style="margin:0;width:auto"/> Taxable
+        </label>
         <label style="font-size:0.74rem;white-space:nowrap;margin-left:4px">CGST %</label>
         <input id="cgstInput" type="number" value="${cgstPct}" min="0" max="28" class="po-tax-input" onchange="recalcPO()"/>
         <label style="font-size:0.74rem;white-space:nowrap">SGST %</label>
         <input id="sgstInput" type="number" value="${sgstPct}" min="0" max="28" class="po-tax-input" onchange="recalcPO()"/>
-        <span style="font-size:0.7rem;color:#92400e;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:2px 7px;white-space:nowrap">GST on Basic + P&amp;F</span>
+        <span id="poGstBadge" style="font-size:0.7rem;color:#92400e;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:2px 7px;white-space:nowrap">GST on Basic + P&amp;F</span>
       </div>
     </div>
 
@@ -2645,16 +2651,21 @@ function recalcPO() {
   const cgst = parseFloat(document.getElementById('cgstInput')?.value || 9) || 0;
   const sgst = parseFloat(document.getElementById('sgstInput')?.value || 9) || 0;
   const pnf  = parseFloat(document.getElementById('pnfInput')?.value  || 0) || 0;
+  const pnfTaxable = document.getElementById('pnfTaxable') ? !!document.getElementById('pnfTaxable').checked : true;
   const discPct = parseFloat(document.getElementById('poDiscountPct')?.value || 0) || 0;
   const other = parseFloat(document.getElementById('poOtherCharges')?.value || 0) || 0;
 
   const discAmt = Math.round(base * discPct / 100 * 100) / 100;
   const afterDiscount = base - discAmt;
-  // P&F is added to discounted amount BEFORE tax — taxable value = afterDiscount + pnf
-  const taxableValue = afterDiscount + pnf;
+  // P&F is added to the discounted amount BEFORE tax ONLY when it's taxable
+  // (i.e. billed by the same vendor in the same invoice). When a vendor bills
+  // freight/P&F separately at a flat rate, it's excluded from the taxable
+  // value and added straight to the net total after GST instead, so the PO
+  // matches that vendor's invoice for easy reconciliation.
+  const taxableValue = pnfTaxable ? (afterDiscount + pnf) : afterDiscount;
   const cgstAmt = Math.round(taxableValue * cgst / 100 * 100) / 100;
   const sgstAmt = Math.round(taxableValue * sgst / 100 * 100) / 100;
-  const subtotal = taxableValue + cgstAmt + sgstAmt + other;
+  const subtotal = taxableValue + cgstAmt + sgstAmt + other + (pnfTaxable ? 0 : pnf);
   const net = Math.round(subtotal);
   const roundOff = 0;
 
@@ -2663,13 +2674,14 @@ function recalcPO() {
   s('poCgstPctLabel', cgst);
   s('poSgstPctLabel', sgst);
   s('poAfterDiscount', `${sym} ${f(afterDiscount)}`);
-  s('poPnf',   `${sym} ${f(pnf)}`);
+  s('poPnf',   `${sym} ${f(pnf)}${pnfTaxable ? '' : ' (non-taxable, added after GST)'}`);
   s('poTaxableValue', `${sym} ${f(taxableValue)}`);
   s('poCgst',  `${sym} ${f(cgstAmt)}`);
   s('poSgst',  `${sym} ${f(sgstAmt)}`);
   s('poRoundOff', roundOff.toFixed(2));
   s('poNet',   `${sym} ${net.toLocaleString('en-IN',{minimumFractionDigits:0})}`);
   s('poWords', numToWords(net));
+  s('poGstBadge', pnfTaxable ? 'GST on Basic + P&F' : 'GST on Basic only');
   // Sync the table P&F input with the strip
   const tableInput = document.getElementById('pnfTableInput');
   if (tableInput && tableInput !== document.activeElement) tableInput.value = pnf;
@@ -2864,14 +2876,17 @@ async function confirmGeneratePO() {
   const cgstPct  = parseFloat(document.getElementById('cgstInput')?.value || 9);
   const sgstPct  = parseFloat(document.getElementById('sgstInput')?.value || 9);
   const pnf      = parseFloat(document.getElementById('pnfInput')?.value  || 0);
+  const pnfTaxable = document.getElementById('pnfTaxable') ? !!document.getElementById('pnfTaxable').checked : true;
   const base     = window._poBaseAmt || 0;
-  // P&F is part of taxable value; tax applies on (base + pnf)
+  // P&F is part of the taxable value only when billed by the vendor in the
+  // same (taxable) invoice; when billed separately at a flat rate it's added
+  // after GST instead — mirrors recalcPO() so the saved total matches the preview.
   const discPct = parseFloat(document.getElementById('poDiscountPct')?.value || 0) || 0;
   const other    = parseFloat(document.getElementById('poOtherCharges')?.value || 0) || 0;
   const discAmt = Math.round(base * discPct / 100 * 100) / 100;
   const afterDiscount = base - discAmt;
-  const taxableValue = afterDiscount + pnf;
-  const netPayable = Math.round(taxableValue + Math.round(taxableValue*cgstPct/100*100)/100 + Math.round(taxableValue*sgstPct/100*100)/100 + other);
+  const taxableValue = pnfTaxable ? (afterDiscount + pnf) : afterDiscount;
+  const netPayable = Math.round(taxableValue + Math.round(taxableValue*cgstPct/100*100)/100 + Math.round(taxableValue*sgstPct/100*100)/100 + other + (pnfTaxable ? 0 : pnf));
 
   const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',currentPR.id);
   const selectedQ = poTargetQuotationId
@@ -4113,13 +4128,16 @@ function cpoRecalc() {
   const cgst = parseFloat(document.getElementById('cpoCGST')?.value||9)||0;
   const sgst = parseFloat(document.getElementById('cpoSGST')?.value||9)||0;
   const pnf  = parseFloat(document.getElementById('cpoPnF')?.value||0)||0;
+  const pnfTaxable = document.getElementById('cpoPnFTaxable') ? !!document.getElementById('cpoPnFTaxable').checked : true;
   const discPct = parseFloat(document.getElementById('cpoDiscount')?.value||0)||0;
   const discAmt = Math.round(basicTotal * discPct / 100 * 100) / 100;
   const afterDisc = basicTotal - discAmt;
-  const taxable = afterDisc + pnf;
+  // When the vendor bills freight/P&F separately (flat rate, not part of the
+  // taxable invoice), exclude it from the taxable value and add it back after GST.
+  const taxable = pnfTaxable ? (afterDisc + pnf) : afterDisc;
   const cgstAmt = Math.round(taxable * cgst / 100 * 100) / 100;
   const sgstAmt = Math.round(taxable * sgst / 100 * 100) / 100;
-  const net = Math.round(taxable + cgstAmt + sgstAmt);
+  const net = Math.round(taxable + cgstAmt + sgstAmt + (pnfTaxable ? 0 : pnf));
   const basicEl = document.getElementById('cpoBasicTotal');
   const netEl   = document.getElementById('cpoNetTotal');
   if (basicEl) basicEl.textContent = basicTotal.toLocaleString('en-IN',{minimumFractionDigits:2});
@@ -4138,6 +4156,7 @@ function cpoReset() {
   document.getElementById('cpoCGST').value='9';
   document.getElementById('cpoSGST').value='9';
   document.getElementById('cpoPnF').value='0';
+  const pnfTaxableEl=document.getElementById('cpoPnFTaxable'); if(pnfTaxableEl) pnfTaxableEl.checked=true;
   document.getElementById('cpoDiscount').value='0';
   _cpoRows=[]; cpoAddRow();
 }
@@ -4174,15 +4193,19 @@ function cpoPreviewPO() {
   const cgstPct  = parseFloat(document.getElementById('cpoCGST')?.value||9)||0;
   const sgstPct  = parseFloat(document.getElementById('cpoSGST')?.value||9)||0;
   const pnfVal   = parseFloat(document.getElementById('cpoPnF')?.value||0)||0;
+  const pnfTaxable = document.getElementById('cpoPnFTaxable') ? !!document.getElementById('cpoPnFTaxable').checked : true;
   const discPct  = parseFloat(document.getElementById('cpoDiscount')?.value||0)||0;
 
   const baseAmt  = _cpoRows.reduce((s,r)=>(s+(parseFloat(r.rate)||0)*(parseFloat(r.qty)||0)),0);
   const discAmt  = Math.round(baseAmt * discPct / 100 * 100) / 100;
   const afterDisc = baseAmt - discAmt;
-  const taxable   = afterDisc + pnfVal;
+  // When freight is billed separately by the vendor (not part of the taxable
+  // invoice), pnfVal is excluded from the taxable value and added after GST
+  // instead — so the PO net total matches what the vendor actually invoices.
+  const taxable   = pnfTaxable ? (afterDisc + pnfVal) : afterDisc;
   const cgstAmt   = Math.round(taxable * cgstPct / 100 * 100) / 100;
   const sgstAmt   = Math.round(taxable * sgstPct / 100 * 100) / 100;
-  const netPayable = Math.round(taxable + cgstAmt + sgstAmt);
+  const netPayable = Math.round(taxable + cgstAmt + sgstAmt + (pnfTaxable ? 0 : pnfVal));
   const sym = '₹';
 
   const savedLogo = localStorage.getItem('po_logo');
@@ -4224,12 +4247,15 @@ function cpoPreviewPO() {
       <span> Review and edit fields directly in the PO below. Adjust tax rates here:</span>
       <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
         <label style="font-size:0.74rem;white-space:nowrap">P&amp;F (₹)</label>
-        <input id="pnfInput" type="number" value="${pnfVal}" min="0" class="po-tax-input" style="width:80px" onchange="recalcPO()" title="P&F is added to the discounted amount before GST is applied"/>
+        <input id="pnfInput" type="number" value="${pnfVal}" min="0" class="po-tax-input" style="width:80px" onchange="recalcPO()"/>
+        <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;white-space:nowrap;cursor:pointer" title="Uncheck when the vendor bills this freight/P&F separately at a flat rate, not part of the taxable invoice — GST will then apply on the Basic amount only, and this charge is added after tax so the PO total matches the vendor's invoice">
+          <input type="checkbox" id="pnfTaxable" ${pnfTaxable ? 'checked' : ''} onchange="recalcPO()" style="margin:0;width:auto"/> Taxable
+        </label>
         <label style="font-size:0.74rem;white-space:nowrap;margin-left:4px">CGST %</label>
         <input id="cgstInput" type="number" value="${cgstPct}" min="0" max="28" class="po-tax-input" onchange="recalcPO()"/>
         <label style="font-size:0.74rem;white-space:nowrap">SGST %</label>
         <input id="sgstInput" type="number" value="${sgstPct}" min="0" max="28" class="po-tax-input" onchange="recalcPO()"/>
-        <span style="font-size:0.7rem;color:#92400e;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:2px 7px;white-space:nowrap">GST on Basic + P&amp;F</span>
+        <span id="poGstBadge" style="font-size:0.7rem;color:#92400e;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:2px 7px;white-space:nowrap">${pnfTaxable ? 'GST on Basic + P&amp;F' : 'GST on Basic only'}</span>
       </div>
     </div>
 
