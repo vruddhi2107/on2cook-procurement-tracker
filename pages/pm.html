@@ -251,8 +251,14 @@
 <script src="../js/supabase-config.js"></script>
 <script src="../js/shared.js"></script>
 <script src="../js/admin-config.js"></script>
+<script src="../js/workflow.js"></script>
 <script>
 let currentUser, allRequests=[], activeTab='clearance', currentPR=null;
+// PM owes an action on a PR when quotes need final approval, or when a PI (final commercial) change
+// below the Director threshold is waiting for them. Above the threshold it goes to the Director instead.
+function isPMFinalAction(r){ return r.phase==='pending_pm_final_approval' || (r.phase==='pending_pi_approval' && r.pi_approver_role!=='director' && r.assigned_pm_id===currentUser.id); }
+// Called by js/workflow.js after a decision: refresh, and re-open only if the modal is still showing.
+window.wfAfterAction = async function(prId){ await loadRequests(); if(document.getElementById('prModal')?.classList.contains('active')) await openPR(prId); };
 function addPhaseTimestamp(pr, phaseName) {
   var existing = (pr && pr.phase_timestamps) ? pr.phase_timestamps : {};
   var ts = Object.assign({}, existing);
@@ -354,15 +360,15 @@ function updateStats() {
   const allTerminal=[...declinedPhases,...closedPhases];
   document.getElementById('sTotal').textContent=allRequests.length;
   document.getElementById('sClearance').textContent=allRequests.filter(r=>clearancePhases.includes(r.phase)&&isMyClearanceAction(r)).length;
-  document.getElementById('sFinal').textContent=allRequests.filter(r=>r.phase==='pending_pm_final_approval').length;
-  document.getElementById('sOngoing').textContent=allRequests.filter(r=>!allTerminal.includes(r.phase)&&!(clearancePhases.includes(r.phase)&&isMyClearanceAction(r))&&r.phase!=='pending_pm_final_approval').length;
+  document.getElementById('sFinal').textContent=allRequests.filter(r=>isPMFinalAction(r)).length;
+  document.getElementById('sOngoing').textContent=allRequests.filter(r=>!allTerminal.includes(r.phase)&&!(clearancePhases.includes(r.phase)&&isMyClearanceAction(r))&&!isPMFinalAction(r)).length;
   document.getElementById('sDone').textContent=allRequests.filter(r=>closedPhases.includes(r.phase)).length;
   document.getElementById('sRejected').textContent=allRequests.filter(r=>declinedPhases.includes(r.phase)).length;
 }
 
 function renderBanner() {
   const clearance=allRequests.filter(r=>['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase)&&isMyClearanceAction(r));
-  const final=allRequests.filter(r=>r.phase==='pending_pm_final_approval');
+  const final=allRequests.filter(r=>isPMFinalAction(r));
   const total=clearance.length+final.length;
   const b=document.getElementById('pendingBanner');
   if(!total){b.style.display='none';return;}
@@ -392,8 +398,8 @@ function filterTable() {
   const allTerminal=[...declinedPhases,...closedPhases];
   let reqs=allRequests;
   if(activeTab==='clearance') reqs=reqs.filter(r=>clearancePhases.includes(r.phase)&&isMyClearanceAction(r));
-  else if(activeTab==='final') reqs=reqs.filter(r=>r.phase==='pending_pm_final_approval');
-  else if(activeTab==='ongoing') reqs=reqs.filter(r=>!allTerminal.includes(r.phase)&&!(clearancePhases.includes(r.phase)&&isMyClearanceAction(r))&&r.phase!=='pending_pm_final_approval');
+  else if(activeTab==='final') reqs=reqs.filter(r=>isPMFinalAction(r));
+  else if(activeTab==='ongoing') reqs=reqs.filter(r=>!allTerminal.includes(r.phase)&&!(clearancePhases.includes(r.phase)&&isMyClearanceAction(r))&&!isPMFinalAction(r));
   else if(activeTab==='declined') reqs=reqs.filter(r=>declinedPhases.includes(r.phase));
   else if(activeTab==='closed') reqs=reqs.filter(r=>closedPhases.includes(r.phase));
   else if(activeTab==='mine') reqs=reqs.filter(r=>r.created_by===currentUser.id);
@@ -409,7 +415,7 @@ function renderTable(reqs) {
   if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${emptyIcon}</div><h3>${emptyTitle}</h3><p>${emptySub}</p>${activeTab==='mine'?'<button class="btn btn-primary" style="margin-top:12px" onclick="openNewPR()">+ New Request</button>':''}</div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
     const isClearancePhase=['pending_initial_pm_approval','lp_submitted','lp_pending_pm_approval','pending_decline_approval'].includes(r.phase);
-    const isClearance=isClearancePhase&&isMyClearanceAction(r), isFinal=r.phase==='pending_pm_final_approval';
+    const isClearance=isClearancePhase&&isMyClearanceAction(r), isFinal=isPMFinalAction(r);
     const needsAction=isClearance||isFinal;
     return `<tr style="${needsAction?'background:rgba(214,43,43,0.025)':''}">
       <td><span class="pr-number${r.is_modification?' modified':''}">${r.is_modification?'↺ ':''} PR-${String(r.request_number).padStart(4,'0')}</span></td>
@@ -595,6 +601,11 @@ async function openPR(id) {
         <button class="btn btn-danger" onclick="rejectDeviation()" style="flex:1"> Reject — Return to QC</button>
       </div>
     </div>`;
+  }
+
+  // ── PI / FINAL COMMERCIAL CHANGE — re-approval of a value above what was approved ──
+  if(currentPR.phase==='pending_pi_approval') {
+    actionSection = await buildPIApprovalPanel(currentPR, currentUser);
   }
 
   // ── LOCAL PURCHASE: lp_submitted / lp_pending_pm_approval — PM or Master can approve/reject ──

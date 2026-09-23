@@ -515,7 +515,7 @@ async function loadAllRequests() {
 }
 
 function renderOverviewBreakdowns() {
-  const rfqPhases = ['submitted','pending_initial_pm_approval','procurement_active','quotations_shared','pending_pm_final_approval','pending_sandy_approval','approved','order_placed','grn_initiated','qc_pending','qc_passed','payment_raised_to_accounts'];
+  const rfqPhases = ['submitted','pending_initial_pm_approval','procurement_active','pending_tech_verification','quotations_shared','pending_pm_final_approval','pending_sandy_approval','approved','pending_pi_approval','order_placed','grn_initiated','qc_pending','qc_passed','payment_raised_to_accounts'];
   const lpPhases = ['lp_submitted','lp_pending_pm_approval','lp_procurement_processing','lp_payment_pending'];
 
   const rfq = allRequests.filter(r => r.request_category === 'RFQ');
@@ -874,6 +874,7 @@ const PHASE_OWNER = {
   vendor_info_shared: 'Engineer', vendor_info_received: '— Closed —',
   quotations_shared: 'Engineer (validates)', quotes_revision_requested: 'Procurement Manager',
   pending_pm_final_approval: 'Project Manager', pending_sandy_approval: 'Director',
+  pending_tech_verification: 'Engineer', pending_pi_approval: 'Project Manager / Director',
   approved: 'Procurement Manager', advance_requested: 'Accounts',
   advance_raised_to_accounts: 'Accounts', advance_payment_received: 'Procurement Manager',
   order_placed: 'Store Manager', grn_initiated: 'QC Inspector', grn_pending: 'Engineer',

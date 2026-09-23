@@ -515,7 +515,7 @@ function showToast(msg, type='info') {
   c.appendChild(t); setTimeout(()=>t.remove(),4000);
 }
 function showLoader(s){ const e=document.getElementById('loadingOverlay'); if(e)e.classList.toggle('active',s); }
-function openModal(id){ const m=document.getElementById(id); if(m){m.classList.add('active');document.body.style.overflow='hidden';} }
+function openModal(id){ const m=document.getElementById(id); if(m){m.classList.add('active');document.body.style.overflow='hidden';} if(window.hydrateRevisionHistory) setTimeout(window.hydrateRevisionHistory,0); }
 function closeModal(id){ const m=document.getElementById(id); if(m){m.classList.remove('active');document.body.style.overflow='';} }
 
 // ── CONSTANTS ────────────────────────────────────────────────
@@ -544,6 +544,8 @@ function getPhaseBadge(phase){
     lp_pending_pm_approval:['LP — Awaiting Project Manager','badge-orange'],
     pending_decline_approval:['Decline — Awaiting Project Manager','badge-red'],
     procurement_active:['Procurement Active','badge-blue'],
+    pending_tech_verification:['Technical Verification','badge-purple'],
+    pending_pi_approval:['PI Change — Awaiting Approval','badge-orange'],
     vendor_info_shared:['Vendor Info Shared','badge-purple'],
     quotations_shared:['Engineer Verification','badge-purple'],
     quotes_revision_requested:['Quote Revision Requested','badge-orange'],
@@ -1072,7 +1074,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
   return `
     <div class="detail-grid">
       <div class="detail-item"><div class="detail-key">Request #</div>
-        <div class="detail-value"><span class="pr-number${pr.is_modification?' modified':''}">PR-${String(pr.request_number).padStart(4,'0')}</span>
+        <div class="detail-value"><span class="pr-number${pr.is_modification?' modified':''}">PR-${String(pr.request_number).padStart(4,'0')}</span>${window.revBadgeHTML?window.revBadgeHTML(pr.revision_no||0):''}
         ${pr.is_modification?`<span class="mod-badge" style="margin-left:6px">↺ Modified</span>`:''}
         ${pr.split_group_id?`<span class="mod-badge" style="margin-left:6px;background:#6366f114;color:#6366f1;border-color:#6366f130">⑂ Split Order</span>`:''}
         </div></div>
@@ -1105,6 +1107,7 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
     </div>`:''}
 
     ${renderPartsTable(parts)}
+    ${(pr.revision_no||0)>0?`<div data-rev-history="${pr.id}"></div>`:''}
     <div style="margin-top:12px;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--off-white);border:1px solid var(--border);border-radius:var(--radius)">
       <span style="font-size:0.8rem;color:var(--gray-3)">Total Lead Time:</span>
       <strong style="font-family:var(--font-mono);font-size:0.88rem">${calcLeadTimeDays(pr.created_at, pr.closed_at, pr.total_hold_seconds, pr.is_on_hold, pr.hold_started_at)} days${pr.closed_at ? ' (final)' : pr.is_on_hold ? ' (paused)' : ''}</strong>
@@ -1215,13 +1218,16 @@ function buildPRDetailHTML(pr, quotations=[], vendorName='', pmName='', extras={
       return `<div style="margin-top:16px;border:1px solid rgba(99,102,241,0.25);border-radius:var(--radius);overflow:hidden">
         <div style="padding:10px 14px;background:rgba(99,102,241,0.07);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
           <div style="font-weight:700;font-size:0.85rem;color:#4f46e5">📄 Purchase Order</div>
-          <span style="font-family:var(--font-mono);font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:3px;background:rgba(99,102,241,0.12);color:#4f46e5">${po.po_number}</span>
+          <span style="font-family:var(--font-mono);font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:3px;background:rgba(99,102,241,0.12);color:#4f46e5">${po.po_number}${(po.revision_no||0)>0?' · Rev.'+po.revision_no:''}</span>
         </div>
         <div style="padding:12px 14px;background:white;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 14px">
           <div><div class="detail-key">PO Date</div><div class="detail-value" style="font-family:var(--font-mono);font-size:0.82rem">${fmtDate(po.po_date||po.created_at)}</div></div>
           <div><div class="detail-key">Total Amount</div><div class="detail-value" style="font-family:var(--font-mono);font-weight:700;font-size:0.9rem">${po.currency||'AED'} ${Number(po.total_amount||0).toLocaleString()}</div></div>
           ${po.ship_to?`<div style="grid-column:1/-1"><div class="detail-key">Ship To</div><div class="detail-value" style="font-size:0.82rem">${po.ship_to}</div></div>`:''}
+          ${po.pdf_url?`<div><div class="detail-key">PO Document</div><div class="detail-value"><a href="${escHtml(po.pdf_url)}" target="_blank" rel="noopener" style="color:var(--red);font-size:0.82rem"> View PDF</a></div></div>`:''}
+          ${(po.revision_no||0)>0&&po.revision_reason?`<div style="grid-column:1/-1"><div class="detail-key">Last revision reason</div><div class="detail-value" style="font-size:0.82rem">${escHtml(po.revision_reason)}</div></div>`:''}
         </div>
+        ${extras.poActionsHTML?`<div style="padding:0 14px 12px;background:white;display:flex;gap:8px;flex-wrap:wrap">${extras.poActionsHTML}</div>`:''}
       </div>`;
     })()}
 
@@ -1807,8 +1813,16 @@ const DEPT_OPTIONS = [
   {val:'mech_design',label:'Mechanical Design Engineering'},
   {val:'other',label:'Other'},
 ];
+let _partsEditorContainerId = 'partsEditorContainer';
 function renderPartsEditor(containerId) {
   const c=document.getElementById(containerId); if(!c) return;
+  _partsEditorContainerId = containerId;
+  // Row ids (prow-N, pname-N ...) are global. Two editors in the DOM at once (e.g. the hidden
+  // "New Request" form + the "Edit Request" form) made getPartsFromEditor() read the WRONG row
+  // and silently drop items - so only one editor is ever mounted.
+  ['partsEditorContainer','reqEditPartsContainer'].forEach(function(id){
+    if (id !== containerId) { var o = document.getElementById(id); if (o) o.innerHTML = ''; }
+  });
   const pm = _partsEditorProductionMode;
   c.innerHTML=`
     ${pm ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:6px;font-size:0.78rem;color:#6366f1">
@@ -1840,7 +1854,7 @@ function partsRowHTML(i, p={}) {
     <input type="text" class="parts-table part-num-input" id="pnum-${rid}"
       placeholder="Search #…" value="${p.part_number||''}"
       autocomplete="off"
-      oninput="onPartNumInput(${rid}, this.value, 'partsEditorContainer')"
+      oninput="onPartNumInput(${rid}, this.value, '${_partsEditorContainerId}')"
       onchange="updatePartField(${rid},'part_number',this.value)"
       style="width:100%;border:1px solid var(--border);border-radius:4px;font-family:var(--font-mono);font-size:0.75rem;padding:3px 6px;background:white"/>
     <div id="pnum-dropdown-${rid}" style="display:none;position:absolute;z-index:9999;left:0;top:100%;min-width:260px;max-height:200px;overflow-y:auto;background:white;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div>
@@ -1857,7 +1871,7 @@ function partsRowHTML(i, p={}) {
     <td><input type="text" id="puom-${rid}" placeholder="pcs" value="${p.uom||''}" onchange="updatePartField(${rid},'uom',this.value)" style="width:100%;border:none;outline:none;font-size:0.78rem;padding:2px 4px;background:transparent;text-align:center"/></td>
     <td><select onchange="updatePartField(${rid},'department',this.value)" style="width:100%;border:1px solid var(--border);border-radius:4px;font-size:0.75rem;padding:2px 4px;background:white">${deptOpts}</select></td>
     <td><input type="text" id="pspec-${rid}" placeholder="Material, grade, dimensions..." value="${p.spec||''}" onchange="updatePartField(${rid},'spec',this.value)" style="width:100%;border:none;outline:none;font-family:var(--font-body);font-size:0.82rem;padding:2px 4px;background:transparent"/></td>
-    <td><button type="button" class="btn btn-danger btn-sm" style="padding:3px 7px" onclick="removePartsRow(${rid},'partsEditorContainer')">✕</button></td>
+    <td><button type="button" class="btn btn-danger btn-sm" style="padding:3px 7px" onclick="removePartsRow(${rid},'${_partsEditorContainerId}')"></button></td>
   </tr>`;
 }
 
@@ -1943,7 +1957,7 @@ function addPartsRow(containerId) {
 }
 function removePartsRow(rowId, containerId) {
   _partsEditorRows=_partsEditorRows.filter(r=>r._id!==rowId);
-  renderPartsEditor(containerId||'partsEditorContainer');
+  renderPartsEditor(containerId||_partsEditorContainerId);
 }
 function updatePartField(rowId, field, value) {
   const r=_partsEditorRows.find(r=>r._id===rowId); if(r) r[field]=value;

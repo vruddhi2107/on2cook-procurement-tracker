@@ -239,6 +239,7 @@
     <button class="tab-btn" data-tab="vendors" onclick="switchTab('vendors')">Vendor DB</button>
     <button class="tab-btn" data-tab="parts" onclick="switchTab('parts')">Parts Catalog</button>
     <button class="tab-btn" data-tab="createpo" onclick="switchTab('createpo')"> Create PO</button>
+    <button class="tab-btn" data-tab="reports" onclick="switchTab('reports')"> PO Master &amp; Reports</button>
   </div>
 
   <div id="tabRequests">
@@ -326,6 +327,11 @@
         </table>
       </div>
     </div>
+  </div>
+
+  <!-- PO MASTER & REPORTS TAB -->
+  <div id="tabReports" style="display:none">
+    <div id="reportsMount"></div>
   </div>
 
   <!-- ── CREATE PO TAB ── -->
@@ -631,6 +637,17 @@
     </div>
   </div>
 </div>
+<!-- PO HISTORY MODAL -->
+<div class="modal-overlay" id="poHistoryModal">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header">
+      <div><div class="modal-title">Purchase Order &mdash; Revision History</div><div class="modal-title-sub" id="poHistorySub"></div></div>
+      <button class="modal-close" onclick="closeModal('poHistoryModal')"></button>
+    </div>
+    <div class="modal-body" id="poHistoryBody" style="max-height:72vh;overflow-y:auto"></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('poHistoryModal')">Close</button></div>
+  </div>
+</div>
 <!-- PAYMENT REQUEST MODAL -->
 <div class="modal-overlay" id="payReqModal">
   <div class="modal" style="max-width:680px">
@@ -774,8 +791,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="../js/supabase-config.js"></script>
 <script src="../js/shared.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="../js/admin-config.js"></script>
+<script src="../js/workflow.js"></script>
+<script src="../js/reports.js"></script>
 <script>
+// Once a PO's goods are through QC / payment is in motion, the PO is no longer revisable.
+const PO_LOCKED_PHASES = new Set(['qc_passed','closed_full_advance','payment_requested','payment_raised_to_accounts','payment_received','accepted','rejected','declined','qc_rejected']);
 let currentUser, allRequests=[], allVendors=[], allParts=[], activeTab='active', currentPR=null;
 
 // Phases that genuinely require Procurement Manager input right now.
@@ -791,6 +813,14 @@ let currentUser, allRequests=[], allVendors=[], allParts=[], activeTab='active',
 // MISSING from this list even though they need a PM action (mark advance
 // received, then place the order) — added back in.
 const ACTION_PHASES=['lp_procurement_processing','lp_payment_pending','procurement_active','quotes_revision_requested','approved','advance_raised_to_accounts','advance_payment_received','qc_passed'];
+// Called by js/workflow.js after a state change (datasheets, PI review, ...).
+// Refreshes the list, and re-opens the request only if its modal is still showing.
+window.wfAfterAction = async function(prId) {
+  await loadRequests();
+  const u = allRequests.find(r => r.id === prId);
+  const open = document.getElementById('prModal')?.classList.contains('active');
+  if (u && open) { currentPR = u; await openPR(prId); }
+};
 function addPhaseTimestamp(pr, phaseName) {
   var existing = (pr && pr.phase_timestamps) ? pr.phase_timestamps : {};
   var ts = Object.assign({}, existing);
@@ -810,7 +840,7 @@ async function init() {
     document.getElementById('customPaymentTermsGroup').style.display=e.target.value==='custom'?'block':'none';
   });
   showLoader(true);
-  await Promise.all([loadRequests(), loadVendors(), applyAdminConfigOverrides()]);
+  await Promise.all([loadRequests(), loadVendors(), applyAdminConfigOverrides(), loadWorkflowFlags()]);
   refreshFieldCatalog(allRequests);
   renderDynamicFilterBar('dynamicFilterBar','procurement_manager','filterTable',{includeSearch:false,includeClear:false, forceSingleFields:['action','is_on_hold']});
   filterTable();
@@ -918,13 +948,15 @@ function updateStats() {
 function switchTab(t) {
   activeTab=t;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
-  document.getElementById('tabRequests').style.display=['vendors','parts','createpo'].includes(t)?'none':'block';
+  document.getElementById('tabRequests').style.display=['vendors','parts','createpo','reports'].includes(t)?'none':'block';
+  document.getElementById('tabReports').style.display=t==='reports'?'block':'none';
   document.getElementById('tabVendors').style.display=t==='vendors'?'block':'none';
   document.getElementById('tabParts').style.display=t==='parts'?'block':'none';
   document.getElementById('tabCreatePO').style.display=t==='createpo'?'block':'none';
   if(t==='vendors') renderVendorCards(allVendors,'vendorGrid',true);
   else if(t==='parts') loadPartsTab();
   else if(t==='createpo') cpoInitTab();
+  else if(t==='reports') mountReports('reportsMount',{dataset:'po_master',rowAction:{label:'Open PR',fn:function(r){ if(r.pr_id) openPR(r.pr_id); }}});
   else filterTable();
 }
 
@@ -1255,9 +1287,14 @@ async function openPR(id) {
   }));
   currentAttachments = [...jsonbAttachments, ...(attRes.data || [])];
   const attachments = currentAttachments;
+  const [wfFlags, dsRows, piRows] = await Promise.all([
+    loadWorkflowFlags(),
+    currentPR.request_category==='RFQ' ? getDatasheets(id) : Promise.resolve([]),
+    currentPR.request_category==='RFQ' ? getFinalCommercialRows(id) : Promise.resolve([])
+  ]);
   showLoader(false);
   const footer=document.getElementById('prModalFooter');
-  footer.innerHTML=`<button class="btn btn-secondary" onclick="enterRequestEditMode()"> Edit Request</button><button class="btn btn-secondary" onclick="closeModal('prModal')" style="margin-left:auto">Close</button>`;
+  footer.innerHTML=`${canEditPR(currentPR,currentUser)?`<button class="btn btn-secondary" onclick="enterRequestEditMode()"> Edit Request</button>`:''}<button class="btn btn-secondary" onclick="closeModal('prModal')" style="margin-left:auto">Close</button>`;
   let actionSection='';
 
   // ── VENDOR INFO ──
@@ -1375,7 +1412,10 @@ async function openPR(id) {
   }
 
   // ── RFQ: assign vendor + upload quotations ──
-  if(currentPR.phase==='procurement_active'&&currentPR.request_category==='RFQ') {
+  if(currentPR.phase==='procurement_active'&&currentPR.request_category==='RFQ'&&wfFlags.tech_verification_required&&currentPR.tech_verification_status!=='approved') {
+    // Technical verification comes before quotations (workflow setting)
+    actionSection = buildDatasheetUploadSection(currentPR, dsRows) + buildDeclineSection();
+  } else if(currentPR.phase==='procurement_active'&&currentPR.request_category==='RFQ') {
     const vendorList=allVendors;
     const selectedVendorObj=vd?.data;
     actionSection=`<div class="action-section">
@@ -1453,7 +1493,25 @@ async function openPR(id) {
     const vendorObj = vd?.data;
     const pt = PAYMENT_TERMS_OPTIONS.find(p=>p.value===vendorObj?.payment_terms);
     // Also fetch advRec for advance_requested
-    actionSection = buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO, acceptedQuotes, allPOs);
+    actionSection = buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO, acceptedQuotes, allPOs, piRows, wfFlags);
+  }
+
+  //  WAITING ON ENGINEER: technical verification
+  if(currentPR.phase==='pending_tech_verification') {
+    actionSection=`<div class="action-section" style="border:1px solid rgba(99,102,241,0.3);background:rgba(99,102,241,0.04)">
+      <div class="action-section-title" style="color:#4f46e5">Waiting for Technical Verification</div>
+      <p style="font-size:0.82rem;color:var(--gray-3);margin:0">The requesting engineer is checking the submitted documents against the requirement. You can upload quotations as soon as they are verified.</p>
+    </div>`;
+  }
+
+  //  WAITING ON APPROVER: PI / final commercial change
+  if(currentPR.phase==='pending_pi_approval') {
+    const piMap = latestPIByQuotation(piRows);
+    const waiting = quotations.filter(x => piMap[x.id] && piMap[x.id].status==='pending_approval');
+    actionSection=`<div class="action-section" style="border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.04)">
+      <div class="action-section-title" style="color:#b45309">PI Change &mdash; Awaiting ${currentPR.pi_approver_role==='director'?'Director':'Project Manager'} Approval</div>
+      ${waiting.map(x=>buildPIReviewCard(currentPR,x,piMap[x.id],wfFlags)).join('')}
+    </div>`;
   }
 
   // ── ADVANCE RAISED TO ACCOUNTS: Procurement Manager marks received ──
@@ -1667,11 +1725,19 @@ async function openPR(id) {
   }
 
   const attachmentsSectionHTML = _buildAttsSection(attachments, 'Attachments');
+  const dsSummaryHTML = dsRows.length ? buildDatasheetSummarySection(currentPR, dsRows, 'Technical Documents') : '';
+  const poActionsHTML = allPOs.map(po => {
+    const revisable = !PO_LOCKED_PHASES.has(currentPR.phase);
+    const tag = allPOs.length>1 ? ' ('+escHtml(po.po_number)+')' : '';
+    return (revisable ? `<button class="btn btn-secondary btn-sm" onclick="openPOModal('${id}','${po.quotation_id||''}',{revisePOId:'${po.id}'})">Revise PO${tag}</button>` : '')
+         + `<button class="btn btn-ghost btn-sm" onclick="openPOHistory('${po.id}')">Revision history${tag}</button>`;
+  }).join('');
 
   document.getElementById('prModalBody').innerHTML=
     `<div id="prDetailViewSection">`+
-    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',currentPR.project_manager_name||'',{poData:existingPO,advPayRec:advRes.data||null,payRec:payRes.data||null,clearanceManagerName,currentUser,splitSibling,onOpenSplitSibling:'openPR'})
+    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',currentPR.project_manager_name||'',{poData:existingPO,advPayRec:advRes.data||null,payRec:payRes.data||null,clearanceManagerName,currentUser,splitSibling,onOpenSplitSibling:'openPR',poActionsHTML})
     +`</div><div id="prDetailEditSection" style="display:none"></div>`
+    +dsSummaryHTML
     +attachmentsSectionHTML
     +actionSection+
     `<div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
@@ -1687,6 +1753,7 @@ async function openPR(id) {
       <div style="font-size:0.7rem;color:var(--gray-4);margin-top:4px">Tip: type @ to mention a team member</div>
     </div>`;
   openModal('prModal');
+  Object.keys(window._piQuotes||{}).forEach(k => piRecalc(k));
   setTimeout(function(){ window.initCommentBox && window.initCommentBox('commentInput','mentionDdPr'); }, 50);
 }
 
@@ -1696,7 +1763,7 @@ function enterRequestEditMode() {
   const viewSec = document.getElementById('prDetailViewSection');
   const editSec = document.getElementById('prDetailEditSection');
   if (!viewSec || !editSec) return;
-  editSec.innerHTML = buildPRDetailEditableHTML(currentPR);
+  editSec.innerHTML = buildPRDetailEditableHTML(currentPR) + buildPREditReasonHTML();
   viewSec.style.display = 'none';
   editSec.style.display = 'block';
   initPartsEditor('reqEditPartsContainer', currentPR.parts||[], false);
@@ -1712,42 +1779,22 @@ function cancelRequestEdit() {
 
 async function saveRequestEdits() {
   if (!currentPR) return;
-  const projectName = document.getElementById('editReqProject')?.value.trim();
-  if (!projectName) { showToast('Project name is required', 'error'); return; }
-
-  const sourcing = [];
-  if (document.getElementById('editReqSourcingDomestic')?.checked) sourcing.push('domestic');
-  if (document.getElementById('editReqSourcingIntl')?.checked) sourcing.push('international');
-
-  const parts = getPartsFromEditor();
-
-  const vals = {
-    project_name: projectName,
-    project_phase: document.getElementById('editReqPhase')?.value.trim() || null,
-    project_manager_name: document.getElementById('editReqPM')?.value.trim() || null,
-    team_member_name: document.getElementById('editReqTeamMember')?.value.trim() || null,
-    department: document.getElementById('editReqDept')?.value || null,
-    order_type: document.getElementById('editReqOrderType')?.value || null,
-    product_link: document.getElementById('editReqProductLink')?.value.trim() || null,
-    sourcing,
-    item_note: document.getElementById('editReqItemNote')?.value.trim() || null,
-    description: document.getElementById('editReqDescription')?.value.trim() || null,
-    parts
-  };
-
+  const c = collectPREditValues();
+  if (c.error) { showToast(c.error, 'error'); return; }
+  if (!c.reason) { showToast('Enter the reason for this change', 'error'); return; }
   showLoader(true);
-  const { error } = await db.from('procurement_requests').update(vals).eq('id', currentPR.id);
+  const r = await savePRRevision(currentPR, c.vals, c.reason, currentUser);
   showLoader(false);
-  if (error) { showToast('Error saving request: ' + error.message, 'error'); return; }
-
-  showToast('Request updated!', 'success');
+  if (r.noChange) { showToast('Nothing was changed', 'info'); return; }
+  if (!r.ok) { showToast('Error saving request: ' + r.error, 'error'); return; }
+  showToast('Request updated \u2014 now Rev.' + r.revision, 'success');
   await loadRequests();
-  const updated = allRequests.find(r => r.id === currentPR.id);
+  const updated = allRequests.find(x => x.id === currentPR.id);
   if (updated) currentPR = updated;
   await openPR(currentPR.id);
 }
 
-// ── VENDOR SELECTOR CHIP ─────────────────────────────────────
+//  VENDOR SELECTOR CHIP ─────────────────────────────────────
 function onVendorSelect() {
   const vid=document.getElementById('assignVendor').value;
   const vendor=allVendors.find(v=>v.id===vid);
@@ -1981,18 +2028,27 @@ async function shareQuotations() {
         uploaded_by: currentUser?.id || null
       });
     }
+    const wf = await loadWorkflowFlags();
+    let nextPhase = 'quotations_shared', extraUpd = {}, routedNote = '';
+    if (wf.tech_verification_required && currentPR.tech_verification_status === 'approved') {
+      // Engineer already verified the specs -> no engineer step on the quotes; go straight to PM / Director by value
+      const { data: allQ } = await db.from('pr_quotations').select('*').eq('pr_id', currentPR.id);
+      const route = await routeQuotationsForApproval(allQ || []);
+      nextPhase = route.phase; extraUpd = { approval_path: 'engineer_verified' };  // existing CHECK only allows engineer_verified / client / project_manager
+      routedNote = ` Technically verified \u2014 routed straight to ${route.needsDirector ? 'the Director' : 'the Project Manager'} for commercial approval.`;
+    }
     const { error } = await db.from('procurement_requests').update({
-      phase:'quotations_shared', updated_at:new Date().toISOString(), phase_timestamps:addPhaseTimestamp(currentPR,'quotations_shared')
+      phase:nextPhase, ...extraUpd, updated_at:new Date().toISOString(), phase_timestamps:addPhaseTimestamp(currentPR,nextPhase)
     }).eq('id',currentPR.id);
-    notifyPhaseChange(currentPR.id,'quotations_shared',currentUser?.id);
+    notifyPhaseChange(currentPR.id,nextPhase,currentUser?.id);
     if (!error) {
       const uniqueVendors = [...new Set(vendorNames)];
       await window.postComment(currentPR.id, currentUser?.id,
-        ` ${uploadedFiles.length} quotation${uploadedFiles.length>1?'s':''} from ${uniqueVendors.join(', ')} shared with engineer.`);
+        ` ${uploadedFiles.length} quotation${uploadedFiles.length>1?'s':''} from ${uniqueVendors.join(', ')} ${nextPhase==='quotations_shared' ? 'shared with engineer.' : 'uploaded.' + routedNote}`);
     }
     showLoader(false);
     if (error) { showToast('Error: '+error.message,'error'); return; }
-    showToast('Quotations shared with engineer!','success');
+    showToast(nextPhase==='quotations_shared' ? 'Quotations shared with engineer!' : 'Quotations sent for commercial approval!','success');
     closeModal('prModal'); await loadRequests();
   } catch(err) {
     showLoader(false); showToast(err.message,'error');
@@ -2267,8 +2323,28 @@ async function requestAdvance() {
 }
 
 // ── SMARTSHEET ADVANCE PAYMENT ───────────────────────────────
+// Workflow setting: a payment request needs a generated PO (and, if enabled, a cleared PI review).
+async function advanceGateCheck() {
+  const flags = await loadWorkflowFlags();
+  if (!flags.po_before_payment && !flags.pi_review_enabled) return { ok: true };
+  const { data: qs } = await db.from('pr_quotations').select('id,is_selected').eq('pr_id', currentPR.id);
+  let need = (qs || []).filter(q => q.is_selected);
+  if (!need.length && currentPR.selected_quotation_id) need = [{ id: currentPR.selected_quotation_id }];
+  const [posRes, piRows] = await Promise.all([
+    db.from('purchase_orders').select('quotation_id').eq('pr_id', currentPR.id),
+    flags.pi_review_enabled ? getFinalCommercialRows(currentPR.id) : Promise.resolve([])
+  ]);
+  const pos = posRes.data || [], piMap = latestPIByQuotation(piRows);
+  if (flags.pi_review_enabled && need.some(q => !piIsCleared(piMap[q.id])))
+    return { ok: false, msg: 'Complete the final commercial (PI) review before raising a payment.' };
+  if (flags.po_before_payment && (!pos.length || (need.length > 1 && need.some(q => !pos.find(p => p.quotation_id === q.id)))))
+    return { ok: false, msg: 'Generate the Purchase Order before raising a payment request.' };
+  return { ok: true };
+}
+
 async function submitAdvanceViaSmartsheet() {
   if (!currentPR) return;
+  { const gate = await advanceGateCheck(); if (!gate.ok) { showToast(gate.msg, 'error'); return; } }
   const amtEl = document.getElementById('advanceAmt');
   const noteEl = document.getElementById('advanceNote');
   const payIdEl = document.getElementById('advSmartsheetPayId');
@@ -2404,14 +2480,76 @@ function numToWords(n) {
 // ── PO MODAL — styled paper layout ───────────────────────────
 let poTargetQuotationId = null; // when a PR has 2 accepted quotes, tracks which one this PO modal instance is for
 
-async function openPOModal(prId, quotationId=null) {
+// Everything the PO paper contains lives in inputs with ids, so it can be stored and re-opened for revision.
+function collectPOSnapshot() {
+  const root = document.getElementById('poModalBody');
+  const fields = {};
+  root.querySelectorAll('input[id]').forEach(el => { fields[el.id] = el.type === 'checkbox' ? !!el.checked : el.value; });
+  return { v: 1, fields, terms_html: document.getElementById('poTermsEditable')?.innerHTML || '', rows: root.querySelectorAll('[id^="po-desc-"]').length };
+}
+function applyPOSnapshot(snap) {
+  if (!snap || !snap.fields) return;
+  Object.entries(snap.fields).forEach(([id, val]) => {
+    if (id === 'poPreviewNum' || id === 'poRevisionReason' || id === 'poReviseVendor') return;
+    const el = document.getElementById(id); if (!el) return;
+    if (el.type === 'checkbox') el.checked = !!val; else el.value = val;
+  });
+  const terms = document.getElementById('poTermsEditable');
+  if (terms && snap.terms_html) terms.innerHTML = snap.terms_html;
+  if (document.getElementById('po-unitrate-0')) recalcPORow(0); else recalcPO();
+}
+function poLineItemsFromDOM() {
+  const out = [];
+  document.querySelectorAll('#poModalBody [id^="po-desc-"]').forEach(el => {
+    const i = el.id.replace('po-desc-', '');
+    out.push({
+      sr: (+i) + 1, desc: el.value, spec: document.getElementById('po-spec-' + i)?.value || '',
+      qty: parseFloat(document.getElementById('po-qty-' + i)?.value) || 0,
+      uom: document.getElementById('po-uom-' + i)?.value || '',
+      unit_rate: parseFloat(document.getElementById('po-unitrate-' + i)?.value) || 0
+    });
+  });
+  return out;
+}
+function _parseDMY(s) {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((s || '').trim());
+  return m ? `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` : null;
+}
+function poFillSupplier(vendorId) {
+  const v = allVendors.find(x => x.id === vendorId); if (!v) return;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  set('poSupplierName', v.name); set('poSupplierAddress', v.address); set('poSupplierContact', v.contact_person);
+  set('poSupplierPhone', v.phone); set('poSupplierEmail', v.email); set('poSupplierGSTIN', v.GSTIN || v.gstin);
+  set('poSupplierCountry', v.country); set('poSupplierType', v.vendor_type);
+}
+
+async function openPOModal(prId, quotationId=null, opts={}) {
   const pr = currentPR;
+  const flags = await loadWorkflowFlags();
+  const { data: existingPOs } = await db.from('purchase_orders').select('*').eq('pr_id', prId);
+  const revisePO = opts.revisePOId ? (existingPOs||[]).find(p => p.id === opts.revisePOId) || null : null;
+  if (opts.revisePOId && !revisePO) { showToast('That PO could not be found - reload and try again.', 'error'); return; }
+  if (revisePO) quotationId = quotationId || revisePO.quotation_id || null;
   poTargetQuotationId = quotationId;
   const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',prId);
   const acceptedQuotes = quotations?.filter(q=>q.is_selected) || [];
   const selectedQ = quotationId
     ? quotations?.find(q=>q.id===quotationId)
     : (quotations?.find(q=>q.is_selected||q.id===pr.selected_quotation_id)||quotations?.[0]);
+  if (!revisePO) {
+    // never create a second PO for the same order by accident - revise the existing one instead
+    const dup = (existingPOs||[]).find(p => acceptedQuotes.length === 2 ? p.quotation_id === selectedQ?.id : true);
+    if (dup) { showToast(`PO ${dup.po_number} already exists for this request - use "Revise PO" to change it.`, 'error'); return; }
+    if (flags.pi_review_enabled) {
+      const gate = await piGateFor(prId, selectedQ?.id || null, flags);
+      if (!gate.cleared) { showToast('Clear the final commercial review (PI) before generating the PO.', 'error'); return; }
+    }
+  }
+  window._poRevising = revisePO; window._poPI = null;
+  if (!revisePO && flags.pi_review_enabled) {
+    const gate = await piGateFor(prId, selectedQ?.id || null, flags);
+    window._poPI = gate.row || null;
+  }
   const vendorId = selectedQ?.vendor_id || pr.assigned_vendor_id;
   const{data:vendor}=vendorId?await db.from('vendors').select('*').eq('id',vendorId).single():{data:null};
 
@@ -2420,7 +2558,16 @@ async function openPOModal(prId, quotationId=null) {
   const fyShort=`${String(fy).slice(2)}-${String(fy+1).slice(2)}`;
   // When both quotes were accepted, suffix the PO number per vendor so the two don't collide
   const poSuffix = acceptedQuotes.length===2 ? `-${acceptedQuotes.findIndex(q=>q.id===selectedQ?.id)+1 || 1}` : '';
-  const poNumber=`O2C/PO/${fyShort}/${String(pr.request_number).padStart(4,'0')}${poSuffix}`;
+  let poNumber;
+  if (revisePO) poNumber = revisePO.po_number;
+  else {
+    // independent PO sequence (assigned for real when the PO is saved)
+    const pk = await db.rpc('peek_next_po_number');
+    if (pk.error || !pk.data) { showToast('PO numbering is not set up yet - run migrations/2026_09_workflow_v2.sql first.', 'error'); return; }
+    poNumber = pk.data;
+  }
+  void poSuffix;
+  const nextRevNo = revisePO ? (revisePO.revision_no||0) + 1 : 0;
   const todayStr=now.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/');
   const deliveryDate=selectedQ?.lead_time_days
     ? new Date(Date.now()+selectedQ.lead_time_days*86400000).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/')
@@ -2453,10 +2600,17 @@ async function openPOModal(prId, quotationId=null) {
   - <strong>Rejection &amp; Replacement :</strong> In case of rejected material due to quality/specification issues, vendor shall be responsible for replacement/rework of material and shall bear all related transportation, pickup, return, and resupply costs. Rejected material handling shall be solely under vendor responsibility.
   - <strong>Jurisdiction :</strong> Subject To Ahmedabad jurisdiction only.`;
 
-  document.getElementById('poModalSub').textContent=`${poNumber} — ${pr.project_name}`;
+  document.getElementById('poModalSub').textContent=`${poNumber}${revisePO?' \u2014 Rev.'+nextRevNo:''} \u2014 ${pr.project_name}`;
+  const _ttl = document.querySelector('#poModal .modal-title'); if (_ttl) _ttl.textContent = revisePO ? 'Revise Purchase Order' : 'Generate Purchase Order';
+  const _prim = document.querySelector('#poModal .modal-footer .btn-primary'); if (_prim) _prim.textContent = revisePO ? 'Save Revision' : 'Generate & Save PO';
 
-  // Build parts rows
-  const partsArr = pr.parts && pr.parts.length ? pr.parts : [{name: pr.project_name||'—', qty:1, spec:''}];
+  // Build parts rows (a revision starts from what the PO said, not from the request)
+  const _snap = revisePO?.po_snapshot;
+  let partsArr = pr.parts && pr.parts.length ? pr.parts : [{name: pr.project_name||'—', qty:1, spec:''}];
+  if (_snap && _snap.rows) {
+    partsArr = [];
+    for (let i = 0; i < _snap.rows; i++) partsArr.push({ name: _snap.fields['po-desc-'+i] || '', spec: _snap.fields['po-spec-'+i] || '', qty: parseFloat(_snap.fields['po-qty-'+i]) || 1 });
+  }
   const itemRows = partsArr.map((p,i) => {
     const unitRate = partsArr.length > 1
       ? (baseAmt / partsArr.reduce((s,x)=>s+(x.qty||1),0))
@@ -2478,6 +2632,19 @@ async function openPOModal(prId, quotationId=null) {
   }).join('');
 
   document.getElementById('poModalBody').innerHTML=`
+    ${revisePO ? `<div style="margin-bottom:12px;padding:10px 12px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.25);border-radius:6px;font-size:0.8rem">
+        <div style="font-weight:700;color:#4f46e5;margin-bottom:6px">Revising ${_escHtml(poNumber)}: Rev.${revisePO.revision_no||0} &rarr; Rev.${nextRevNo}. The previous version stays in the PO history.</div>
+        ${revisePO.po_snapshot ? '' : '<div style="color:#b45309;margin-bottom:6px">This PO was created before revisions were supported, so the form is rebuilt from the quotation and the request &mdash; check every value against the PO you issued before saving.</div>'}
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <label style="font-size:0.74rem;white-space:nowrap">Reason for revision *</label>
+          <input class="form-control" id="poRevisionReason" style="flex:1;min-width:220px;font-size:0.8rem" placeholder="e.g. freight added, quantity reduced 10 to 8"/>
+          <label style="font-size:0.74rem;white-space:nowrap">Supplier</label>
+          <select class="form-control" id="poReviseVendor" style="max-width:220px;font-size:0.8rem" onchange="poFillSupplier(this.value)">
+            ${allVendors.map(v=>`<option value="${v.id}" ${v.id===revisePO.vendor_id?'selected':''}>${_escHtml(v.name)}</option>`).join('')}
+          </select>
+        </div></div>`
+      : `<div style="margin-bottom:10px;font-size:0.72rem;color:var(--gray-3)">The PO number shown is the next in sequence; it is fixed when you save.</div>`}
+    ${window._poPI ? `<div style="margin-bottom:10px;padding:8px 12px;background:rgba(22,163,74,0.06);border:1px solid rgba(22,163,74,0.25);border-radius:6px;font-size:0.76rem;color:#166534">Final commercial review (PI ${_escHtml(window._poPI.pi_number||'')}) cleared &mdash; final value ${_escHtml(window._poPI.currency)} ${Number(window._poPI.final_value).toLocaleString('en-IN')}. Freight and other charges below are pre-filled from the PI &mdash; check them against the invoice.</div>` : ''}
     <!-- Tax controls strip (outside printable area) -->
     <div style="margin-bottom:12px;padding:9px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:6px;font-size:0.78rem;display:flex;align-items:center;flex-wrap:wrap;gap:12px">
       <span> Review and edit fields directly in the PO below. Adjust tax rates here:</span>
@@ -2522,7 +2689,8 @@ async function openPOModal(prId, quotationId=null) {
         </div>
         <div class="po-addr-cell">
           <table style="width:100%;font-size:0.74rem">
-            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">PO Number :</td><td><input class="po-meta-input" id="poPreviewNum" value="${poNumber}" style="font-weight:700;font-size:0.82rem"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">PO Number :</td><td><input class="po-meta-input" id="poPreviewNum" value="${poNumber}" ${revisePO?'':'readonly'} style="font-weight:700;font-size:0.82rem"/>${revisePO?'<div style="font-size:0.66rem;color:#b45309;margin-top:2px">Only change this to correct the number — it is logged and the old number stays visible in the history.</div>':''}</td></tr>
+            ${revisePO ? `<tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Revision :</td><td><input class="po-meta-input" id="poRevisionLabel" value="Rev.${nextRevNo}" readonly style="font-weight:700"/></td></tr>` : ''}
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">PO Date :</td><td><input class="po-meta-input" id="poDate" value="${todayStr}" oninput="document.getElementById('poPreviewNum')&&recalcPO()"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Date :</td><td><input class="po-meta-input" id="poDelivery" value="${deliveryDate}"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Payment Terms :</td><td><input class="po-meta-input" id="poPaymentTerms" value="${ptLabel}"/></td></tr>
@@ -2545,7 +2713,7 @@ async function openPOModal(prId, quotationId=null) {
           Contact: <input class="po-meta-input" id="poSupplierContact" value="${_escHtml(vendor?.contact_person||'')}" style="width:calc(100% - 58px);box-sizing:border-box"/><br/>
           Phone: <input class="po-meta-input" id="poSupplierPhone" value="${_escHtml(vendor?.phone||'')}" style="width:calc(100% - 48px);box-sizing:border-box"/><br/>
           Email: <input class="po-meta-input" id="poSupplierEmail" value="${_escHtml(vendor?.email||'')}" style="width:calc(100% - 46px);box-sizing:border-box"/><br/>
-          GSTIN : <input class="po-meta-input" id="poSupplierGSTIN" value="${_escHtml(vendor?.gstin||'')}" style="width:calc(100% - 55px);box-sizing:border-box"/><br/>
+          GSTIN : <input class="po-meta-input" id="poSupplierGSTIN" value="${_escHtml(vendor?.GSTIN||vendor?.gstin||'')}" style="width:calc(100% - 55px);box-sizing:border-box"/><br/>
           Country : <input class="po-meta-input" id="poSupplierCountry" value="${_escHtml(vendor?.country||'')}" style="width:calc(100% - 62px);box-sizing:border-box"/><br/>
           Vendor Type : <input class="po-meta-input" id="poSupplierType" value="${_escHtml(vendor?.vendor_type||'')}" style="width:calc(100% - 90px);box-sizing:border-box"/><br/>
           Place of Supply: <input class="po-meta-input" id="poSupplierPlace" value="Gujarat.India" style="width:calc(100% - 118px);box-sizing:border-box"/>
@@ -2641,6 +2809,13 @@ async function openPOModal(prId, quotationId=null) {
   window._poCgstPct = cgstPct;
   window._poSgstPct = sgstPct;
 
+  if (revisePO && revisePO.po_snapshot) applyPOSnapshot(revisePO.po_snapshot);
+  else if (window._poPI) {
+    const pi = window._poPI, set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set('pnfInput', parseFloat(pi.freight) || 0);
+    set('poOtherCharges', (parseFloat(pi.packing_other)||0) + (parseFloat(pi.taxes_duties)||0) + (parseFloat(pi.price_adjustment)||0));
+    recalcPO();
+  }
   openModal('poModal');
 }
 
@@ -2870,9 +3045,20 @@ function renderPRAttachList() {
 
 function removePRAttach(i) { paymentRequestFiles.splice(i,1); renderPRAttachList(); }
 
+const PO_NUMBER_RE = /^[A-Za-z0-9/_.\-]{3,40}$/;
+
 async function confirmGeneratePO() {
+  const revising = window._poRevising || null;
+  let reason = '', editedNumber = null;
+  if (revising) {
+    reason = document.getElementById('poRevisionReason')?.value.trim() || '';
+    if (!reason) { showToast('Enter the reason for this revision', 'error'); return; }
+    const typed = document.getElementById('poPreviewNum')?.value.trim() || '';
+    if (!typed) { showToast('PO Number cannot be empty', 'error'); return; }
+    if (!PO_NUMBER_RE.test(typed)) { showToast('PO Number can only contain letters, numbers, / _ .  and  -', 'error'); return; }
+    if (typed !== revising.po_number) editedNumber = typed;
+  }
   showLoader(true);
-  const poNumber = document.getElementById('poPreviewNum')?.value || document.getElementById('poPreviewNum')?.textContent || '';
   const cgstPct  = parseFloat(document.getElementById('cgstInput')?.value || 9);
   const sgstPct  = parseFloat(document.getElementById('sgstInput')?.value || 9);
   const pnf      = parseFloat(document.getElementById('pnfInput')?.value  || 0);
@@ -2880,40 +3066,70 @@ async function confirmGeneratePO() {
   const base     = window._poBaseAmt || 0;
   // P&F is part of the taxable value only when billed by the vendor in the
   // same (taxable) invoice; when billed separately at a flat rate it's added
-  // after GST instead — mirrors recalcPO() so the saved total matches the preview.
+  // after GST instead - mirrors recalcPO() so the saved total matches the preview.
   const discPct = parseFloat(document.getElementById('poDiscountPct')?.value || 0) || 0;
   const other    = parseFloat(document.getElementById('poOtherCharges')?.value || 0) || 0;
   const discAmt = Math.round(base * discPct / 100 * 100) / 100;
   const afterDiscount = base - discAmt;
   const taxableValue = pnfTaxable ? (afterDiscount + pnf) : afterDiscount;
-  const netPayable = Math.round(taxableValue + Math.round(taxableValue*cgstPct/100*100)/100 + Math.round(taxableValue*sgstPct/100*100)/100 + other + (pnfTaxable ? 0 : pnf));
+  const cgstAmt = Math.round(taxableValue*cgstPct/100*100)/100, sgstAmt = Math.round(taxableValue*sgstPct/100*100)/100;
+  const netPayable = Math.round(taxableValue + cgstAmt + sgstAmt + other + (pnfTaxable ? 0 : pnf));
 
   const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',currentPR.id);
   const selectedQ = poTargetQuotationId
     ? quotations?.find(q=>q.id===poTargetQuotationId)
     : (quotations?.find(q=>q.is_selected)||quotations?.[0]);
 
-  // ── SNAPSHOT vendor payment terms AT THE MOMENT THE PO IS RAISED ──
-  // This is deliberately a snapshot, not a live lookup. If the vendor's
-  // payment_terms field is edited later (e.g. for a future, unrelated
-  // order), this PO — and every downstream QC/closing check that reads
-  // it — must keep behaving exactly as it did the day it was generated.
-  // See buildQcPassedActionSection(): it reads THIS snapshot, never
-  // vendors.payment_terms live.
-  const poVendorId = selectedQ?.vendor_id||currentPR.assigned_vendor_id;
+  // Everything on the paper is kept so the PO can be re-opened and revised later.
+  const financial = {
+    total_amount: netPayable, currency: selectedQ?.currency || 'INR',
+    basic_amount: base, discount_pct: discPct, freight_amount: pnf, other_charges: other, tax_amount: cgstAmt + sgstAmt,
+    payment_terms_text: document.getElementById('poPaymentTerms')?.value || null,
+    expected_delivery: _parseDMY(document.getElementById('poDelivery')?.value),
+    line_items: poLineItemsFromDOM(), po_snapshot: collectPOSnapshot()
+  };
+
+  //  SNAPSHOT vendor payment terms AT THE MOMENT THE PO IS RAISED
+  // Deliberately a snapshot, not a live lookup: if the vendor's payment_terms
+  // are edited later, this PO - and every downstream QC/closing check that
+  // reads it - must keep behaving exactly as it did the day it was generated.
+  // See buildQcPassedActionSection(): it reads THIS snapshot, never vendors.payment_terms live.
+  const revVendorId = revising ? (document.getElementById('poReviseVendor')?.value || revising.vendor_id) : null;
+  const poVendorId = revising ? revVendorId : (selectedQ?.vendor_id||currentPR.assigned_vendor_id);
   const poVendorObj = allVendors.find(v=>v.id===poVendorId);
   const poVendorPaymentTerms = poVendorObj?.payment_terms || null;
   const poIsFullAdvance = poVendorPaymentTerms==='full_advance';
 
-  // Step 1: Save to purchase_orders
-  const{error:poErr}=await db.from('purchase_orders').insert({
-    pr_id:currentPR.id, po_number:poNumber, po_date:new Date().toISOString(),
-    vendor_id:poVendorId, quotation_id:selectedQ?.id||null,
-    total_amount:netPayable, currency:selectedQ?.currency||'INR', generated_by:currentUser.id,
-    vendor_payment_terms:poVendorPaymentTerms, is_full_advance:poIsFullAdvance
-  });
-  if(poErr){showLoader(false);showToast('Error saving PO: '+poErr.message,'error');return;}
+  let poNumber, nextRev = 0;
+  if (revising) {
+    // ---- REVISION: same PO number, revision +1. The DB trigger archives the previous version. ----
+    nextRev = (revising.revision_no || 0) + 1;
+    const vendorChanged = poVendorId !== revising.vendor_id;
+    const upd = { ...financial, revision_no: nextRev, revised_by: currentUser.id, revised_at: new Date().toISOString(), revision_reason: reason, pdf_url: null };
+    if (vendorChanged) { upd.vendor_id = poVendorId; upd.vendor_payment_terms = poVendorPaymentTerms; upd.is_full_advance = poIsFullAdvance; }
+    if (editedNumber) upd.po_number = editedNumber;   // DB trigger allows a number change only alongside a revision bump, and rejects a duplicate
+    const { data, error } = await db.from('purchase_orders').update(upd)
+      .eq('id', revising.id).eq('revision_no', revising.revision_no || 0).select('id,po_number');
+    if (error || !data || !data.length) {
+      showLoader(false);
+      const dup = error && error.code === '23505';
+      showToast(dup ? `PO number ${editedNumber} is already used by another PO` : ('Could not save the revision: ' + (error ? error.message : 'this PO was revised by someone else - reload and try again.')), 'error');
+      return;
+    }
+    poNumber = data[0].po_number;
+  } else {
+    // ---- NEW PO: the number comes from the independent PO sequence, assigned inside the INSERT ----
+    const { data, error } = await db.from('purchase_orders').insert({
+      pr_id: currentPR.id, po_number: null, po_date: new Date().toISOString(),
+      vendor_id: poVendorId, quotation_id: selectedQ?.id || null, generated_by: currentUser.id,
+      vendor_payment_terms: poVendorPaymentTerms, is_full_advance: poIsFullAdvance, ...financial
+    }).select('id,po_number').single();
+    if (error) { showLoader(false); showToast('Error saving PO: ' + error.message, 'error'); return; }
+    poNumber = data.po_number;
+  }
   poTargetQuotationId = null;
+  const numEl = document.getElementById('poPreviewNum'); if (numEl) numEl.value = poNumber;   // PDF shows the real number
+  const revTag = revising ? `_Rev${nextRev}` : '';
 
   // Step 2: Generate PDF from the styled preview box
   let pdfUrl = null;
@@ -2930,7 +3146,7 @@ async function confirmGeneratePO() {
     pdf.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', 0, 0, imgW, imgH);
 
     const pdfBlob = pdf.output('blob');
-    const fileName = `${poNumber.replace(/\//g,'-')}_${Date.now()}.pdf`;
+    const fileName = `${poNumber.replace(/\//g,'-')}${revTag}_${Date.now()}.pdf`;
     const storagePath = `po/${currentPR.id}/${fileName}`;
 
     // Step 3: Upload to Supabase Storage (bucket: 'attachments' must exist and be public)
@@ -2939,7 +3155,7 @@ async function confirmGeneratePO() {
       .upload(storagePath, pdfBlob, {contentType:'application/pdf'});
 
     if(uploadErr){
-      console.warn('Storage upload failed:', uploadErr.message, '— falling back to base64 storage');
+      console.warn('Storage upload failed:', uploadErr.message, ' falling back to base64 storage');
       // Fallback: store PDF as base64 data URI directly in pr_attachments
       try {
         const reader = new FileReader();
@@ -2947,13 +3163,13 @@ async function confirmGeneratePO() {
         await db.from('pr_attachments').insert({
           pr_id: currentPR.id, uploaded_by: currentUser.id,
           attachment_type: 'other',
-          file_name: `PO_${poNumber.replace(/\//g,'-')}.pdf`,
+          file_name: `PO_${poNumber.replace(/\//g,'-')}${revTag}.pdf`,
           file_url: base64Url
         });
         pdfUrl = base64Url;
       } catch(fbErr) {
         console.warn('Base64 fallback also failed:', fbErr);
-        showToast('PO saved — PDF could not be stored: '+uploadErr.message,'error');
+        showToast('PO saved - PDF could not be stored: '+uploadErr.message,'error');
       }
     } else {
       const{data:urlData} = db.storage.from('attachments').getPublicUrl(storagePath);
@@ -2963,32 +3179,71 @@ async function confirmGeneratePO() {
       await db.from('pr_attachments').insert({
         pr_id: currentPR.id, uploaded_by: currentUser.id,
         attachment_type: 'other',
-        file_name: `PO_${poNumber.replace(/\//g,'-')}.pdf`,
+        file_name: `PO_${poNumber.replace(/\//g,'-')}${revTag}.pdf`,
         file_url: pdfUrl
       });
+      // keep a direct link on the PO itself (used by PO Master and the revision history)
+      await db.from('purchase_orders').update({ pdf_url: pdfUrl }).eq('po_number', poNumber);
     }
   } catch(pdfErr) {
     console.warn('PDF generation failed:', pdfErr);
-    showToast('PO saved — PDF generation failed: '+pdfErr.message,'error');
-    await loadRequests();
-
-    const updatedPR = allRequests.find(r => r.id === currentPR.id);
-    if (updatedPR) {
-      currentPR = updatedPR;
-      closeModal('poModal');
-      openPR(currentPR.id);
-      }
-    }
+    showToast('PO saved - PDF generation failed: '+pdfErr.message,'error');
+  }
 
   // Step 5: Comment on PR thread
-  const commentText = pdfUrl
-    ? ` Purchase Order ${poNumber} generated. Net Payable: ₹${netPayable.toLocaleString('en-IN')} — [View PO PDF](${pdfUrl})`
-    : ` Purchase Order ${poNumber} generated. Net Payable: ₹${netPayable.toLocaleString('en-IN')}`;
+  const amt = netPayable.toLocaleString('en-IN');
+  const commentText = revising
+    ? (editedNumber
+        ? ` Purchase Order renumbered ${revising.po_number} → ${poNumber} (Rev.${nextRev}). Reason: ${reason}. Net Payable: ${amt}` + (pdfUrl ? `  [View PO PDF](${pdfUrl})` : '')
+        : ` Purchase Order ${poNumber} revised to Rev.${nextRev}. Reason: ${reason}. Net Payable: ${amt}` + (pdfUrl ? `  [View PO PDF](${pdfUrl})` : ''))
+    : (pdfUrl
+        ? ` Purchase Order ${poNumber} generated. Net Payable: ${amt}  [View PO PDF](${pdfUrl})`
+        : ` Purchase Order ${poNumber} generated. Net Payable: ${amt}`);
   await window.postComment(currentPR.id, currentUser.id, commentText);
 
   showLoader(false);
-  showToast(`PO ${poNumber} generated${pdfUrl?' & saved as attachment':''}!`,'success');
+  showToast(revising ? (editedNumber ? `Renumbered ${revising.po_number} \u2192 ${poNumber} (Rev.${nextRev})` : `PO ${poNumber} revised (Rev.${nextRev})`) : `PO ${poNumber} generated${pdfUrl?' & saved as attachment':''}!`,'success');
+  window._poRevising = null;
   closeModal('poModal');
+  // refresh so the request shows the new PO / revision straight away
+  await loadRequests();
+  const fresh = allRequests.find(r => r.id === currentPR.id);
+  if (fresh) { currentPR = fresh; await openPR(fresh.id); }
+}
+
+async function openPOHistory(poId) {
+  showLoader(true);
+  const [cur, arch] = await Promise.all([
+    db.from('purchase_orders').select('*').eq('id', poId).maybeSingle(),
+    db.from('po_revisions').select('*').eq('po_id', poId).order('revision_no', { ascending: false })
+  ]);
+  showLoader(false);
+  const po = cur.data; if (!po) { showToast('PO not found', 'error'); return; }
+  const rows = [{ rev: po.revision_no || 0, cur: true, snap: po, pdf: po.pdf_url }].concat((arch.data || []).map(r => ({ rev: r.revision_no, cur: false, snap: r.snapshot || {}, pdf: r.pdf_url || r.snapshot?.pdf_url })));
+  const names = {};
+  for (const r of rows) { const u = r.snap.revised_by; if (u && !(u in names)) names[u] = await getUserName(u); }
+  const money = (s) => `${s.currency || 'INR'} ${Number(s.total_amount || 0).toLocaleString('en-IN')}`;
+  document.getElementById('poHistorySub').textContent = po.po_number;
+  document.getElementById('poHistoryBody').innerHTML = rows.map((r, i) => {
+    const prev = rows[i + 1];
+    const delta = prev ? (Number(r.snap.total_amount || 0) - Number(prev.snap.total_amount || 0)) : 0;
+    const items = (r.snap.line_items || []).map(li => `<li>${_escHtml(li.desc)} &times; ${li.qty} @ ${Number(li.unit_rate || 0).toLocaleString('en-IN')}</li>`).join('');
+    const numChanged = prev && r.snap.po_number !== prev.snap.po_number;
+    return `<div style="border:1px solid ${r.cur ? 'rgba(99,102,241,0.35)' : 'var(--border)'};border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;background:${r.cur ? 'rgba(99,102,241,0.04)' : 'white'}">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <strong style="font-family:var(--font-mono)">Rev.${r.rev}${r.cur ? ' <span style="font-size:0.66rem;background:#6366f114;color:#4f46e5;padding:1px 6px;border-radius:3px;border:1px solid #6366f130">CURRENT</span>' : ''}</strong>
+        <span style="font-family:var(--font-mono);font-weight:700">${money(r.snap)}${prev && delta ? ` <span style="font-size:0.72rem;color:${delta > 0 ? '#b45309' : '#15803d'}">(${delta > 0 ? '+' : ''}${delta.toLocaleString('en-IN')})</span>` : ''}</span>
+      </div>
+      <div style="font-size:0.74rem;color:var(--gray-4)">${fmtDateTime(r.snap.revised_at || r.snap.created_at)}${names[r.snap.revised_by] ? ' &middot; ' + _escHtml(names[r.snap.revised_by]) : ''}</div>
+      ${numChanged
+        ? `<div style="font-size:0.78rem;font-weight:700;color:#b45309;margin-top:4px">PO No. renumbered: ${_escHtml(prev.snap.po_number)} &rarr; ${_escHtml(r.snap.po_number)}</div>`
+        : `<div style="font-size:0.74rem;color:var(--gray-4);font-family:var(--font-mono)">${_escHtml(r.snap.po_number || '')}</div>`}
+      ${r.snap.revision_reason ? `<div style="font-size:0.8rem;margin-top:4px">${_escHtml(r.snap.revision_reason)}</div>` : ''}
+      ${items ? `<ul style="margin:6px 0 0 18px;padding:0;font-size:0.76rem;color:var(--gray-3)">${items}</ul>` : ''}
+      ${r.pdf ? `<div style="margin-top:6px"><a href="${_escHtml(r.pdf)}" target="_blank" rel="noopener" style="color:var(--red);font-size:0.78rem">View PDF</a></div>` : ''}
+    </div>`;
+  }).join('');
+  openModal('poHistoryModal');
 }
 
 // ── PO BRANDING ───────────────────────────────────────────────
@@ -3585,13 +3840,24 @@ function _freezePOInputs(container) {
       if (terms) { terms.style.border = terms._origBorder || ''; terms.style.boxShadow = terms._origShadow || ''; }
     }
 
-function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO, acceptedQuotes, allPOs) {
+function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existingPO, acceptedQuotes, allPOs, piRows, flags) {
   const currency = selectedQ?.currency || 'AED';
   acceptedQuotes = acceptedQuotes || (selectedQ ? [selectedQ] : []);
   allPOs = allPOs || (existingPO ? [existingPO] : []);
   const isDual = acceptedQuotes.length === 2;
 
+  // Final commercial review (PI) - only when enabled in Workflow Options
+  flags = flags || WORKFLOW_FLAG_DEFAULTS;
+  const piMap = latestPIByQuotation(piRows || []);
+  const piQuotes = acceptedQuotes.length ? acceptedQuotes : (selectedQ ? [selectedQ] : []);
+  const piCleared = q => !flags.pi_review_enabled || piIsCleared(piMap[q.id]);
+  const piBlocked = piQuotes.some(q => !piCleared(q));
+  const step0HTML = (flags.pi_review_enabled && piQuotes.length)
+    ? `<div style="margin-bottom:14px"><div style="font-size:0.82rem;font-weight:700;margin-bottom:8px">&#x1F9FE; Step 0 &mdash; Final Commercial Review (PI vs approved quotation)</div>${piQuotes.map(q => buildPIReviewCard(currentPR, q, piMap[q.id], flags)).join('')}</div>`
+    : '';
+
   let step1HTML, hasPO;
+  let advGateMsg = '';
   if (isDual) {
     // Both quotes were accepted at PM approval — one PO per vendor, both feeding
     // the same request. GRN/QC/payment below stay combined for the whole PR.
@@ -3606,7 +3872,7 @@ function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existin
         </div>
         ${po
           ? `<span style="font-family:var(--font-mono);font-size:0.78rem;font-weight:700;color:#16a34a">&#x2705; ${po.po_number}</span>`
-          : `<button class="btn btn-secondary btn-sm" onclick="openPOModal('${id}','${q.id}')">&#x1F4C4; Generate PO</button>`
+          : `<button class="btn btn-secondary btn-sm" onclick="openPOModal('${id}','${q.id}')" ${piCleared(q)?'':'disabled title="Clear the final commercial review first"'}>&#x1F4C4; Generate PO</button>`
         }
       </div>`;
     }).join('');
@@ -3629,10 +3895,12 @@ function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existin
       ${hasPO
         ? `<div style="font-size:0.72rem;color:var(--gray-3)">Generated ${fmtDate(existingPO.po_date || existingPO.created_at)} &middot; ${existingPO.currency || 'AED'} ${Number(existingPO.total_amount || 0).toLocaleString()}</div>`
         : `<p style="font-size:0.78rem;color:var(--gray-3);margin-bottom:10px">Generate and save the PO before confirming the order.</p>
-           <button class="btn btn-secondary" onclick="openPOModal('${id}')">&#x1F4C4; Preview &amp; Generate PO</button>`
+           <button class="btn btn-secondary" onclick="openPOModal('${id}')" ${piBlocked?'disabled title="Clear the final commercial review first"':''}>&#x1F4C4; Preview &amp; Generate PO</button>${piBlocked?'<div style="font-size:0.72rem;color:#b45309;margin-top:6px">Clear Step 0 (final commercial review) to enable PO generation.</div>':''}`
       }
     </div>`;
   }
+
+  advGateMsg = (flags.po_before_payment && !hasPO) ? 'Generate the PO first \u2014 payment requests need a PO (workflow setting).' : (piBlocked ? 'Clear the final commercial review (Step 0) first.' : '');
 
   return `<div class="action-section">
     <div class="action-section-title"> Place Order <span class="action-badge">ACTION REQUIRED</span></div>
@@ -3644,6 +3912,7 @@ function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existin
       ${pt ? `<div style="font-size:0.72rem;color:#6366f1;margin-top:3px"> Payment Terms: ${pt.label}</div>` : ''}
     </div>` : '')}
 
+    ${step0HTML}
     <!-- STEP 1: PO -->
     ${step1HTML}
 
@@ -3660,8 +3929,9 @@ function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existin
     </div>
 
     <!-- STEP 3: Advance via Smartsheet -->
-    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:white;">
+    <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:white;${advGateMsg ? 'opacity:0.55;pointer-events:none' : ''}">
       <div style="font-size:0.82rem;font-weight:700;margin-bottom:10px;">&#x1F4B3; Step 3 — Advance Payment via Smartsheet (optional)</div>
+      ${advGateMsg ? `<div style="font-size:0.74rem;color:#b45309;margin-bottom:8px">&#x1F512; ${advGateMsg}</div>` : ''}
       <div class="advance-options">
         <div class="advance-option" id="advOptNone" onclick="selectAdvanceOption('none')">
           <div style="font-size:1.2rem;margin-bottom:4px">&#x2713;</div>
@@ -4050,7 +4320,7 @@ function cpoFillVendor(vendorId) {
     'custom': 'custom'
   };
   document.getElementById('cpoVendorName').value  = v.name || '';
-  document.getElementById('cpoVendorGSTIN').value = v.gstin || '';
+  document.getElementById('cpoVendorGSTIN').value = v.GSTIN || v.gstin || '';
   document.getElementById('cpoVendorAddress').value = v.address || '';
   document.getElementById('cpoVendorContact').value = v.contact_person || '';
   document.getElementById('cpoVendorPhone').value = v.phone || '';
@@ -4403,6 +4673,9 @@ window.closeModal = function(id) {
   if (id === 'poModal') {
     const btn = document.querySelector('#poModal .modal-footer .btn-primary');
     if (btn && btn.dataset.cpoHidden) { btn.style.display = ''; delete btn.dataset.cpoHidden; }
+    window._poRevising = null;
+    const t = document.querySelector('#poModal .modal-title'); if (t) t.textContent = 'Generate Purchase Order';
+    if (btn) btn.textContent = 'Generate & Save PO';
   }
   _origCloseModal(id);
 };

@@ -44,6 +44,7 @@
     <button class="tab-btn" data-tab="users" onclick="switchTab('users')"> Users</button>
     <button class="tab-btn" data-tab="vendors" onclick="switchTab('vendors')"> Vendors</button>
     <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')"> Analytics</button>
+    <button class="tab-btn" data-tab="reports" onclick="switchTab('reports')"> PO Master &amp; Reports</button>
     <button class="tab-btn" onclick="goToProjects()"> Projects</button>
     <button class="tab-btn" onclick="window.location.href='admin.html'" style="background:rgba(224,32,32,0.08);color:var(--red);border:1px solid rgba(224,32,32,0.2);font-weight:600"> Admin Panel</button>
   </div>
@@ -153,6 +154,23 @@
       <div style="padding:0 16px 14px;font-size:0.75rem;color:var(--gray-4)">Note: access to the Director approval queue is still role-based (any user with role Director or Master can act on escalated requests) — the Director picked here is used for the name shown to Project Managers, not as an extra permission check.</div>
     </div>
 
+    <div class="card" style="margin-bottom:18px;border:1.5px solid rgba(99,102,241,0.25);background:rgba(99,102,241,0.02)">
+      <div class="card-header">
+        <span class="section-title" style="color:#4f46e5">Workflow Options</span>
+        <span style="font-size:0.8rem;color:var(--gray-3)">Switch new process steps on once the people involved have agreed. All are OFF by default and only affect requests from that point on.</span>
+      </div>
+      <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+        <label style="display:flex;gap:10px;align-items:flex-start;font-size:0.84rem"><input type="checkbox" id="wf-tech" style="margin-top:3px"/>
+          <span><strong>Technical verification before quotations</strong><br/><span style="color:var(--gray-3);font-size:0.76rem">Procurement uploads datasheets/specs first; the requesting engineer verifies them. Quotations then go straight to the Project Manager / Director by value &mdash; the engineer no longer validates quotes.</span></span></label>
+        <label style="display:flex;gap:10px;align-items:flex-start;font-size:0.84rem"><input type="checkbox" id="wf-pi" style="margin-top:3px"/>
+          <span><strong>Final commercial (PI) review before the PO</strong><br/><span style="color:var(--gray-3);font-size:0.76rem">After a quotation is approved, Procurement records the supplier's PI. Unchanged (or within tolerance) continues automatically; a material increase goes back to the PM / Director depending on the final value (same threshold as above).</span></span></label>
+        <div style="margin-left:26px;display:flex;gap:10px;align-items:center;font-size:0.8rem">Auto-continue when the PI is at most <input class="form-control" type="number" min="0" step="0.5" id="wf-tol" style="max-width:90px"/> % above the approved quotation</div>
+        <label style="display:flex;gap:10px;align-items:flex-start;font-size:0.84rem"><input type="checkbox" id="wf-pobp" style="margin-top:3px"/>
+          <span><strong>Require a PO before any payment request</strong><br/><span style="color:var(--gray-3);font-size:0.76rem">Blocks advance / payment requests until a PO has been generated (and the PI review cleared, if enabled). PO revisions are always available, so a later change does not need a payment redo.</span></span></label>
+        <div><button class="btn btn-primary btn-sm" onclick="saveWorkflowOptions()">Save</button></div>
+      </div>
+    </div>
+
     <div class="card" style="margin-bottom:18px">
       <div class="card-header">
         <span class="section-title">Default Department Routing</span>
@@ -225,6 +243,10 @@
   </div>
 
   <!-- ANALYTICS TAB -->
+  <div id="tab-reports" style="display:none">
+    <div id="reportsMount"></div>
+  </div>
+
   <div id="tab-analytics" style="display:none">
     <!-- KPI Row -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px" id="analyticsKPIs"></div>
@@ -395,8 +417,15 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="../js/supabase-config.js"></script>
 <script src="../js/shared.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="../js/admin-config.js"></script>
+<script src="../js/workflow.js"></script>
+<script src="../js/reports.js"></script>
 <script>
+// A PI (final commercial) change whose final value is above the PM limit waits for the Director.
+function isDirectorPI(r){ return r.phase==='pending_pi_approval' && r.pi_approver_role==='director'; }
+// Called by js/workflow.js after a decision.
+window.wfAfterAction = async function(prId){ await loadRequests(); if(activeTab==='director') renderDirectorApprovals(); };
 let currentUser, allRequests=[], allUsers=[], allVendors=[], activeTab='requests', editingUserId=null, viewingPRId=null;
 Chart.defaults.animation = false;
 Chart.defaults.maintainAspectRatio = false;
@@ -576,6 +605,7 @@ function renderRoutingTab() {
   document.getElementById('newRoutingGroupDirectorManager').innerHTML = userPickerOptions(null, null, DIRECTOR_APPROVER_BLANK_LABEL);
   renderFallbackApprovers();
   renderQuoteAmountRouting();
+  renderWorkflowOptions();
   renderReassignQueue();
 }
 
@@ -592,6 +622,26 @@ function renderQuoteAmountRouting() {
         .map(u=>`<option value="${u.id}" ${u.id===cfg.director_id?'selected':''}>${u.name} (${u.role})</option>`));
     document.getElementById('qar-director').innerHTML = directorOptions.join('');
   });
+}
+function renderWorkflowOptions() {
+  loadWorkflowFlags(true).then(f=>{
+    document.getElementById('wf-tech').checked = f.tech_verification_required;
+    document.getElementById('wf-pi').checked = f.pi_review_enabled;
+    document.getElementById('wf-pobp').checked = f.po_before_payment;
+    document.getElementById('wf-tol').value = f.pi_tolerance_pct;
+  });
+}
+async function saveWorkflowOptions() {
+  showLoader(true);
+  const r = await saveWorkflowFlags({
+    tech_verification_required: document.getElementById('wf-tech').checked,
+    pi_review_enabled: document.getElementById('wf-pi').checked,
+    po_before_payment: document.getElementById('wf-pobp').checked,
+    pi_tolerance_pct: document.getElementById('wf-tol').value
+  }, currentUser.id);
+  showLoader(false);
+  if(!r.ok){ showToast('Failed to save workflow options: '+r.error,'error'); return; }
+  showToast('Workflow options saved.','success');
 }
 async function saveQuoteAmountRouting() {
   const thresholdRaw = document.getElementById('qar-threshold').value;
@@ -807,7 +857,7 @@ function renderStatCards(){
 function updateStats() {
   renderStatCards();
   // Director badge
-  const directorPending=allRequests.filter(r=>['pending_sandy_approval','deviation_approval','pending_decline_approval'].includes(r.phase));
+  const directorPending=allRequests.filter(r=>['pending_sandy_approval','deviation_approval','pending_decline_approval'].includes(r.phase)||isDirectorPI(r));
   const badge=document.getElementById('directorBadge');
   if(badge){badge.textContent=directorPending.length;badge.style.display=directorPending.length?'':'none';}
   // Reassignment badge
@@ -823,7 +873,7 @@ function updateStats() {
 
 function switchTab(tab) {
   activeTab=tab;
-  ['requests','onhold','director','routing','users','vendors','analytics'].forEach(t=>{
+  ['requests','onhold','director','routing','users','vendors','analytics','reports'].forEach(t=>{
     const el=document.getElementById(`tab-${t}`);
     if(el) el.style.display=t===tab?'':'none';
   });
@@ -835,6 +885,7 @@ function switchTab(tab) {
   }
   if(tab==='director') renderDirectorApprovals();
   if(tab==='routing') renderRoutingTab();
+  if(tab==='reports') mountReports('reportsMount',{dataset:'po_master',rowAction:{label:'Open PR',fn:function(r){ if(r.pr_id) viewPR(r.pr_id); }}});
   if(tab==='onhold') renderOnHoldTab();
 }
 
@@ -1053,7 +1104,7 @@ async function renderDirectorApprovals() {
     && r.director_approver_id && r.director_approver_id !== currentUser.id;
   const visibleToMe = r => currentUser.role === 'master' || !isDelegatedAwayFromMe(r);
 
-  const pending = allRequests.filter(r => ['pending_sandy_approval','deviation_approval'].includes(r.phase) && visibleToMe(r));
+  const pending = allRequests.filter(r => (['pending_sandy_approval','deviation_approval'].includes(r.phase) || isDirectorPI(r)) && visibleToMe(r));
   const overridable = allRequests.filter(r => DIRECTOR_OVERRIDABLE_PHASES.includes(r.phase) && r.phase !== 'pending_sandy_approval');
   const tbody = document.getElementById('directorBody');
 
@@ -1151,6 +1202,15 @@ async function openDirectorModal(prId, isOverride = false) {
           <button class="btn btn-danger" onclick="directorRejectDeviation()" style="flex:1"> Reject — QC Failed</button>
         </div>
       </div>`;
+    openModal('mainModal');
+    return;
+  }
+
+  if (directorCurrentPR.phase === 'pending_pi_approval') {
+    document.getElementById('modalTitle').textContent = `Final Commercial Change \u2014 ${prLabel}`;
+    document.getElementById('modalBody').innerHTML =
+      `<div style="margin-bottom:16px">${buildPRDetailHTML(directorCurrentPR, directorQuotations, '', directorCurrentPR.project_manager_name||'', {clearanceManagerName:directorClearanceManagerName})}</div>`
+      + await buildPIApprovalPanel(directorCurrentPR, currentUser);
     openModal('mainModal');
     return;
   }

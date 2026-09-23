@@ -385,6 +385,7 @@
 <script src="../js/supabase-config.js"></script>
 <script src="../js/shared.js"></script>
 <script src="../js/admin-config.js"></script>
+<script src="../js/workflow.js"></script>
 <script>
 let currentUser, myRequests=[], prQuotations=[], allPMs=[], allProjects=[];
 function addPhaseTimestamp(pr, phaseName) {
@@ -394,6 +395,11 @@ function addPhaseTimestamp(pr, phaseName) {
   return ts;
 }
 let activeTab='all', selectedPMApproval=null, currentPR=null;
+// Called by js/workflow.js after a state change: refresh the list, and re-open the request only if its modal is still showing.
+window.wfAfterAction = async function(prId) {
+  await loadRequests();
+  if (document.getElementById('prModal')?.classList.contains('active')) await openPR(prId);
+};
 let selectedQuotationId=null;
 let isEditMode=false, editingParentId=null;
 let pmScreenshotBase64=null, selectedSourcing=[], attachedFiles=[];
@@ -552,7 +558,7 @@ function onPhaseChange() {
 function updateStats() {
   const declinedPhases=['rejected','qc_rejected','declined','lp_rejected'];
   const closedPhases=['qc_passed','accepted','payment_requested','payment_received','lp_payment_done','vendor_info_received'];
-  const actionPhases=['quotations_shared','grn_pending','vendor_info_shared','lp_submitted'];
+  const actionPhases=['quotations_shared','pending_tech_verification','grn_pending','vendor_info_shared','lp_submitted'];
   const allTerminal=[...declinedPhases,...closedPhases];
   document.getElementById('sTotal').textContent=myRequests.length;
   document.getElementById('sOngoing').textContent=myRequests.filter(r=>!allTerminal.includes(r.phase)&&!actionPhases.includes(r.phase)).length;
@@ -562,7 +568,7 @@ function updateStats() {
 }
 
 function renderBanner() {
-  const items=myRequests.filter(r=>['quotations_shared','grn_pending','vendor_info_shared'].includes(r.phase));
+  const items=myRequests.filter(r=>['quotations_shared','pending_tech_verification','grn_pending','vendor_info_shared'].includes(r.phase));
   const b=document.getElementById('actionBanner');
   if(!items.length){b.style.display='none';return;}
   b.style.display='block';
@@ -648,7 +654,7 @@ function filterTable() {
   const urg=document.getElementById('filterUrgency')?.value||'';
   const declinedPhases=['rejected','qc_rejected','declined','lp_rejected'];
   const closedPhases=['qc_passed','accepted','payment_requested','payment_received','lp_payment_done','vendor_info_received'];
-  const actionPhases=['quotations_shared','grn_pending','vendor_info_shared','lp_submitted'];
+  const actionPhases=['quotations_shared','pending_tech_verification','grn_pending','vendor_info_shared','lp_submitted'];
   const allTerminal=[...declinedPhases,...closedPhases];
   let reqs=myRequests;
   if(activeTab==='ongoing') reqs=reqs.filter(r=>!allTerminal.includes(r.phase)&&!actionPhases.includes(r.phase));
@@ -669,7 +675,7 @@ function renderTable(reqs) {
   const emptySub={all:'Submit a new request to get started.',ongoing:'All your requests are either completed or need action.',action:'No actions needed right now.',declined:'None of your requests have been declined.',closed:'No requests have been completed yet.'}[activeTab]||'';
   if(!reqs.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">${emptyIcon}</div><h3>${emptyTitle}</h3><p>${emptySub}</p></div></td></tr>`;return;}
   tbody.innerHTML=reqs.map(r=>{
-    const needsAction=['quotations_shared','grn_pending','vendor_info_shared'].includes(r.phase);
+    const needsAction=['quotations_shared','pending_tech_verification','grn_pending','vendor_info_shared'].includes(r.phase);
     const pmName=r.users?.name||r.project_manager_name||'—';
     const typeLabel=r.request_category==='vendor_info'?'Vendor Info':r.request_category==='local_purchase'?'Local Purchase':'RFQ';
     const typeBg=r.request_category==='local_purchase'?'background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.35);color:#15803d':r.request_category==='vendor_info'?'background:rgba(139,92,246,0.08);border-color:rgba(139,92,246,0.3);color:#6d28d9':'background:var(--off-white);border-color:var(--border)';
@@ -1010,6 +1016,7 @@ async function openPR(id) {
     getUserName(currentPR.initial_approver_id)
   ]);
   prQuotations=quotations;
+  const dsRows = currentPR.request_category==='RFQ' ? await getDatasheets(id) : [];
   showLoader(false);
   const pmName=allPMs.find(p=>p.id===currentPR.assigned_pm_id)?.name||currentPR.project_manager_name||'';
   const footer=document.getElementById('prModalFooter');
@@ -1050,6 +1057,11 @@ async function openPR(id) {
         ${billUrl?`<a href="${billUrl}" target="_blank" style="font-size:0.82rem;color:#15803d;text-decoration:underline"> ${currentPR.lp_bill_name||'View Bill'}</a>`:'<p style="font-size:0.78rem;color:var(--gray-3);margin:0">No bill attached.</p>'}
       </div>`;
     }
+  }
+
+  if(currentPR.phase==='pending_tech_verification') {
+    actionSection=buildDatasheetReviewSection(currentPR, dsRows);
+    footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('prModal')">Cancel</button>`;
   }
 
   if(currentPR.phase==='quotations_shared') {
@@ -1150,8 +1162,15 @@ async function openPR(id) {
       <button class="btn btn-primary" onclick="submitQC()">Submit GRN &amp; QC →</button>`;
   }
 
+  if(canEditPR(currentPR,currentUser)) {
+    footer.insertAdjacentHTML('afterbegin', `<button class="btn btn-secondary" onclick="enterRequestEditMode()" style="margin-right:auto">Edit Request</button>`);
+  }
   document.getElementById('prModalBody').innerHTML=
-    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',pmName,{poData:poRes.data||null,advPayRec:advRes.data||null,payRec:payRes.data||null,clearanceManagerName})+actionSection+
+    `<div id="prDetailViewSection">`+
+    buildPRDetailHTML(currentPR,quotations,vd?.data?.name||'',pmName,{poData:poRes.data||null,advPayRec:advRes.data||null,payRec:payRes.data||null,clearanceManagerName})+
+    `</div><div id="prDetailEditSection" style="display:none"></div>`+
+    (dsRows.length && currentPR.phase!=='pending_tech_verification' ? buildDatasheetSummarySection(currentPR, dsRows, 'Technical Documents') : '')+
+    actionSection+
     `<div style="margin-top:22px;border-top:1px solid var(--border);padding-top:16px">
       <div class="section-title" style="margin-bottom:10px"> Comments</div>
       <div id="commentsList">${renderComments(comments)}</div>
@@ -1166,6 +1185,32 @@ async function openPR(id) {
     </div>`;
   openModal('prModal');
   setTimeout(function(){ window.initCommentBox && window.initCommentBox('commentInput','mentionDdEng'); }, 50);
+}
+
+//  EDIT OWN REQUEST (creates a new revision; the old one is kept)
+function enterRequestEditMode() {
+  if (!currentPR) return;
+  const viewSec = document.getElementById('prDetailViewSection'), editSec = document.getElementById('prDetailEditSection');
+  if (!viewSec || !editSec) return;
+  editSec.innerHTML = buildPRDetailEditableHTML(currentPR) + buildPREditReasonHTML();
+  viewSec.style.display = 'none'; editSec.style.display = 'block';
+  initPartsEditor('reqEditPartsContainer', currentPR.parts||[], false);
+  document.getElementById('prModalFooter').innerHTML = `<button class="btn btn-secondary" onclick="cancelRequestEdit()">Cancel</button><button class="btn btn-primary" onclick="saveRequestEdits()" style="margin-left:auto">Save Changes</button>`;
+}
+function cancelRequestEdit() { if (currentPR) openPR(currentPR.id); }
+async function saveRequestEdits() {
+  if (!currentPR) return;
+  const c = collectPREditValues();
+  if (c.error) { showToast(c.error, 'error'); return; }
+  if (!c.reason) { showToast('Enter the reason for this change', 'error'); return; }
+  showLoader(true);
+  const r = await savePRRevision(currentPR, c.vals, c.reason, currentUser);
+  showLoader(false);
+  if (r.noChange) { showToast('Nothing was changed', 'info'); return; }
+  if (!r.ok) { showToast('Error saving request: ' + r.error, 'error'); return; }
+  showToast('Request updated \u2014 now Rev.' + r.revision, 'success');
+  await loadRequests();
+  await openPR(currentPR.id);
 }
 
 async function resolveVendorInfo(action) {

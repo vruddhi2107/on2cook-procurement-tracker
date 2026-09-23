@@ -71,6 +71,8 @@ const PHASES = {
   pending_master_reassignment:  { label: 'Awaiting Approver Assignment', color: '#ed1c24', icon: 'compass' },
   pending_initial_pm_approval:  { label: 'Awaiting PM Clearance',   color: '#b45309', icon: 'lock' },
   procurement_active:           { label: 'Procurement Active',       color: '#2563eb', icon: 'gear'  },
+  pending_tech_verification:    { label: 'Awaiting Technical Verification', color: '#4f46e5', icon: 'clipboard' },
+  pending_pi_approval:          { label: 'PI Change — Awaiting Approval', color: '#b45309', icon: 'edit' },
   vendor_info_shared:           { label: 'Vendor Info Shared',       color: '#18181b', icon: 'building' },
   quotations_shared:            { label: 'Quotations Shared',        color: '#18181b', icon: 'mail' },
   pending_client_approval:      { label: 'Pending Client Approval',  color: '#18181b', icon: 'user' },
@@ -126,11 +128,13 @@ const PIPELINES = {
       'pending_master_reassignment',
       'pending_initial_pm_approval',
       'procurement_active',
+      'pending_tech_verification',
       'quotations_shared',
       'quotes_revision_requested',
       'pending_pm_final_approval',
       'pending_sandy_approval',
       'approved',
+      'pending_pi_approval',
       'advance_raised_to_accounts',
       'advance_payment_received',
       'order_placed',
@@ -197,12 +201,14 @@ const PIPELINE_WF_STEPS = {
     {key:'submitted',label:'Submitted'},
     {key:'pending_initial_pm_approval',label:'PM Clearance',optional:true},
     {key:'procurement_active',label:'Procurement'},
+    {key:'pending_tech_verification',label:'Tech Verify',optional:true},
     {key:'quotations_shared',label:'Quotations'},
     {key:'quotes_revision_requested',label:'Quote Revision',optional:true},
     {key:'pending_pm_final_approval',label:'PM Approval'},
     {key:'pending_decline_approval',label:'Decline → PM',optional:true},
     {key:'pending_sandy_approval',label:'Director Approval',optional:true},
     {key:'approved',label:'Approved'},
+    {key:'pending_pi_approval',label:'PI Re-approval',optional:true},
     {key:'advance_raised_to_accounts',label:'Adv. Raised',optional:true},
     {key:'advance_payment_received',label:'Adv. Received',optional:true},
     {key:'order_placed',label:'Ordered'},
@@ -271,10 +277,12 @@ const PHASE_ORDER = [
   'pending_master_reassignment',
   'pending_initial_pm_approval',
   'procurement_active',
+  'pending_tech_verification',
   'quotations_shared',
   'quotes_revision_requested',
   'pending_pm_final_approval',
   'approved',
+  'pending_pi_approval',
   'advance_raised_to_accounts',
   'advance_payment_received',
   'order_placed',
@@ -331,7 +339,7 @@ function starRating(rating, count) {
 // growing Storage-URL arrays, and are only ever read off a single fetched
 // PR in detail modals, never off list rows. Use select('*') only for
 // single-PR detail queries (.eq('id', id).single()).
-const PR_LIST_COLUMNS = 'id,request_number,request_category,department,order_type,project_name,project_phase,project_manager_name,team_member_name,assigned_pm_id,vendor_suggestion,assigned_vendor_id,selected_quotation_id,sourcing,description,product_link,parts,phase,initial_pm_approval,approval_path,client_approval_notes,pm_final_approval_status,pm_final_approval_notes,rejection_reason,needs_more_vendors,vendor_info_details,is_modification,parent_request_id,modification_note,order_notes,advance_option,qc_result,qc_notes,qc_criteria,phase_timestamps,created_by,created_at,updated_at,urgency,lp_bill_name,deviation_target_id,deviation_approval_status,is_closed,closed_at,item_note,request_for,discipline,initial_approver_id,director_approver_id,is_on_hold,hold_reason,hold_started_at,total_hold_seconds,split_group_id';
+const PR_LIST_COLUMNS = 'id,request_number,request_category,department,order_type,project_name,project_phase,project_manager_name,team_member_name,assigned_pm_id,vendor_suggestion,assigned_vendor_id,selected_quotation_id,sourcing,description,product_link,parts,phase,initial_pm_approval,approval_path,client_approval_notes,pm_final_approval_status,pm_final_approval_notes,rejection_reason,needs_more_vendors,vendor_info_details,is_modification,parent_request_id,modification_note,order_notes,advance_option,qc_result,qc_notes,qc_criteria,phase_timestamps,created_by,created_at,updated_at,urgency,lp_bill_name,deviation_target_id,deviation_approval_status,is_closed,closed_at,item_note,request_for,discipline,initial_approver_id,director_approver_id,is_on_hold,hold_reason,hold_started_at,total_hold_seconds,split_group_id,revision_no,tech_verification_status,pi_status,pi_approver_role';
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
