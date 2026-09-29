@@ -1067,11 +1067,9 @@ async function saveOverride(prId) {
 }
 
 async function deletePR() {
-  if(!viewingPRId||!confirm('Delete this request permanently? All associated quotations and comments will also be deleted.')) return;
+  if(!viewingPRId||!confirm('Delete this request permanently? Quotations, POs, payments, comments and all linked records will also be deleted.')) return;
   showLoader(true);
-  await db.from('pr_comments').delete().eq('pr_id',viewingPRId);
-  await db.from('pr_quotations').delete().eq('pr_id',viewingPRId);
-  const{error}=await db.from('procurement_requests').delete().eq('id',viewingPRId);
+  const{error}=await db.rpc('delete_procurement_request',{p_pr_id:viewingPRId,p_user_id:currentUser.id});
   showLoader(false);
   if(error){showToast('Delete failed: '+error.message,'error');return;}
   showToast('Request deleted','success');
