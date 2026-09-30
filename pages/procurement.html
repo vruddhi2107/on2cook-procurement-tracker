@@ -1146,6 +1146,10 @@ async function openVendorPartsModal(vendorId, vendorName) {
 
 
 
+// Re-sync the list when the tab regains focus (phases change from other roles' screens)
+document.addEventListener('visibilitychange',()=>{
+  if (document.visibilityState==='visible' && typeof loadRequests==='function' && !document.getElementById('prModal')?.classList.contains('active')) loadRequests();
+});
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('vendorSearch')?.addEventListener('input',e=>{
     if(document.getElementById('vendorPartSearch')?.value) return;
@@ -1252,6 +1256,17 @@ async function toggleVendorActive(id,current){
 // ── PR DETAIL MODAL ──────────────────────────────────────────
 async function openPR(id) {
   currentPR=allRequests.find(r=>r.id===id);if(!currentPR)return;
+  // Always work from the live row: other roles (engineer, PM) change the phase while this page sits open
+  try {
+    const { data: fresh } = await db.from('procurement_requests')
+      .select(PR_LIST_COLUMNS + ', users!procurement_requests_created_by_fkey(name)').eq('id', id).maybeSingle();
+    if (fresh) {
+      const i = allRequests.findIndex(r=>r.id===id);
+      if (i >= 0) allRequests[i] = fresh;
+      currentPR = fresh;
+      filterTable(); updateStats();
+    }
+  } catch (e) { console.warn('openPR refresh failed, using cached row:', e); }
   uploadedFiles=[];
   document.getElementById('prModalTitle').textContent=`PR-${String(currentPR.request_number).padStart(4,'0')} — ${currentPR.project_name}`;
   document.getElementById('prModalSub').textContent=`${currentPR.request_category==='vendor_info'?'Vendor Info':currentPR.request_category==='local_purchase'?'Local Purchase':'RFQ'} · ${DEPARTMENTS[currentPR.department]} · ${currentPR.users?.name||''}`;
