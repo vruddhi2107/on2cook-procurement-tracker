@@ -2907,6 +2907,80 @@ function recalcPORow(idx) {
   if (basicEl) basicEl.textContent = `${sym} ${newBase.toLocaleString('en-IN',{minimumFractionDigits:2})}`;
   recalcPO();
 }
+// ── PO → PDF (shared by Download + Generate & Save) ───────────
+// Renders #poPreviewBox at a fixed A4 width (so the PDF looks the same no matter how
+// wide the modal is) and paginates only at row / paragraph boundaries, never mid-line.
+function _poPickBreaks(total, pageH, candidates, ranges) {
+  // candidates: sorted y-positions where a cut is clean. ranges: [top,bottom] blocks that must not be split.
+  const ok = y => !ranges.some(([t, b]) => y > t + 1 && y < b - 1);
+  const valid = candidates.filter(ok);
+  const breaks = [];
+  let start = 0;
+  while (total - start > pageH + 1) {
+    const limit = start + pageH;
+    let cut = 0;
+    for (const y of valid) { if (y > start + pageH * 0.35 && y <= limit) cut = y; }
+    if (!cut) cut = limit;                       // nothing clean → hard cut (last resort)
+    breaks.push(cut);
+    start = cut;
+  }
+  return breaks;                                  // y-positions where a new page starts
+}
+
+async function _poBoxToPDF(box) {
+  const SCALE = 2, PAGE_PX_W = 794;               // A4 width @96dpi
+  const MARGIN = 8, A4W = 210, A4H = 297;         // mm
+  const imgWmm = A4W - MARGIN * 2, pageHmm = A4H - MARGIN * 2;
+  let candidates = [], ranges = [];
+
+  const canvas = await html2canvas(box, {
+    scale: SCALE, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', logging: false,
+    width: PAGE_PX_W, windowWidth: PAGE_PX_W + 40,
+    onclone: (doc) => {
+      const b = doc.getElementById('poPreviewBox');
+      b.style.width = PAGE_PX_W + 'px'; b.style.maxWidth = 'none';
+      b.style.border = 'none'; b.style.margin = '0';
+      const top = b.getBoundingClientRect().top;
+      const rel = el => { const r = el.getBoundingClientRect(); return [(r.top - top) * SCALE, (r.bottom - top) * SCALE]; };
+      b.querySelectorAll('.po-top-bar, .po-addr-grid, .po-items-table tr, .po-amount-table tr, .po-sig-section, .po-doc-footer')
+        .forEach(el => { const [t, bt] = rel(el); if (bt > t) candidates.push(bt); });
+      // Terms are plain text lines → every line bottom is a clean cut point
+      const terms = b.querySelector('#poTermsEditable');
+      if (terms) {
+        const w = doc.createTreeWalker(terms, NodeFilter.SHOW_TEXT);
+        for (let n; (n = w.nextNode()); ) {
+          if (!n.nodeValue.trim()) continue;
+          const r = doc.createRange(); r.selectNodeContents(n);
+          for (const rc of r.getClientRects()) if (rc.height > 0) candidates.push((rc.bottom - top) * SCALE);
+        }
+      }
+      b.querySelectorAll('.po-sig-section, .po-amount-table, .po-addr-cell, .po-items-table tr')
+        .forEach(el => ranges.push(rel(el)));
+      candidates.sort((x, y) => x - y);
+    }
+  });
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pxPerMm = canvas.width / imgWmm;
+  const pageHpx = Math.floor(pageHmm * pxPerMm);
+  const breaks = _poPickBreaks(canvas.height, pageHpx, candidates, ranges);
+  const edges = [0, ...breaks, canvas.height];
+
+  for (let i = 0; i < edges.length - 1; i++) {
+    const sy = Math.round(edges[i]), sh = Math.round(edges[i + 1]) - sy;
+    if (sh <= 0) continue;
+    const slice = document.createElement('canvas');
+    slice.width = canvas.width; slice.height = sh;
+    const ctx = slice.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, slice.width, sh);
+    ctx.drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, canvas.width, sh);
+    if (i > 0) pdf.addPage();
+    pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', MARGIN, MARGIN, imgWmm, sh / pxPerMm);
+  }
+  return pdf;
+}
+
 // ── DOWNLOAD PO AS PDF ────────────────────────────────────────
 async function downloadPO() {
   const poBox = document.getElementById('poPreviewBox');
@@ -2922,31 +2996,7 @@ const frozen = _freezePOInputs(poBox);   // ← swap inputs to spans
     // Temporarily hide contenteditable outlines and input borders for clean capture
     // ── PO CAPTURE HELPER: swap inputs → spans, capture, restore ──
     
-   const canvas = await html2canvas(poBox, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false
-    });
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
-    const pageW = 210, pageH = 297;
-    const imgW = pageW;
-    const imgH = (canvas.height * imgW) / canvas.width;
-
-    if (imgH <= pageH) {
-      pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
-    } else {
-      let yOffset = 0;
-      while (yOffset < imgH) {
-        if (yOffset > 0) pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, -yOffset, imgW, imgH);
-        yOffset += pageH;
-      }
-    }
+    const pdf = await _poBoxToPDF(poBox);
 
     const poNum = document.getElementById('poPreviewNum')?.value || 'PO';
     pdf.save(`${poNum.replace(/\//g,'-')}.pdf`);
@@ -3151,14 +3201,8 @@ async function confirmGeneratePO() {
   try {
     const previewEl = document.getElementById('poPreviewBox');
     const frozen = _freezePOInputs(previewEl);
-    const canvas = await html2canvas(previewEl, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
-    _restorePOInputs(frozen);
-
-    const {jsPDF} = window.jspdf;
-    const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
-    const imgW = 210;
-    const imgH = (canvas.height * imgW) / canvas.width;
-    pdf.addImage(canvas.toDataURL('image/jpeg',0.92), 'JPEG', 0, 0, imgW, imgH);
+    let pdf;
+    try { pdf = await _poBoxToPDF(previewEl); } finally { _restorePOInputs(frozen); }
 
     const pdfBlob = pdf.output('blob');
     const fileName = `${poNumber.replace(/\//g,'-')}${revTag}_${Date.now()}.pdf`;
