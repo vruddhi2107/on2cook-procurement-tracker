@@ -2472,7 +2472,7 @@ async function handleContinuePR() {
 }
 
 // ── NUMBER TO WORDS (INDIAN) ─────────────────────────────────
-function numToWords(n) {
+function numToWords(n, cur) {
   if (!n || isNaN(n)) return 'Zero Only';
   const a=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
   const b=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
@@ -2488,7 +2488,7 @@ function numToWords(n) {
   const intPart=Math.floor(n);
   const decPart=Math.round((n-intPart)*100);
   let result=words(intPart).trim()+' Only';
-  if(decPart){ result = words(intPart).trim()+' rupees and '+words(decPart).trim()+' Paise Only'; }
+  if(decPart){ result = (cur==='INR'||!cur) ? words(intPart).trim()+' rupees and '+words(decPart).trim()+' Paise Only' : words(intPart).trim()+' and '+words(decPart).trim()+' Cents Only'; }
   return result;
 }
 
@@ -2598,7 +2598,7 @@ async function openPOModal(prId, quotationId=null, opts={}) {
   const cgstPct=9, sgstPct=9;
   const cgstAmt=Math.round(baseAmt*cgstPct/100*100)/100;
   const sgstAmt=Math.round(baseAmt *sgstPct/100*100)/100;
-  const netPayable=baseAmt+cgstAmt+sgstAmt;
+  const netPayable=Math.round((baseAmt+cgstAmt+sgstAmt)*100)/100;
 
   const savedLogo=localStorage.getItem('po_logo');
   const savedSig=localStorage.getItem('po_sig');
@@ -2664,7 +2664,7 @@ async function openPOModal(prId, quotationId=null, opts={}) {
     <div style="margin-bottom:12px;padding:9px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:6px;font-size:0.78rem;display:flex;align-items:center;flex-wrap:wrap;gap:12px">
       <span> Review and edit fields directly in the PO below. Adjust tax rates here:</span>
       <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
-        <label style="font-size:0.74rem;white-space:nowrap">P&amp;F (₹)</label>
+        <label style="font-size:0.74rem;white-space:nowrap">P&amp;F (${currSymbol})</label>
         <input id="pnfInput" type="number" value="0" min="0" class="po-tax-input" style="width:80px" onchange="recalcPO()"/>
         <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;white-space:nowrap;cursor:pointer" title="Uncheck when the vendor bills this freight/P&F separately at a flat rate, not part of the taxable invoice — GST will then apply on the Basic amount only, and this charge is added after tax so the PO total matches the vendor's invoice">
           <input type="checkbox" id="pnfTaxable" checked onchange="recalcPO()" style="margin:0;width:auto"/> Taxable
@@ -2792,8 +2792,8 @@ async function openPOModal(prId, quotationId=null, opts={}) {
             <tr><td>CGST % &nbsp; <span id="poCgstPctLabel">${cgstPct}</span>.00 :</td><td id="poCgst">${currSymbol} ${cgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr><td>SGST % &nbsp; <span id="poSgstPctLabel">${sgstPct}</span>.00 :</td><td id="poSgst">${currSymbol} ${sgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr><td>Round Off :</td><td id="poRoundOff">0.00</td></tr>
-            <tr class="net-row"><td>Net Payable (INR) :</td><td id="poNet">${currSymbol} ${netPayable.toLocaleString('en-IN',{minimumFractionDigits:0})}</td></tr>
-            <tr class="words-row"><td colspan="2"><strong>Amount in words :</strong><br/><span id="poWords">${numToWords(netPayable)}</span></td></tr>
+            <tr class="net-row"><td>Net Payable (${currency}) :</td><td id="poNet">${currSymbol} ${netPayable.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
+            <tr class="words-row"><td colspan="2"><strong>Amount in words :</strong><br/><span id="poWords">${numToWords(netPayable, currency)}</span></td></tr>
           </table>
 
           <!-- Signature -->
@@ -2820,7 +2820,7 @@ async function openPOModal(prId, quotationId=null, opts={}) {
 
   // Store base amount and currency symbol for recalc
   window._poBaseAmt = baseAmt;
-  window._poCurrSymbol = currSymbol;
+  window._poCurrSymbol = currSymbol; window._poCurrency = currency;
   window._poCgstPct = cgstPct;
   window._poSgstPct = sgstPct;
 
@@ -2856,7 +2856,7 @@ function recalcPO() {
   const cgstAmt = Math.round(taxableValue * cgst / 100 * 100) / 100;
   const sgstAmt = Math.round(taxableValue * sgst / 100 * 100) / 100;
   const subtotal = taxableValue + cgstAmt + sgstAmt + other + (pnfTaxable ? 0 : pnf);
-  const net = Math.round(subtotal);
+  const net = Math.round(subtotal * 100) / 100;
   const roundOff = 0;
 
   const s = (el, val) => { const e = document.getElementById(el); if(e) e.textContent = val; };
@@ -2869,8 +2869,8 @@ function recalcPO() {
   s('poCgst',  `${sym} ${f(cgstAmt)}`);
   s('poSgst',  `${sym} ${f(sgstAmt)}`);
   s('poRoundOff', roundOff.toFixed(2));
-  s('poNet',   `${sym} ${net.toLocaleString('en-IN',{minimumFractionDigits:0})}`);
-  s('poWords', numToWords(net));
+  s('poNet',   `${sym} ${net.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}`);
+  s('poWords', numToWords(net, window._poCurrency || 'INR'));
   s('poGstBadge', pnfTaxable ? 'GST on Basic + P&F' : 'GST on Basic only');
   // Sync the table P&F input with the strip
   const tableInput = document.getElementById('pnfTableInput');
@@ -3138,7 +3138,7 @@ async function confirmGeneratePO() {
   const afterDiscount = base - discAmt;
   const taxableValue = pnfTaxable ? (afterDiscount + pnf) : afterDiscount;
   const cgstAmt = Math.round(taxableValue*cgstPct/100*100)/100, sgstAmt = Math.round(taxableValue*sgstPct/100*100)/100;
-  const netPayable = Math.round(taxableValue + cgstAmt + sgstAmt + other + (pnfTaxable ? 0 : pnf));
+  const netPayable = Math.round((taxableValue + cgstAmt + sgstAmt + other + (pnfTaxable ? 0 : pnf)) * 100) / 100;
 
   const{data:quotations}=await db.from('pr_quotations').select('*').eq('pr_id',currentPR.id);
   const selectedQ = poTargetQuotationId
@@ -3250,7 +3250,7 @@ async function confirmGeneratePO() {
   }
 
   // Step 5: Comment on PR thread
-  const amt = netPayable.toLocaleString('en-IN');
+  const amt = netPayable.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
   const commentText = revising
     ? (editedNumber
         ? ` Purchase Order renumbered ${revising.po_number} → ${poNumber} (Rev.${nextRev}). Reason: ${reason}. Net Payable: ${amt}` + (pdfUrl ? `  [View PO PDF](${pdfUrl})` : '')
@@ -3281,7 +3281,7 @@ async function openPOHistory(poId) {
   const rows = [{ rev: po.revision_no || 0, cur: true, snap: po, pdf: po.pdf_url }].concat((arch.data || []).map(r => ({ rev: r.revision_no, cur: false, snap: r.snapshot || {}, pdf: r.pdf_url || r.snapshot?.pdf_url })));
   const names = {};
   for (const r of rows) { const u = r.snap.revised_by; if (u && !(u in names)) names[u] = await getUserName(u); }
-  const money = (s) => `${s.currency || 'INR'} ${Number(s.total_amount || 0).toLocaleString('en-IN')}`;
+  const money = (s) => `${s.currency || 'INR'} ${Number(s.total_amount || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   document.getElementById('poHistorySub').textContent = po.po_number;
   document.getElementById('poHistoryBody').innerHTML = rows.map((r, i) => {
     const prev = rows[i + 1];
@@ -3817,7 +3817,7 @@ function buildAdvanceRejectedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, 
                <div style="font-size:0.78rem;font-weight:700;color:#16a34a"> PO Already Generated</div>
                <div style="font-family:var(--font-mono);font-size:0.82rem;font-weight:700">${existingPO.po_number}</div>
              </div>
-             <div style="text-align:right;font-size:0.72rem;color:var(--gray-3)">${existingPO.currency || 'INR'} ${Number(existingPO.total_amount || 0).toLocaleString()}</div>
+             <div style="text-align:right;font-size:0.72rem;color:var(--gray-3)">${existingPO.currency || 'INR'} ${Number(existingPO.total_amount || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
            </div>`
         : `<div style="font-size:0.78rem;color:#b45309;font-weight:600"> No PO found — generate before placing order</div>
            <div style="margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="openPOModal('${id}')"> Generate PO</button></div>`
@@ -3860,7 +3860,7 @@ function buildAdvanceApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, 
                <div style="font-size:0.78rem;font-weight:700;color:#16a34a"> Purchase Order Already Generated</div>
                <div style="font-family:var(--font-mono);font-size:0.82rem;font-weight:700">${existingPO.po_number}</div>
              </div>
-             <div style="text-align:right;font-size:0.72rem;color:var(--gray-3)">${existingPO.currency || 'INR'} ${Number(existingPO.total_amount || 0).toLocaleString()}<br/>${fmtDate(existingPO.po_date || existingPO.created_at)}</div>
+             <div style="text-align:right;font-size:0.72rem;color:var(--gray-3)">${existingPO.currency || 'INR'} ${Number(existingPO.total_amount || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}<br/>${fmtDate(existingPO.po_date || existingPO.created_at)}</div>
            </div>`
         : `<div style="font-size:0.78rem;color:#b45309;font-weight:600"> No PO found — generate PO before placing order</div>
            <div style="margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="openPOModal('${id}')"> Generate PO Now</button></div>`
@@ -3952,7 +3952,7 @@ function buildApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, existin
         ${hasPO ? `<div style="font-family:var(--font-mono);font-size:0.78rem;font-weight:700;color:#16a34a">${existingPO.po_number}</div>` : ''}
       </div>
       ${hasPO
-        ? `<div style="font-size:0.72rem;color:var(--gray-3)">Generated ${fmtDate(existingPO.po_date || existingPO.created_at)} &middot; ${existingPO.currency || 'AED'} ${Number(existingPO.total_amount || 0).toLocaleString()}</div>`
+        ? `<div style="font-size:0.72rem;color:var(--gray-3)">Generated ${fmtDate(existingPO.po_date || existingPO.created_at)} &middot; ${existingPO.currency || 'AED'} ${Number(existingPO.total_amount || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>`
         : `<p style="font-size:0.78rem;color:var(--gray-3);margin-bottom:10px">Generate and save the PO before confirming the order.</p>
            <button class="btn btn-secondary" onclick="openPOModal('${id}')" ${piBlocked?'disabled title="Clear the final commercial review first"':''}>&#x1F4C4; Preview &amp; Generate PO</button>${piBlocked?'<div style="font-size:0.72rem;color:#b45309;margin-top:6px">Clear Step 0 (final commercial review) to enable PO generation.</div>':''}`
       }
@@ -4466,11 +4466,11 @@ function cpoRecalc() {
   const taxable = pnfTaxable ? (afterDisc + pnf) : afterDisc;
   const cgstAmt = Math.round(taxable * cgst / 100 * 100) / 100;
   const sgstAmt = Math.round(taxable * sgst / 100 * 100) / 100;
-  const net = Math.round(taxable + cgstAmt + sgstAmt + (pnfTaxable ? 0 : pnf));
+  const net = Math.round((taxable + cgstAmt + sgstAmt + (pnfTaxable ? 0 : pnf)) * 100) / 100;
   const basicEl = document.getElementById('cpoBasicTotal');
   const netEl   = document.getElementById('cpoNetTotal');
   if (basicEl) basicEl.textContent = basicTotal.toLocaleString('en-IN',{minimumFractionDigits:2});
-  if (netEl)   netEl.textContent   = net.toLocaleString('en-IN');
+  if (netEl)   netEl.textContent   = net.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
 function cpoReset() {
@@ -4534,7 +4534,7 @@ function cpoPreviewPO() {
   const taxable   = pnfTaxable ? (afterDisc + pnfVal) : afterDisc;
   const cgstAmt   = Math.round(taxable * cgstPct / 100 * 100) / 100;
   const sgstAmt   = Math.round(taxable * sgstPct / 100 * 100) / 100;
-  const netPayable = Math.round(taxable + cgstAmt + sgstAmt + (pnfTaxable ? 0 : pnfVal));
+  const netPayable = Math.round((taxable + cgstAmt + sgstAmt + (pnfTaxable ? 0 : pnfVal)) * 100) / 100;
   const sym = '₹';
 
   const savedLogo = localStorage.getItem('po_logo');
@@ -4575,7 +4575,7 @@ function cpoPreviewPO() {
     <div style="margin-bottom:12px;padding:9px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:6px;font-size:0.78rem;display:flex;align-items:center;flex-wrap:wrap;gap:12px">
       <span> Review and edit fields directly in the PO below. Adjust tax rates here:</span>
       <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
-        <label style="font-size:0.74rem;white-space:nowrap">P&amp;F (₹)</label>
+        <label style="font-size:0.74rem;white-space:nowrap">P&amp;F (${sym})</label>
         <input id="pnfInput" type="number" value="${pnfVal}" min="0" class="po-tax-input" style="width:80px" onchange="recalcPO()"/>
         <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;white-space:nowrap;cursor:pointer" title="Uncheck when the vendor bills this freight/P&F separately at a flat rate, not part of the taxable invoice — GST will then apply on the Basic amount only, and this charge is added after tax so the PO total matches the vendor's invoice">
           <input type="checkbox" id="pnfTaxable" ${pnfTaxable ? 'checked' : ''} onchange="recalcPO()" style="margin:0;width:auto"/> Taxable
@@ -4617,10 +4617,10 @@ function cpoPreviewPO() {
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">PO Number :</td><td><input class="po-meta-input" id="poPreviewNum" value="${_escHtml(poNumber)}" style="font-weight:700;font-size:0.82rem"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">PO Date :</td><td><input class="po-meta-input" id="poDate" value="${todayStr}"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Date :</td><td><input class="po-meta-input" id="poDelivery" value="—"/></td></tr>
-            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Payment Terms :</td><td>${_escHtml(ptLabel)}</td></tr>
-            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Terms :</td><td>NA</td></tr>
-            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Mode of Transport :</td><td>NA</td></tr>
-            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Final Destination :</td><td>On2Cook</td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Payment Terms :</td><td><input class="po-meta-input" id="poPaymentTerms" value="${_escHtml(ptLabel)}"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Delivery Terms :</td><td><input class="po-meta-input" id="poDeliveryTerms" value="NA"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Mode of Transport :</td><td><input class="po-meta-input" id="poModeTransport" value="NA"/></td></tr>
+            <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Final Destination :</td><td><input class="po-meta-input" id="poFinalDest" value="On2Cook"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Quote Ref :</td><td><input class="po-meta-input" id="poQuoteRef" placeholder="—"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Indent Number :</td><td><input class="po-meta-input" id="poIndent" value="${_escHtml(indent)}"/></td></tr>
             <tr><td style="font-weight:600;white-space:nowrap;padding-right:6px;padding-bottom:2px">Project Code/Name :</td><td><input class="po-meta-input" id="poProjectCode" value="${_escHtml(projectName)}"/></td></tr>
@@ -4691,7 +4691,7 @@ function cpoPreviewPO() {
             <tr><td>Taxable Value :</td><td id="poTaxableValue">${sym} ${taxable.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr><td>CGST % &nbsp; <span id="poCgstPctLabel">${cgstPct}</span>.00 :</td><td id="poCgst">${sym} ${cgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr><td>SGST % &nbsp; <span id="poSgstPctLabel">${sgstPct}</span>.00 :</td><td id="poSgst">${sym} ${sgstAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
-            <tr class="net-row"><td>Net Payable (INR) :</td><td id="poNet">${sym} ${netPayable.toLocaleString('en-IN',{minimumFractionDigits:0})}</td></tr>
+            <tr class="net-row"><td>Net Payable (INR) :</td><td id="poNet">${sym} ${netPayable.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
             <tr class="words-row"><td colspan="2"><strong>Amount in words :</strong><br/><span id="poWords">${numToWords(netPayable)}</span></td></tr>
           </table>
           <div class="po-sig-section">
@@ -4715,7 +4715,7 @@ function cpoPreviewPO() {
 
   // Set base amounts for recalc
   window._poBaseAmt = baseAmt;
-  window._poCurrSymbol = sym;
+  window._poCurrSymbol = sym; window._poCurrency = 'INR';
   window._poCgstPct = cgstPct;
   window._poSgstPct = sgstPct;
 
