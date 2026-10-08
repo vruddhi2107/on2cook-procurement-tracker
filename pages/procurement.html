@@ -3888,10 +3888,19 @@ function buildAdvanceApprovedPhaseHTML(currentPR, id, selectedQ, vendorObj, pt, 
 function _freezePOInputs(container) {
       const inputs = [...container.querySelectorAll('input.po-meta-input')];
       const snapshots = inputs.map(inp => {
+        // Keep the input's own inline sizing (e.g. width:calc(100% - 55px)) so the value stays on the
+        // same line as its label, exactly like the editable layout - no forced width:100% line-wrap.
+        const cs = getComputedStyle(inp);
         const span = document.createElement('span');
         span.textContent = inp.value || inp.placeholder || '';
-        span.style.cssText = `display:inline-block;font-size:inherit;font-family:inherit;
-          color:inherit;width:100%;padding:0;background:transparent;`;
+        span.style.cssText = inp.style.cssText;
+        Object.assign(span.style, {
+          display: 'inline-block', verticalAlign: 'top', border: 'none', background: 'transparent',
+          padding: '0', fontFamily: 'inherit', fontSize: inp.style.fontSize || 'inherit',
+          fontWeight: cs.fontWeight, color: inp.style.color || 'inherit',
+          textAlign: cs.textAlign === 'start' ? '' : cs.textAlign,
+          whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 'inherit'
+        });
         inp.parentNode.replaceChild(span, inp);
         return { span, inp };
       });
