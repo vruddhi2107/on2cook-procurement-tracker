@@ -2929,7 +2929,8 @@ function _poPickBreaks(total, pageH, candidates, ranges) {
 
 async function _poBoxToPDF(box) {
   const SCALE = 2, PAGE_PX_W = 794;               // A4 width @96dpi
-  const MARGIN = 8, A4W = 210, A4H = 297;         // mm
+  const MARGIN = 6, A4W = 210, A4H = 297;         // mm
+  const MIN_FIT = 0.6;                            // shrink to fit ONE page down to 60%; beyond that paginate
   const imgWmm = A4W - MARGIN * 2, pageHmm = A4H - MARGIN * 2;
   let candidates = [], ranges = [];
 
@@ -2964,6 +2965,16 @@ async function _poBoxToPDF(box) {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pxPerMm = canvas.width / imgWmm;
   const pageHpx = Math.floor(pageHmm * pxPerMm);
+  // Prefer a single page: if it only overflows a bit, scale the whole PO down to fit.
+  const contentHmm = canvas.height / pxPerMm;
+  if (contentHmm > pageHmm) {
+    const f = Math.min(1, pageHmm / contentHmm);
+    if (f >= MIN_FIT) {
+      const w = imgWmm * f, h = contentHmm * f;
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', (A4W - w) / 2, MARGIN, w, h);
+      return pdf;
+    }
+  }
   const breaks = _poPickBreaks(canvas.height, pageHpx, candidates, ranges);
   const edges = [0, ...breaks, canvas.height];
 
