@@ -230,9 +230,40 @@ window._loadQuoteAmountRouting = _loadQuoteAmountRouting;
 function _invalidateQuoteAmountRoutingCache() { _quoteAmountRoutingCache = null; }
 window._invalidateQuoteAmountRoutingCache = _invalidateQuoteAmountRoutingCache;
 
+// ── ANTUNES LOCK ─────────────────────────────────────────────
+// A project flagged is_antunes sends EVERYTHING (clearance, quote approval,
+// director approval, Local Purchase) to one owner (Arpit), regardless
+// of requester, per-user overrides or department routing. Mirrors the DB
+// trigger enforce_antunes_routing (antunes_routing_fix.sql), which is the
+// actual guarantee; this keeps the client's phase/notification logic in sync.
+// Owner (Arpit): admin_configs 'antunes_owner' {user_id}, set by the SQL.
+let _antunesOwnerCache = undefined;
+async function _loadAntunesOwner() {
+  if (_antunesOwnerCache !== undefined) return _antunesOwnerCache;
+  let owner = null;
+  try {
+    const { data: cfg } = await db.from('admin_configs').select('config_data').eq('config_type', 'antunes_owner').maybeSingle();
+    owner = (cfg && cfg.config_data && cfg.config_data.user_id) || null;
+  } catch (e) { console.warn('_loadAntunesOwner failed:', e.message); }
+  _antunesOwnerCache = owner;
+  return owner;
+}
+async function resolveAntunesOwnerForProject(projectId) {
+  if (!projectId) return null;
+  try {
+    const { data } = await db.from('projects').select('is_antunes').eq('id', projectId).maybeSingle();
+    if (!data || !data.is_antunes) return null;
+    return await _loadAntunesOwner();
+  } catch (e) { console.warn('resolveAntunesOwnerForProject failed:', e.message); return null; }
+}
+window.resolveAntunesOwnerForProject = resolveAntunesOwnerForProject;
+
 async function resolveRoutedApprover(projectId, requestFor, discipline, approvalType) {
   if (!discipline || !requestFor) return null;
   approvalType = (approvalType === 'quote' || approvalType === 'director') ? approvalType : 'clearance';
+  // Antunes projects: always the Antunes owner, for every approval type.
+  const _antunes = await resolveAntunesOwnerForProject(projectId);
+  if (_antunes) return _antunes;
   try {
     let proj = null;
     if (projectId) {
@@ -322,6 +353,9 @@ window.needsManualReassignment = needsManualReassignment;
 async function resolveApproverForSubmission(requesterUser, projectId, requestFor, discipline, approvalType) {
   approvalType = approvalType === 'quote' ? 'quote' : 'clearance';
 
+  const _antunes = await resolveAntunesOwnerForProject(projectId);
+  if (_antunes) return { approverId: _antunes, needsReassignment: false };
+
   let liveUser = requesterUser;
   try {
     const { data, error } = await db.from('users')
@@ -397,8 +431,10 @@ window.getUserName = getUserName;
 // refetched, same split as resolveApproverForSubmission). Returns the
 // override user id, or null if no override is in effect for this requester
 // + request_for combination.
-async function resolveLPFixedOverride(requesterUser, requestFor) {
+async function resolveLPFixedOverride(requesterUser, requestFor, projectId) {
   try {
+    const _antunes = await resolveAntunesOwnerForProject(projectId);
+    if (_antunes) return _antunes;
     const { data, error } = await db.from('users')
       .select('id, override_approver_id, override_approver_npd_id, override_approver_production_id')
       .eq('id', requesterUser.id).maybeSingle();
