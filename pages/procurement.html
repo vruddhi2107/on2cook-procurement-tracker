@@ -339,7 +339,7 @@
     <div class="card" style="max-width:820px;margin:0 auto">
       <div style="font-size:0.95rem;font-weight:700;color:var(--primary);margin-bottom:18px;display:flex;align-items:center;gap:8px">
          Create Custom Purchase Order
-        <span style="font-size:0.72rem;font-weight:400;color:var(--gray-3);margin-left:4px">Fill in details below — the PO is for preview &amp; download only, not saved</span>
+        <span style="font-size:0.72rem;font-weight:400;color:var(--gray-3);margin-left:4px">Fill in details below — the PO is saved to the system (PO Master) when you click Generate &amp; Save PO in the preview</span>
       </div>
 
       <!-- Section: PO Meta -->
@@ -475,7 +475,28 @@
 
       <div style="display:flex;justify-content:flex-end;gap:10px">
         <button class="btn btn-ghost" onclick="cpoReset()"> Reset</button>
-        <button class="btn btn-primary" onclick="cpoPreviewPO()"> Preview &amp; Download PO</button>
+        <button class="btn btn-primary" onclick="cpoPreviewPO()"> Generate &amp; Save PO</button>
+      </div>
+    </div>
+
+    <!-- Saved custom POs -->
+    <div class="card" style="max-width:820px;margin:18px auto 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:0.95rem;font-weight:700;color:var(--primary)">Saved Custom POs</div>
+        <button class="btn btn-ghost btn-sm" onclick="cpoLoadSaved()">Refresh</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:0.78rem">
+          <thead><tr style="text-align:left;color:var(--gray-3)">
+            <th style="padding:6px 8px;border-bottom:1px solid var(--border)">PO No.</th>
+            <th style="padding:6px 8px;border-bottom:1px solid var(--border)">Date</th>
+            <th style="padding:6px 8px;border-bottom:1px solid var(--border)">Vendor</th>
+            <th style="padding:6px 8px;border-bottom:1px solid var(--border)">Project</th>
+            <th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:right">Net Payable</th>
+            <th style="padding:6px 8px;border-bottom:1px solid var(--border)">PDF</th>
+          </tr></thead>
+          <tbody id="cpoSavedBody"><tr><td colspan="6" style="padding:12px;color:var(--gray-3)">Loading…</td></tr></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -2560,7 +2581,7 @@ async function openPOModal(prId, quotationId=null, opts={}) {
       if (!gate.cleared) { showToast('Clear the final commercial review (PI) before generating the PO.', 'error'); return; }
     }
   }
-  window._poRevising = revisePO; window._poPI = null;
+  window._poRevising = revisePO; window._poPI = null; window._poCustom = false;
   if (!revisePO && flags.pi_review_enabled) {
     const gate = await piGateFor(prId, selectedQ?.id || null, flags);
     window._poPI = gate.row || null;
@@ -3124,6 +3145,7 @@ function removePRAttach(i) { paymentRequestFiles.splice(i,1); renderPRAttachList
 const PO_NUMBER_RE = /^[A-Za-z0-9/_.\-]{3,40}$/;
 
 async function confirmGeneratePO() {
+  if (window._poCustom) return cpoSavePO();   // Create PO tab: not tied to a PR
   const revising = window._poRevising || null;
   let reason = '', editedNumber = null;
   if (revising) {
@@ -4356,7 +4378,26 @@ function escHtml(str) {
 // ── CREATE PO TAB ─────────────────────────────────────────────
 let _cpoRows = [];
 
-function cpoInitTab() {
+async function cpoLoadSaved() {
+  const body = document.getElementById('cpoSavedBody'); if (!body) return;
+  const { data, error } = await db.from('purchase_orders')
+    .select('id,po_number,po_date,custom_vendor_name,custom_project,total_amount,currency,pdf_url,vendor_id')
+    .eq('is_custom', true).order('created_at', { ascending: false }).limit(200);
+  if (error) { body.innerHTML = `<tr><td colspan="6" style="padding:12px;color:#ef4444">Could not load saved POs: ${_escHtml(error.message)}${/is_custom/.test(error.message) ? ' - run migrations/2026_10_custom_po.sql' : ''}</td></tr>`; return; }
+  if (!data.length) { body.innerHTML = '<tr><td colspan="6" style="padding:12px;color:var(--gray-3)">No custom POs saved yet.</td></tr>'; return; }
+  const td = 'padding:6px 8px;border-bottom:1px solid var(--border)';
+  body.innerHTML = data.map(r => `<tr>
+    <td style="${td};font-family:monospace;font-weight:600">${_escHtml(r.po_number || '')}</td>
+    <td style="${td}">${r.po_date ? new Date(r.po_date).toLocaleDateString('en-GB') : ''}</td>
+    <td style="${td}">${_escHtml(r.custom_vendor_name || '')}</td>
+    <td style="${td}">${_escHtml(r.custom_project || '')}</td>
+    <td style="${td};text-align:right">${_escHtml(r.currency || 'INR')} ${Number(r.total_amount || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+    <td style="${td}">${r.pdf_url ? `<a href="${_escHtml(r.pdf_url)}" target="_blank" rel="noopener">Open PDF</a>` : '—'}</td>
+  </tr>`).join('');
+}
+
+async function cpoInitTab() {
+  cpoLoadSaved();
   // Populate vendor dropdown from allVendors
   const sel = document.getElementById('cpoVendorPick');
   if (!sel) return;
@@ -4368,15 +4409,6 @@ function cpoInitTab() {
     opt.textContent = v.name || '—';
     sel.appendChild(opt);
   });
-  // Auto-generate PO number if empty
-  const poNumEl = document.getElementById('cpoPONum');
-  if (poNumEl && !poNumEl.value) {
-    const now = new Date();
-    const fy = now.getMonth()>=3 ? now.getFullYear() : now.getFullYear()-1;
-    const fyShort = `${String(fy).slice(2)}-${String(fy+1).slice(2)}`;
-    poNumEl.value = `O2C/PO/${fyShort}/`;
-    poNumEl.focus(); poNumEl.setSelectionRange(poNumEl.value.length, poNumEl.value.length);
-  }
   // Init rows if empty
   if (_cpoRows.length === 0) {
     _cpoRows = [];
@@ -4384,6 +4416,21 @@ function cpoInitTab() {
   }
   cpoRenderRows();
   cpoRecalc();
+  // Suggest the next number from the same independent PO sequence the PR-based POs use.
+  // Leave it as suggested and the DB assigns the real number on save; type another to override.
+  const poNumEl = document.getElementById('cpoPONum');
+  if (poNumEl && !poNumEl.value) {
+    window._cpoPeek = null;
+    try {
+      const pk = await db.rpc('peek_next_po_number');
+      if (!pk.error && pk.data) { window._cpoPeek = pk.data; if (!poNumEl.value) poNumEl.value = pk.data; }
+    } catch (e) { console.warn('peek_next_po_number failed', e); }
+    if (!window._cpoPeek && !poNumEl.value) {
+      const now = new Date();
+      const fy = now.getMonth()>=3 ? now.getFullYear() : now.getFullYear()-1;
+      poNumEl.value = `O2C/PO/${String(fy).slice(2)}-${String(fy+1).slice(2)}/`;
+    }
+  }
 }
 
 function cpoFillVendor(vendorId) {
@@ -4508,6 +4555,7 @@ function cpoReset() {
   const pnfTaxableEl=document.getElementById('cpoPnFTaxable'); if(pnfTaxableEl) pnfTaxableEl.checked=true;
   document.getElementById('cpoDiscount').value='0';
   _cpoRows=[]; cpoAddRow();
+  cpoInitTab();
 }
 
 function cpoPreviewPO() {
@@ -4522,7 +4570,7 @@ function cpoPreviewPO() {
   const fyShort = `${String(fy).slice(2)}-${String(fy+1).slice(2)}`;
   const todayStr = now.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'/');
 
-  const poNumber = document.getElementById('cpoPONum')?.value?.trim() || `O2C/PO/${fyShort}/DRAFT`;
+  const poNumber = document.getElementById('cpoPONum')?.value?.trim() || window._cpoPeek || `O2C/PO/${fyShort}/DRAFT`;
   const projectName = document.getElementById('cpoProject')?.value?.trim() || '—';
   const indent = document.getElementById('cpoIndent')?.value?.trim() || 'NA';
 
@@ -4556,6 +4604,11 @@ function cpoPreviewPO() {
   const sgstAmt   = Math.round(taxable * sgstPct / 100 * 100) / 100;
   const netPayable = Math.round((taxable + cgstAmt + sgstAmt + (pnfTaxable ? 0 : pnfVal)) * 100) / 100;
   const sym = '₹';
+
+  // Everything the save step needs that isn't an input on the paper itself.
+  window._cpoMeta = { vendorId: document.getElementById('cpoVendorPick')?.value || null,
+    vName, vAddress, vContact, vPhone, vEmail, vGSTIN, project: projectName === '—' ? '' : projectName, indent };
+  window._poCustom = true;
 
   const savedLogo = localStorage.getItem('po_logo');
   const savedSig  = localStorage.getItem('po_sig');
@@ -4705,7 +4758,7 @@ function cpoPreviewPO() {
         <div>
           <table class="po-amount-table">
             <tr><td>Basic Amount :</td><td id="poBasicAmt">${sym} ${baseAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
-            <tr><td>Discount (%) :</td><td id="poDiscount">${discPct.toFixed(2)}</td></tr>
+            <tr><td>Discount (%) :</td><td><input class="po-meta-input" id="poDiscountPct" type="number" min="0" max="100" step="any" value="${discPct}" style="width:60px;text-align:right" oninput="recalcPO()"/></td></tr>
             <tr><td>Amount after Discount :</td><td id="poAfterDiscount">${sym} ${afterDisc.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
             <tr><td>P&amp;F Charge :</td><td id="poPnf">${sym} ${pnfVal.toFixed(2)}</td></tr>
             <tr><td>Taxable Value :</td><td id="poTaxableValue">${sym} ${taxable.toLocaleString('en-IN',{minimumFractionDigits:2})}</td></tr>
@@ -4739,9 +4792,9 @@ function cpoPreviewPO() {
   window._poCgstPct = cgstPct;
   window._poSgstPct = sgstPct;
 
-  // Hide the "Generate & Save PO" button since this is download-only
+  const _ttl = document.querySelector('#poModal .modal-title'); if (_ttl) _ttl.textContent = 'Generate Purchase Order';
   const footerPrimary = document.querySelector('#poModal .modal-footer .btn-primary');
-  if (footerPrimary) { footerPrimary.style.display = 'none'; footerPrimary.dataset.cpoHidden = '1'; }
+  if (footerPrimary) { footerPrimary.style.display = ''; footerPrimary.textContent = 'Generate & Save PO'; }
 
   openModal('poModal');
 }
@@ -4753,6 +4806,7 @@ window.closeModal = function(id) {
     const btn = document.querySelector('#poModal .modal-footer .btn-primary');
     if (btn && btn.dataset.cpoHidden) { btn.style.display = ''; delete btn.dataset.cpoHidden; }
     window._poRevising = null;
+    window._poCustom = false; window._cpoMeta = null;
     const t = document.querySelector('#poModal .modal-title'); if (t) t.textContent = 'Generate Purchase Order';
     if (btn) btn.textContent = 'Generate & Save PO';
   }
@@ -4778,6 +4832,76 @@ function cpoRecalcPORow(idx, qty) {
   const basicEl = document.getElementById('poBasicAmt');
   if (basicEl) basicEl.textContent = `${sym} ${newBase.toLocaleString('en-IN',{minimumFractionDigits:2})}`;
   recalcPO();
+}
+
+// Save a Create-PO-tab order to purchase_orders (no PR attached), generate the PDF and store it.
+async function cpoSavePO() {
+  const m = window._cpoMeta;
+  if (!m) { showToast('Nothing to save - re-open the preview', 'error'); return; }
+  const typed = document.getElementById('poPreviewNum')?.value.trim() || '';
+  let requested = null;                       // null -> DB assigns the next number from the PO sequence
+  if (typed && typed !== window._cpoPeek) {
+    if (!PO_NUMBER_RE.test(typed) || typed.endsWith('/')) { showToast('Enter a complete PO number (letters, numbers, / _ . -) or leave the suggested one', 'error'); return; }
+    requested = typed;
+  }
+  showLoader(true);
+  const num = id => parseFloat(document.getElementById(id)?.value || 0) || 0;
+  const cgstPct = num('cgstInput'), sgstPct = num('sgstInput'), pnf = num('pnfInput'), discPct = num('poDiscountPct');
+  const pnfTaxable = document.getElementById('pnfTaxable') ? !!document.getElementById('pnfTaxable').checked : true;
+  const rows = _cpoRows.filter(r => (r.desc || '').trim());
+  const lineItems = rows.map((r, i) => ({
+    sr: i + 1, desc: r.desc, spec: r.spec || '', qty: parseFloat(r.qty) || 0, uom: r.unit || 'Nos',
+    unit_rate: parseFloat(document.getElementById(`cpo-po-unitrate-${i}`)?.value) || 0
+  }));
+  const base = Math.round(lineItems.reduce((s, l) => s + l.unit_rate * l.qty, 0) * 100) / 100;
+  const discAmt = Math.round(base * discPct / 100 * 100) / 100;
+  const afterDisc = base - discAmt;
+  const taxable = pnfTaxable ? afterDisc + pnf : afterDisc;
+  const cgstAmt = Math.round(taxable * cgstPct / 100 * 100) / 100, sgstAmt = Math.round(taxable * sgstPct / 100 * 100) / 100;
+  const net = Math.round((taxable + cgstAmt + sgstAmt + (pnfTaxable ? 0 : pnf)) * 100) / 100;
+
+  // Same payment-terms snapshot rule as PR-based POs, when a master vendor was picked
+  const vendor = m.vendorId ? allVendors.find(v => v.id === m.vendorId) : null;
+  const snap = collectPOSnapshot(); snap.custom = m;
+  const { data, error } = await db.from('purchase_orders').insert({
+    pr_id: null, po_number: requested, po_date: new Date().toISOString(), generated_by: currentUser.id,
+    vendor_id: vendor?.id || null, quotation_id: null,
+    vendor_payment_terms: vendor?.payment_terms || null, is_full_advance: vendor?.payment_terms === 'full_advance',
+    is_custom: true, custom_vendor_name: m.vName, custom_project: m.project || null,
+    total_amount: net, currency: 'INR', basic_amount: base, discount_pct: discPct, freight_amount: pnf, other_charges: 0,
+    tax_amount: cgstAmt + sgstAmt, payment_terms_text: document.getElementById('poPaymentTerms')?.value || null,
+    expected_delivery: _parseDMY(document.getElementById('poDelivery')?.value),
+    line_items: lineItems, po_snapshot: snap
+  }).select('id,po_number').single();
+  if (error) {
+    showLoader(false);
+    const msg = error.code === '23505' ? `PO number ${requested} is already used by another PO`
+      : /column|null value|violates not-null/i.test(error.message) ? 'Database is not ready for custom POs - run migrations/2026_10_custom_po.sql first. (' + error.message + ')'
+      : 'Error saving PO: ' + error.message;
+    showToast(msg, 'error'); return;
+  }
+  const poNumber = data.po_number;
+  const numEl = document.getElementById('poPreviewNum'); if (numEl) numEl.value = poNumber;   // PDF shows the real number
+
+  let pdfUrl = null;
+  try {
+    const previewEl = document.getElementById('poPreviewBox');
+    const frozen = _freezePOInputs(previewEl);
+    let pdf; try { pdf = await _poBoxToPDF(previewEl); } finally { _restorePOInputs(frozen); }
+    const path = `po/custom/${data.id}/${poNumber.replace(/\//g, '-')}_${Date.now()}.pdf`;
+    const up = await db.storage.from('attachments').upload(path, pdf.output('blob'), { contentType: 'application/pdf' });
+    if (up.error) throw up.error;
+    pdfUrl = db.storage.from('attachments').getPublicUrl(path).data?.publicUrl || null;
+    if (pdfUrl) await db.from('purchase_orders').update({ pdf_url: pdfUrl }).eq('id', data.id);
+  } catch (e) {
+    console.warn('Custom PO PDF failed:', e);
+    showToast('PO saved - PDF could not be stored: ' + (e.message || e), 'error');
+  }
+  showLoader(false);
+  showToast(`PO ${poNumber} saved${pdfUrl ? ' with PDF' : ''}`, 'success');
+  closeModal('poModal');
+  cpoReset();
+  cpoLoadSaved();
 }
 
 init();
